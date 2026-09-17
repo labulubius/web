@@ -1,49 +1,53 @@
-import { ArrowRight, Compass, Info, Layers3, Terminal } from "lucide-react";
+import { ArrowRight, Compass, ExternalLink, Folder, Info, Star } from "lucide-react";
 import Link from "next/link";
 import { SiteShell } from "./site-shell";
 
 export default function Home() {
   return (
-    <SiteShell active="/">
-      <main className="site-main home-main">
-        <section className="home-hero">
-          <div className="site-eyebrow"><span className="live-dot" /> PERSONAL WORKSPACE · ONLINE</div>
-          <h1>A quieter corner<br />of <em>the web.</em></h1>
-          <p>
-            欢迎来到 Labulubius。这里收集值得反复访问的网站、正在进行的想法，
-            以及关于技术与互联网的零散记录。
-          </p>
-          <div className="hero-actions">
-            <Link className="primary-action" href="/nav">打开网页导航 <ArrowRight size={16} /></Link>
-            <Link className="secondary-action" href="/about">关于这里</Link>
-          </div>
-        </section>
+    <SiteShell active="/" title="Home">
+      <div className="welcome-layout">
+        <aside className="places-sidebar">
+          <h2>Places</h2>
+          <nav>
+            <Link className="selected" href="/"><Folder size={16} /> Home</Link>
+            <Link href="/nav"><Compass size={16} /> Web Navigator</Link>
+            <Link href="/about"><Info size={16} /> About</Link>
+          </nav>
+          <h2>Recently Used</h2>
+          <nav><Link href="/nav"><Star size={16} /> Curated links</Link></nav>
+        </aside>
 
-        <section className="workspace-window" aria-label="Quick access">
-          <div className="workspace-titlebar">
-            <span><Layers3 size={15} /> Workspace</span>
-            <div className="workspace-controls" aria-hidden="true"><i /><i /><i /></div>
+        <section className="welcome-view">
+          <div className="view-heading">
+            <span className="breeze-logo"><span>K</span></span>
+            <div>
+              <p className="section-label">LABULUBIUS WORKSPACE</p>
+              <h1>Welcome.</h1>
+              <p>这里是一个用于整理网络资源、想法与开放技术的个人空间。</p>
+            </div>
           </div>
-          <div className="workspace-content">
-            <div className="workspace-intro">
-              <span className="workspace-icon"><Terminal size={23} /></span>
-              <div><small>WELCOME BACK</small><h2>Where would you like to go?</h2></div>
-            </div>
-            <div className="quick-grid">
-              <Link href="/nav" className="quick-card">
-                <span className="quick-card-icon blue"><Compass size={21} /></span>
-                <div><h3>Web Navigator</h3><p>精心整理的实用网站与开放资源。</p></div>
-                <ArrowRight size={16} />
-              </Link>
-              <Link href="/about" className="quick-card">
-                <span className="quick-card-icon violet"><Info size={21} /></span>
-                <div><h3>About</h3><p>了解这个网站及其设计理念。</p></div>
-                <ArrowRight size={16} />
-              </Link>
-            </div>
+
+          <div className="section-separator"><span>Get started</span></div>
+
+          <div className="action-list">
+            <Link href="/nav" className="action-row">
+              <span className="action-icon"><Compass size={24} /></span>
+              <span><strong>Open Web Navigator</strong><small>浏览精心整理的实用网站与开放资源</small></span>
+              <ArrowRight size={18} />
+            </Link>
+            <Link href="/about" className="action-row">
+              <span className="action-icon"><Info size={24} /></span>
+              <span><strong>About this workspace</strong><small>了解这个网站、设计选择及其用途</small></span>
+              <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          <div className="info-panel">
+            <div><strong>Clean and focused</strong><p>遵循 KDE Breeze 的信息层级与交互方式，减少不必要的装饰。</p></div>
+            <a href="https://kde.org/plasma-desktop/" target="_blank" rel="noreferrer">About KDE Plasma <ExternalLink size={13} /></a>
           </div>
         </section>
-      </main>
+      </div>
     </SiteShell>
   );
 }
