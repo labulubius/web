@@ -10,6 +10,7 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { sites, type Site } from "./sites";
 
@@ -39,7 +40,7 @@ export function NavDirectory() {
   const [category, setCategory] = useState("All");
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "system";
-    return (window.localStorage.getItem("nav-theme-mode") as ThemeMode | null) ?? "system";
+    return (window.localStorage.getItem("site-theme-mode") as ThemeMode | null) ?? "system";
   });
   const [systemTheme, setSystemTheme] = useState<Theme>("light");
   const theme = themeMode === "system" ? systemTheme : themeMode;
@@ -70,24 +71,25 @@ export function NavDirectory() {
   function cycleThemeMode() {
     const next: ThemeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
     setThemeMode(next);
-    window.localStorage.setItem("nav-theme-mode", next);
+    window.localStorage.setItem("site-theme-mode", next);
   }
 
   return (
     <div className="nav-shell" data-theme={theme} suppressHydrationWarning>
       <header className="nav-header">
-        <a className="brand" href="/nav" aria-label="Labulubius Nav home">
+        <Link className="brand" href="/nav" aria-label="Labulubius Nav home">
           <span className="brand-mark"><Compass size={20} strokeWidth={2.2} /></span>
           <span className="brand-copy">
             <strong>Labulubius</strong>
             <small>Web Navigator</small>
           </span>
-        </a>
+        </Link>
 
-        <div className="desktop-label" aria-hidden="true">
-          <span className="fedora-dot">f</span>
-          Fedora Plasma
-        </div>
+        <nav className="desktop-nav" aria-label="Main navigation">
+          <Link href="/">Home</Link>
+          <Link className="active" href="/nav">Navigator</Link>
+          <Link href="/about">About</Link>
+        </nav>
 
         <div className="header-actions">
           <span className="status-dot" aria-hidden="true" />

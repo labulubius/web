@@ -102,30 +102,10 @@
 .brand-copy strong { font-size: 13px; font-weight: 650; }
 .brand-copy small { color: var(--nav-faint); font-size: 9px; margin-top: 4px; }
 
-.desktop-label {
-  align-items: center;
-  color: var(--nav-muted);
-  display: flex;
-  font-size: 11px;
-  font-weight: 550;
-  gap: 7px;
-  letter-spacing: .02em;
-}
-
-.fedora-dot {
-  align-items: center;
-  background: #294172;
-  border-radius: 50%;
-  color: white;
-  display: inline-flex;
-  font-family: Georgia, serif;
-  font-size: 12px;
-  font-style: italic;
-  font-weight: 700;
-  height: 21px;
-  justify-content: center;
-  width: 21px;
-}
+.desktop-nav { align-items: center; display: flex; gap: 3px; }
+.desktop-nav a { border-radius: 7px; color: var(--nav-muted); font-size: 11px; padding: 8px 11px; text-decoration: none; transition: background 130ms ease, color 130ms ease; }
+.desktop-nav a:hover { background: var(--nav-accent-soft); color: var(--nav-text); }
+.desktop-nav a.active { background: var(--nav-accent); color: white; }
 
 .header-actions { align-items: center; display: flex; gap: 10px; justify-self: end; }
 .status-dot { background: #27ae60; border: 2px solid var(--nav-surface-solid); border-radius: 50%; height: 9px; width: 9px; }
@@ -225,7 +205,7 @@
 .nav-footer { color: var(--nav-faint); display: flex; font-family: var(--font-geist-mono), monospace; font-size: 8px; justify-content: space-between; letter-spacing: .04em; margin: 0 auto; max-width: 1240px; padding: 22px 32px 30px; text-transform: uppercase; }
 
 @media (max-width: 900px) {
-  .desktop-label { display: none; }
+  .desktop-nav { display: none; }
   .nav-header { grid-template-columns: 1fr auto; }
   .hero { padding: 100px 0 52px; }
   .directory-layout { grid-template-columns: 170px minmax(0, 1fr); }
