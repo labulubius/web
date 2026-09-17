@@ -37,23 +37,14 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   --positive: #27ae60;
   --frame: rgba(35, 38, 41, .24);
   --separator: rgba(35, 38, 41, .14);
-  background:
-    radial-gradient(ellipse at 73% 28%, rgba(101, 193, 230, .9) 0, rgba(101, 193, 230, 0) 34%),
-    radial-gradient(ellipse at 22% 77%, rgba(41, 128, 185, .55) 0, rgba(41, 128, 185, 0) 38%),
-    linear-gradient(145deg, #173f68 0%, #287eb1 38%, #72c8e6 68%, #c0ebf4 100%);
+  background: var(--window);
   color: var(--text);
   min-height: 100vh;
-  padding: 22px 22px 70px;
+  padding: 0;
   position: relative;
 }
 
-.plasma-desktop::before {
-  background: linear-gradient(128deg, transparent 0 47%, rgba(255,255,255,.12) 47.2% 48%, transparent 48.2%);
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: fixed;
-}
+.plasma-desktop::before { display: none; }
 
 .plasma-desktop[data-theme="dark"] {
   --window: #202326;
@@ -71,25 +62,23 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   --link: #1d99f3;
   --frame: rgba(252, 252, 252, .18);
   --separator: rgba(252, 252, 252, .12);
-  background:
-    radial-gradient(ellipse at 74% 27%, rgba(22, 105, 145, .7) 0, rgba(22, 105, 145, 0) 35%),
-    radial-gradient(ellipse at 20% 80%, rgba(16, 73, 109, .6) 0, rgba(16, 73, 109, 0) 40%),
-    linear-gradient(145deg, #071622 0%, #0d3149 42%, #145676 72%, #173d50 100%);
+  background: var(--window);
 }
 
 .breeze-window {
   background: var(--window);
-  border: 1px solid var(--frame);
-  border-radius: 7px;
-  box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 32px rgba(0,0,0,.3);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 94px);
-  margin: 0 auto;
-  max-width: 1220px;
-  min-height: 560px;
+  height: 100dvh;
+  margin: 0;
+  max-width: none;
+  min-height: 0;
   overflow: hidden;
   position: relative;
+  width: 100%;
 }
 
 .window-decoration {
@@ -221,12 +210,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .credits { align-items: center; color: var(--text-muted); display: flex; font-size: 10px; gap: 6px; margin-top: 23px; }
 
 @media (max-width: 760px) {
-  .plasma-desktop { padding: 0 0 55px; }
-  .plasma-desktop::before { display: none; }
-  .breeze-window { border: 0; border-radius: 0; box-shadow: none; height: calc(100vh - 55px); min-height: 0; }
-  .window-decoration { height: 36px; }
-  .window-buttons button:not(.close-button) { display: none; }
-  .window-buttons .close-button { width: 40px; }
+  .plasma-desktop { padding: 0; }
+  .breeze-window { height: 100dvh; }
   .menu-bar { display: none; }
   .tool-bar { min-height: 43px; }
   .tool-bar nav a { min-width: 43px; padding: 5px; }
