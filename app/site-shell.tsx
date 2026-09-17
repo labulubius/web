@@ -39,8 +39,7 @@ export function SiteShell({
     return () => media.removeEventListener("change", syncTheme);
   }, []);
 
-  function cycleThemeMode() {
-    const next: ThemeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
+  function selectThemeMode(next: ThemeMode) {
     setThemeMode(next);
     window.localStorage.setItem("site-theme-mode", next);
   }
@@ -60,9 +59,18 @@ export function SiteShell({
           </nav>
           <div className="toolbar-spacer" />
           {active === "/nav" && <span className="toolbar-context"><Search size={15} /> Directory</span>}
-          <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${themeMode}`} aria-label={`Color theme: ${themeMode}. Click to change.`}>
-            <ThemeIcon size={17} /><span>{themeMode === "system" ? "System theme" : `${themeMode} theme`}</span>
-          </button>
+          <label className="theme-control">
+            <ThemeIcon size={17} aria-hidden="true" />
+            <select
+              aria-label="Color theme"
+              onChange={(event) => selectThemeMode(event.target.value as ThemeMode)}
+              value={themeMode}
+            >
+              <option value="system">Follow system</option>
+              <option value="light">Breeze Light</option>
+              <option value="dark">Breeze Dark</option>
+            </select>
+          </label>
         </div>
 
         <div className="application-view">{children}</div>

@@ -39,6 +39,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   --separator: rgba(35, 38, 41, .14);
   background: var(--window);
   color: var(--text);
+  color-scheme: light;
   min-height: 100vh;
   padding: 0;
   position: relative;
@@ -63,6 +64,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   --frame: rgba(252, 252, 252, .18);
   --separator: rgba(252, 252, 252, .12);
   background: var(--window);
+  color-scheme: dark;
 }
 
 .breeze-window {
@@ -109,9 +111,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .tool-bar nav a svg { color: var(--link); }
 .toolbar-spacer { flex: 1; }
 .toolbar-context { align-items: center; color: var(--text-muted); display: flex; font-size: 11px; gap: 6px; margin-right: 10px; }
-.theme-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 7px; min-height: 30px; padding: 4px 9px; }
-.theme-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
-.theme-control:active { background: color-mix(in srgb, var(--accent) 33%, var(--button)); }
+.theme-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); display: flex; font-size: 11px; gap: 6px; min-height: 30px; padding: 3px 6px 3px 8px; }
+.theme-control:hover, .theme-control:focus-within { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
+.theme-control select { appearance: auto; background: transparent; border: 0; color: var(--text); cursor: pointer; font-size: 11px; outline: 0; padding: 1px 2px; }
+.theme-control option { background: var(--button); color: var(--text); }
 
 .application-view { background: var(--view); flex: 1; min-height: 0; overflow: auto; }
 .status-bar { align-items: center; background: var(--window); border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; font-size: 10px; height: 24px; justify-content: space-between; padding: 0 9px; }
@@ -215,8 +218,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .menu-bar { display: none; }
   .tool-bar { min-height: 43px; }
   .tool-bar nav a { min-width: 43px; padding: 5px; }
-  .tool-bar nav a span, .toolbar-context, .theme-control span { display: none; }
-  .theme-control { justify-content: center; padding: 4px; width: 34px; }
+  .tool-bar nav a span, .toolbar-context { display: none; }
+  .theme-control { padding-left: 7px; }
+  .theme-control select { max-width: 96px; }
   .status-bar { display: none; }
   .plasma-panel { border-bottom: 0; border-left: 0; border-radius: 0; border-right: 0; bottom: 0; height: 55px; left: 0; padding: 4px 10px; right: 0; }
   .launcher-button, .panel-separator, .panel-spacer, .system-tray, .panel-theme, .digital-clock, .show-desktop { display: none; }
