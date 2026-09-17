@@ -21,9 +21,9 @@ export default function AboutPage() {
 
         <div className="about-body">
           <section>
-            <h2>关于这个空间</h2>
-            <p>这是一个个人数字空间，用来整理有用的网络资源、记录想法，也用来尝试更舒适、更专注的网页体验。</p>
-            <p>界面依据 KDE Breeze 与 Breeze Dark 的官方色彩层级重新设计，强调清晰、稳定和一致，而不是过度装饰。</p>
+            <h2>About this space</h2>
+            <p>This is a personal digital space for organizing useful online resources, recording ideas, and exploring a more comfortable, focused web experience.</p>
+            <p>The interface uses the official KDE Breeze and Breeze Dark color systems, emphasizing clarity, stability, and consistency rather than excessive decoration.</p>
           </section>
 
           <section>

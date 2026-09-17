@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Labulubius Workspace
+
+A personal web workspace for useful links, ideas, and open technologies. The interface is inspired by KDE Plasma and uses the official Breeze and Breeze Dark color systems for a clean, consistent desktop-like experience.
+
+## Features
+
+- Responsive KDE Breeze-inspired interface
+- Light, dark, and system color themes
+- Curated website directory with search and category filters
+- Dedicated home, navigator, and about pages
+- Automatic routing for `nav.labulubius.com`
+- Accessible labels and semantic navigation
+
+## Pages
+
+| Route | Description |
+| --- | --- |
+| `/` | Workspace home page |
+| `/nav` | Searchable directory of curated websites |
+| `/about` | Project overview and design principles |
+
+Requests to `nav.labulubius.com` are rewritten to the corresponding `/nav` route by `proxy.ts`.
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org/) 16
+- [React](https://react.dev/) 19
+- [TypeScript](https://www.typescriptlang.org/)
+- [Tailwind CSS](https://tailwindcss.com/) 4
+- [Lucide React](https://lucide.dev/)
 
 ## Getting Started
 
-First, run the development server:
+### Requirements
+
+- Node.js 20.9 or newer
+- npm
+
+### Installation
+
+```bash
+git clone git@github.com:labulubius/web.git
+cd web
+npm install
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser. To test the navigator hostname locally, map `nav.localhost` to your local environment and open [http://nav.localhost:3000](http://nav.localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev    # Start the development server
+npm run build  # Create an optimized production build
+npm run start  # Start the production server
+npm run lint   # Run ESLint
+```
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```text
+app/
+├── about/             # About page
+├── nav/               # Website directory, data, and styles
+├── globals.css        # Global Breeze theme and layout styles
+├── layout.tsx         # Root layout and metadata
+├── page.tsx           # Home page
+└── site-shell.tsx     # Shared navigation, theme control, and status bar
+proxy.ts               # Host-based routing for the navigator subdomain
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Adding a Website
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Add an entry to `app/nav/sites.ts`:
 
-## Deploy on Vercel
+```ts
+{
+  name: "Example",
+  description: "A short description of the website.",
+  url: "https://example.com/",
+  category: "Category",
+  initials: "EX",
+  accent: "linear-gradient(135deg, #3daee9, #1d99f3)",
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The category list and item counts are generated automatically.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Production
+
+Build and start the application with:
+
+```bash
+npm run build
+npm run start
+```
+
+In production, place the Next.js server behind a reverse proxy and forward the original `Host` header so host-based navigator routing continues to work.
+
+## License
+
+No license has been specified for this repository.

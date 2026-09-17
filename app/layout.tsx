@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="zh-CN" className={`${notoSans.variable} ${notoMono.variable}`}>
+    <html lang="en" className={`${notoSans.variable} ${notoMono.variable}`}>
       <body>{children}</body>
     </html>
   );
