@@ -4,15 +4,17 @@ import {
   ArrowUpRight,
   Compass,
   LayoutGrid,
+  Monitor,
   Moon,
   Search,
   Sparkles,
   Sun,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sites, type Site } from "./sites";
 
 type Theme = "light" | "dark";
+type ThemeMode = Theme | "system";
 
 function SiteCard({ site }: { site: Site }) {
   return (
@@ -35,11 +37,21 @@ function SiteCard({ site }: { site: Site }) {
 export function NavDirectory() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
-    const saved = window.localStorage.getItem("nav-theme") as Theme | null;
-    return saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") return "system";
+    return (window.localStorage.getItem("nav-theme-mode") as ThemeMode | null) ?? "system";
   });
+  const [systemTheme, setSystemTheme] = useState<Theme>("light");
+  const theme = themeMode === "system" ? systemTheme : themeMode;
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => setSystemTheme(media.matches ? "dark" : "light");
+
+    syncSystemTheme();
+    media.addEventListener("change", syncSystemTheme);
+    return () => media.removeEventListener("change", syncSystemTheme);
+  }, []);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(sites.map((site) => site.category)))],
@@ -55,10 +67,10 @@ export function NavDirectory() {
     });
   }, [category, query]);
 
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    window.localStorage.setItem("nav-theme", next);
+  function cycleThemeMode() {
+    const next: ThemeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
+    setThemeMode(next);
+    window.localStorage.setItem("nav-theme-mode", next);
   }
 
   return (
@@ -66,23 +78,37 @@ export function NavDirectory() {
       <header className="nav-header">
         <a className="brand" href="/nav" aria-label="Labulubius Nav home">
           <span className="brand-mark"><Compass size={20} strokeWidth={2.2} /></span>
-          <span>Labulubius</span>
-          <span className="brand-product">Nav</span>
+          <span className="brand-copy">
+            <strong>Labulubius</strong>
+            <small>Web Navigator</small>
+          </span>
         </a>
 
+        <div className="desktop-label" aria-hidden="true">
+          <span className="fedora-dot">f</span>
+          Fedora Plasma
+        </div>
+
         <div className="header-actions">
-          <span className="site-count">{sites.length} sites</span>
-          <button className="icon-button" onClick={toggleTheme} type="button" aria-label="Toggle color theme">
-            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          <span className="status-dot" aria-hidden="true" />
+          <span className="site-count">{sites.length} sites online</span>
+          <button
+            className="icon-button"
+            onClick={cycleThemeMode}
+            type="button"
+            aria-label={`Color theme: ${themeMode}. Click to change.`}
+            title={`Theme: ${themeMode}`}
+          >
+            {themeMode === "system" ? <Monitor size={18} /> : themeMode === "light" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </header>
 
       <main className="nav-main">
         <section className="hero">
-          <div className="eyebrow"><Sparkles size={14} /> CURATED FOR THE CURIOUS</div>
-          <h1>The web, <em>worth exploring.</em></h1>
-          <p>A quiet corner for useful tools, thoughtful products, and places worth coming back to.</p>
+          <div className="eyebrow"><Sparkles size={14} /> PLASMA WORKSPACE · WEB DIRECTORY</div>
+          <h1>Your corner of <em>the web.</em></h1>
+          <p>A clean, focused workspace for useful tools, open technologies, and places worth coming back to.</p>
 
           <label className="search-box">
             <Search aria-hidden="true" size={20} strokeWidth={1.8} />
@@ -97,7 +123,17 @@ export function NavDirectory() {
           </label>
         </section>
 
-        <div className="directory-layout">
+        <div className="plasma-window">
+          <div className="window-titlebar">
+            <span><LayoutGrid size={15} /> Web Navigator</span>
+            <div className="window-controls" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+          </div>
+
+          <div className="directory-layout">
           <aside className="category-panel">
             <div className="panel-label">Browse</div>
             <nav aria-label="Website categories">
@@ -143,6 +179,7 @@ export function NavDirectory() {
               </div>
             )}
           </section>
+          </div>
         </div>
       </main>
 
