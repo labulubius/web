@@ -246,12 +246,12 @@ export function NavDirectory() {
         <nav aria-label="Website categories">
           <div className="category-row">
             <button className={categoryId === "all" ? "active" : ""} onClick={() => setCategoryId("all")} type="button">
-              <LayoutGrid size={16} /><span>All</span><small>{sites.length}</small>
+              <LayoutGrid size={16} /><span>All</span>
             </button>
           </div>
           <div className="category-row">
             <button className={categoryId === "favorites" ? "active" : ""} onClick={() => setCategoryId("favorites")} type="button">
-              <Star size={16} fill={categoryId === "favorites" ? "currentColor" : "none"} /><span>Favorites</span><small>{sites.filter((site) => site.is_favorite).length}</small>
+              <Star size={16} fill={categoryId === "favorites" ? "currentColor" : "none"} /><span>Favorites</span>
             </button>
           </div>
           {categories.map((category) => (
@@ -280,7 +280,7 @@ export function NavDirectory() {
               onDragEnd={() => { setDraggingCategoryId(null); setCategoryDropTarget(null); }}
             >
               <button className={categoryId === category.id ? "active" : ""} onClick={() => setCategoryId(category.id)} type="button">
-                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span><small>{sites.filter((site) => site.category_id === category.id).length}</small>
+                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
               </button>
               {isAdmin && (
                 <span className="category-actions">
