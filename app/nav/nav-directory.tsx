@@ -42,23 +42,13 @@ function SiteCard({
   onDelete: () => void;
   onFavorite: () => void;
 }) {
-  const hostname = (() => {
-    try {
-      return new URL(site.url).hostname.toLowerCase();
-    } catch {
-      return "";
-    }
-  })();
-  const useGitHubIcon = !site.icon_url && (hostname === "github.com" || hostname === "www.github.com");
-  const icon = site.icon_url || (useGitHubIcon ? "" : automaticIcon(site.url));
+  const icon = site.icon_url || automaticIcon(site.url);
 
   return (
     <article className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}`}>
       <a className="site-card-link" href={site.url} rel="noreferrer" target="_blank">
         <span className="site-logo">
-          {useGitHubIcon
-            ? <span className="site-logo-github" aria-hidden="true" />
-            : <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />}
+          <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
           {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {icon && (
