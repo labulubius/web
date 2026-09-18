@@ -157,9 +157,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .show-desktop { margin: 0 6px; }
 
 /* Home */
-.welcome-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
+.welcome-layout, .about-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
 .places-sidebar { background: var(--window); border-right: 1px solid var(--separator); min-width: 0; overflow: hidden; padding: 13px 8px; transition: border-color 180ms ease, padding 180ms ease; }
-.plasma-desktop[data-sidebar-collapsed="true"] .welcome-layout { grid-template-columns: 0 minmax(0, 1fr); }
+.plasma-desktop[data-sidebar-collapsed="true"] :is(.welcome-layout, .about-layout) { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .places-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
 .places-sidebar h2 { color: var(--text-muted); font-size: 11px; font-weight: 500; margin: 8px 9px 5px; }
 .places-sidebar nav { display: flex; flex-direction: column; gap: 1px; }
@@ -194,7 +194,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .info-panel a:hover { text-decoration: underline; }
 
 /* About */
-.about-view { margin: 0 auto; max-width: 850px; padding: 44px 38px; }
+.about-view { margin: 0 auto; max-width: 850px; padding: 44px 38px; width: 100%; }
 .about-header { align-items: center; display: flex; gap: 18px; }
 .about-logo { align-items: center; background: linear-gradient(145deg, #54bcef, #1679b9); border-radius: 7px; color: white; display: flex; font-size: 31px; font-weight: 600; height: 72px; justify-content: center; width: 72px; }
 .about-header h1 { font-size: 26px; font-weight: 500; margin: 0; }
@@ -229,7 +229,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .launcher-button, .panel-separator, .panel-spacer, .system-tray, .panel-theme, .digital-clock, .show-desktop { display: none; }
   .panel-tasks { justify-content: space-around; width: 100%; }
   .panel-tasks a { width: 58px; }
-  .welcome-layout { display: block; }
+  .welcome-layout, .about-layout { display: block; }
   .places-sidebar { display: none; }
   .welcome-view, .about-view { padding: 28px 18px; }
   .view-heading { align-items: flex-start; gap: 14px; }

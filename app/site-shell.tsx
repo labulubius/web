@@ -57,20 +57,18 @@ export function SiteShell({
     >
       <main className="breeze-window">
         <div className="tool-bar">
-          {active === "/" && (
-            <button
-              className="sidebar-toggle"
-              type="button"
-              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-              aria-controls="places-sidebar"
-              aria-expanded={!sidebarCollapsed}
-              aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-            >
-              <Menu size={20} />
-              <span>Sidebar</span>
-            </button>
-          )}
+          <button
+            className="sidebar-toggle"
+            type="button"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            aria-controls="page-sidebar"
+            aria-expanded={!sidebarCollapsed}
+            aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+          >
+            <Menu size={20} />
+            <span>Sidebar</span>
+          </button>
           <nav aria-label="Main navigation">
             {navigation.map(({ href, label, icon: Icon }) => (
               <Link className={active === href ? "active" : ""} href={href} key={href} aria-current={active === href ? "page" : undefined}>

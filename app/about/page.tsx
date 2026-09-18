@@ -1,10 +1,13 @@
 import { CheckCircle2, Code2, Coffee, Globe2, Heart, Palette } from "lucide-react";
+import { PlacesSidebar } from "../places-sidebar";
 import { SiteShell } from "../site-shell";
 
 export default function AboutPage() {
   return (
     <SiteShell active="/about" title="About">
-      <div className="about-view">
+      <div className="about-layout">
+        <PlacesSidebar active="/about" />
+        <div className="about-view">
         <header className="about-header">
           <span className="about-logo">L</span>
           <div>
@@ -37,6 +40,7 @@ export default function AboutPage() {
           </section>
 
           <div className="credits"><Heart size={15} /> Built with curiosity and open source.</div>
+        </div>
         </div>
       </div>
     </SiteShell>

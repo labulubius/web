@@ -1,21 +1,13 @@
-import { ArrowRight, Compass, ExternalLink, Folder, Info, Star } from "lucide-react";
+import { ArrowRight, Compass, ExternalLink, Info } from "lucide-react";
 import Link from "next/link";
+import { PlacesSidebar } from "./places-sidebar";
 import { SiteShell } from "./site-shell";
 
 export default function Home() {
   return (
     <SiteShell active="/" title="Home">
       <div className="welcome-layout">
-        <aside className="places-sidebar" id="places-sidebar">
-          <h2>Places</h2>
-          <nav>
-            <Link className="selected" href="/"><Folder size={16} /> Home</Link>
-            <Link href="/nav"><Compass size={16} /> Web Navigator</Link>
-            <Link href="/about"><Info size={16} /> About</Link>
-          </nav>
-          <h2>Recently Used</h2>
-          <nav><Link href="/nav"><Star size={16} /> Curated links</Link></nav>
-        </aside>
+        <PlacesSidebar active="/" />
 
         <section className="welcome-view">
           <div className="view-heading">

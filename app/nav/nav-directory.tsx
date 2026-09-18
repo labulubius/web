@@ -33,7 +33,7 @@ export function NavDirectory() {
 
   return (
     <div className="directory-view">
-      <aside className="directory-sidebar">
+      <aside className="directory-sidebar" id="page-sidebar">
         <h2>Categories</h2>
         <nav aria-label="Website categories">
           {categories.map((item) => (
