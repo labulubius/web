@@ -30,7 +30,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
@@ -52,6 +52,7 @@ function SiteCard({
   onEdit,
   onDelete,
   onFavorite,
+  shouldSuppressNavigation,
 }: {
   site: Site;
   category?: Category;
@@ -60,6 +61,7 @@ function SiteCard({
   onEdit: () => void;
   onDelete: () => void;
   onFavorite: () => void;
+  shouldSuppressNavigation: () => boolean;
 }) {
   const icon = site.icon_url || automaticIcon(site.url);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -75,7 +77,19 @@ function SiteCard({
       {...(canReorder ? attributes : {})}
       {...(canReorder ? listeners : {})}
     >
-      <a className="site-card-link" draggable={false} href={site.url} rel="noreferrer" target="_blank">
+      <a
+        className="site-card-link"
+        draggable={false}
+        href={site.url}
+        rel="noreferrer"
+        target="_blank"
+        onClick={(event) => {
+          if (shouldSuppressNavigation()) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
         <span className="site-logo">
           <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
           {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
@@ -129,6 +143,7 @@ export function NavDirectory() {
   const [message, setMessage] = useState("");
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
+  const suppressSiteNavigation = useRef(false);
   const siteSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -382,7 +397,16 @@ export function NavDirectory() {
         {loading ? (
           <div className="empty-state"><p>Loading navigator…</p></div>
         ) : filteredSites.length > 0 ? (
-          <DndContext sensors={siteSensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleSiteDragEnd(event)}>
+          <DndContext
+            sensors={siteSensors}
+            collisionDetection={closestCenter}
+            onDragStart={() => { suppressSiteNavigation.current = true; }}
+            onDragCancel={() => { window.setTimeout(() => { suppressSiteNavigation.current = false; }, 0); }}
+            onDragEnd={(event) => {
+              void handleSiteDragEnd(event);
+              window.setTimeout(() => { suppressSiteNavigation.current = false; }, 0);
+            }}
+          >
             <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
               <div className="site-grid">
                 {filteredSites.map((site) => (
@@ -395,6 +419,7 @@ export function NavDirectory() {
                     onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                     onDelete={() => void deleteSite(site)}
                     onFavorite={() => void toggleFavorite(site)}
+                    shouldSuppressNavigation={() => suppressSiteNavigation.current}
                   />
                 ))}
               </div>
