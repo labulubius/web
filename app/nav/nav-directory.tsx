@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -41,17 +42,19 @@ function SiteCard({
   isAdmin,
   onEdit,
   onDelete,
+  onFavorite,
 }: {
   site: Site;
   category?: Category;
   isAdmin: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onFavorite: () => void;
 }) {
   const icon = site.icon_url || automaticIcon(site.url);
 
   return (
-    <article className="site-card">
+    <article className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}`}>
       <a className="site-card-link" href={site.url} rel="noreferrer" target="_blank">
         <span className="site-logo">
           <span>{initialsFor(site.name)}</span>
@@ -66,10 +69,15 @@ function SiteCard({
         </span>
         <ArrowUpRight size={16} aria-hidden="true" />
       </a>
-      {isAdmin && (
+      {(isAdmin || site.is_favorite) && (
         <span className="site-card-actions">
-          <button type="button" onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>
-          <button type="button" onClick={onDelete} aria-label={`Delete ${site.name}`} title="Delete website"><Trash2 size={14} /></button>
+          {isAdmin ? (
+            <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
+          ) : (
+            <span className="favorite-indicator" title="Favorite"><Star size={14} fill="currentColor" /></span>
+          )}
+          {isAdmin && <button type="button" onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>}
+          {isAdmin && <button type="button" onClick={onDelete} aria-label={`Delete ${site.name}`} title="Delete website"><Trash2 size={14} /></button>}
         </span>
       )}
     </article>
@@ -94,7 +102,7 @@ export function NavDirectory() {
   const loadDirectory = useCallback(async () => {
     const [categoryResult, siteResult] = await Promise.all([
       supabase.from("navigator_categories").select("id,name,sort_order").order("sort_order").order("name"),
-      supabase.from("navigator_sites").select("id,category_id,name,description,url,icon_url,sort_order,is_published").order("sort_order").order("name"),
+      supabase.from("navigator_sites").select("*").order("sort_order").order("name"),
     ]);
 
     const error = categoryResult.error ?? siteResult.error;
@@ -102,7 +110,7 @@ export function NavDirectory() {
       setMessage(error.message.includes("navigator_") ? "Navigator database has not been initialized yet." : error.message);
     } else {
       setCategories((categoryResult.data ?? []) as Category[]);
-      setSites((siteResult.data ?? []) as Site[]);
+      setSites((siteResult.data ?? []).map((site) => ({ ...site, is_favorite: site.is_favorite === true })) as Site[]);
       setMessage("");
     }
     setLoading(false);
@@ -116,7 +124,7 @@ export function NavDirectory() {
   const filteredSites = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return sites.filter((site) => {
-      const inCategory = categoryId === "all" || site.category_id === categoryId;
+      const inCategory = categoryId === "all" || (categoryId === "favorites" ? site.is_favorite : site.category_id === categoryId);
       const category = categories.find((item) => item.id === site.category_id)?.name ?? "";
       const searchable = `${site.name} ${site.description} ${site.url} ${category}`.toLowerCase();
       return inCategory && (!keyword || searchable.includes(keyword));
@@ -178,6 +186,16 @@ export function NavDirectory() {
     else await loadDirectory();
   }
 
+  async function toggleFavorite(site: Site) {
+    const nextValue = !site.is_favorite;
+    setSites((current) => current.map((item) => item.id === site.id ? { ...item, is_favorite: nextValue } : item));
+    const { error } = await supabase.from("navigator_sites").update({ is_favorite: nextValue }).eq("id", site.id);
+    if (error) {
+      setMessage(`Could not update favorite: ${error.message}`);
+      setSites((current) => current.map((item) => item.id === site.id ? { ...item, is_favorite: site.is_favorite } : item));
+    }
+  }
+
   async function deleteCategory(category: Category) {
     if (!window.confirm(`Delete the “${category.name}” group?`)) return;
     const { error } = await supabase.from("navigator_categories").delete().eq("id", category.id);
@@ -231,6 +249,11 @@ export function NavDirectory() {
               <LayoutGrid size={16} /><span>All</span><small>{sites.length}</small>
             </button>
           </div>
+          <div className="category-row">
+            <button className={categoryId === "favorites" ? "active" : ""} onClick={() => setCategoryId("favorites")} type="button">
+              <Star size={16} fill={categoryId === "favorites" ? "currentColor" : "none"} /><span>Favorites</span><small>{sites.filter((site) => site.is_favorite).length}</small>
+            </button>
+          </div>
           {categories.map((category) => (
             <div
               className={`category-row${draggingCategoryId === category.id ? " dragging" : ""}`}
@@ -272,7 +295,7 @@ export function NavDirectory() {
 
       <section className="directory-content">
         <header className="directory-header">
-          <div><h1>{categoryId === "all" ? "Web Navigator" : categories.find((item) => item.id === categoryId)?.name}</h1><p>{filteredSites.length} items</p></div>
+          <div><h1>{categoryId === "all" ? "Web Navigator" : categoryId === "favorites" ? "Favorites" : categories.find((item) => item.id === categoryId)?.name}</h1><p>{filteredSites.length} items</p></div>
           <div className="directory-tools">
             <label className="breeze-search">
               <Search size={16} aria-hidden="true" />
@@ -296,6 +319,7 @@ export function NavDirectory() {
                 isAdmin={isAdmin}
                 onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                 onDelete={() => void deleteSite(site)}
+                onFavorite={() => void toggleFavorite(site)}
               />
             ))}
           </div>
@@ -329,7 +353,7 @@ export function NavDirectory() {
               <form onSubmit={handleSiteSave}>
                 <div className="form-grid">
                   <label>Website name<input name="name" defaultValue={editingSite?.name ?? ""} maxLength={100} autoFocus required /></label>
-                  <label>Group<select name="category_id" defaultValue={editingSite?.category_id ?? (categoryId === "all" ? categories[0]?.id : categoryId)} required>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+                  <label>Group<select name="category_id" defaultValue={editingSite?.category_id ?? (categoryId === "all" || categoryId === "favorites" ? categories[0]?.id : categoryId)} required>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
                 </div>
                 <label>Website URL<input name="url" type="url" placeholder="https://example.com" defaultValue={editingSite?.url ?? ""} required /></label>
                 <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={editingSite?.description ?? ""} /></label>

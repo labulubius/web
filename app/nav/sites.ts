@@ -13,4 +13,5 @@ export type Site = {
   icon_url: string | null;
   sort_order: number;
   is_published: boolean;
+  is_favorite: boolean;
 };
