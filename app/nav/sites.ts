@@ -15,4 +15,5 @@ export type Site = {
   sort_order: number;
   is_published: boolean;
   is_favorite: boolean;
+  favorite_sort_order?: number | null;
 };

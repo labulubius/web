@@ -4,6 +4,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type Modifier,
   PointerSensor,
   useSensor,
   useSensors,
@@ -40,6 +41,21 @@ function automaticIcon(url: string) {
     return "";
   }
 }
+
+const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect }) => {
+  if (!draggingNodeRect || !windowRect) return transform;
+
+  const next = { ...transform };
+  next.x = Math.min(
+    Math.max(transform.x, windowRect.left - draggingNodeRect.left),
+    windowRect.right - draggingNodeRect.right,
+  );
+  next.y = Math.min(
+    Math.max(transform.y, windowRect.top - draggingNodeRect.top),
+    windowRect.bottom - draggingNodeRect.bottom,
+  );
+  return next;
+};
 
 function SiteCard({
   site,
@@ -188,6 +204,8 @@ export function NavDirectory() {
       })
       .sort((a, b) => {
         if (categoryId === "favorites") {
+          const favoriteDifference = (a.favorite_sort_order ?? a.sort_order) - (b.favorite_sort_order ?? b.sort_order);
+          if (favoriteDifference !== 0) return favoriteDifference;
           const categoryDifference = (categoryOrder.get(a.category_id) ?? Number.MAX_SAFE_INTEGER) - (categoryOrder.get(b.category_id) ?? Number.MAX_SAFE_INTEGER);
           if (categoryDifference !== 0) return categoryDifference;
         }
@@ -195,8 +213,9 @@ export function NavDirectory() {
       });
   }, [categories, categoryId, query, sites]);
 
-  const canReorderSites = isAdmin && categoryId !== "favorites" && query.trim() === "";
+  const canReorderSites = isAdmin && query.trim() === "";
   const supportsCategoryVisibility = categories.some((category) => typeof category.is_published === "boolean");
+  const supportsFavoriteOrder = sites.some((site) => site.favorite_sort_order !== undefined);
 
   function closeDialog() {
     setDialog(null);
@@ -262,11 +281,20 @@ export function NavDirectory() {
 
   async function toggleFavorite(site: Site) {
     const nextValue = !site.is_favorite;
-    setSites((current) => current.map((item) => item.id === site.id ? { ...item, is_favorite: nextValue } : item));
-    const { error } = await supabase.from("navigator_sites").update({ is_favorite: nextValue }).eq("id", site.id);
+    const favoriteSortOrder = nextValue
+      ? Math.max(-1, ...sites.filter((item) => item.is_favorite).map((item) => item.favorite_sort_order ?? item.sort_order)) + 1
+      : null;
+    const optimisticValues = supportsFavoriteOrder
+      ? { is_favorite: nextValue, favorite_sort_order: favoriteSortOrder }
+      : { is_favorite: nextValue };
+    const databaseValues = supportsFavoriteOrder
+      ? optimisticValues
+      : { is_favorite: nextValue };
+    setSites((current) => current.map((item) => item.id === site.id ? { ...item, ...optimisticValues } : item));
+    const { error } = await supabase.from("navigator_sites").update(databaseValues).eq("id", site.id);
     if (error) {
       setMessage(`Could not update favorite: ${error.message}`);
-      setSites((current) => current.map((item) => item.id === site.id ? { ...item, is_favorite: site.is_favorite } : item));
+      setSites((current) => current.map((item) => item.id === site.id ? { ...item, is_favorite: site.is_favorite, favorite_sort_order: site.favorite_sort_order } : item));
     }
   }
 
@@ -306,19 +334,18 @@ export function NavDirectory() {
 
   async function handleSiteDragEnd(event: DragEndEvent) {
     if (!canReorderSites || !event.over || event.active.id === event.over.id) return;
-    const categorySites = sites
-      .filter((site) => site.category_id === categoryId)
-      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
-    const sourceIndex = categorySites.findIndex((site) => site.id === event.active.id);
-    const targetIndex = categorySites.findIndex((site) => site.id === event.over?.id);
+    const sourceIndex = filteredSites.findIndex((site) => site.id === event.active.id);
+    const targetIndex = filteredSites.findIndex((site) => site.id === event.over?.id);
     if (sourceIndex < 0 || targetIndex < 0) return;
-    const withOrder = arrayMove(categorySites, sourceIndex, targetIndex)
-      .map((site, index) => ({ ...site, sort_order: index }));
-    const orderById = new Map(withOrder.map((site) => [site.id, site.sort_order]));
 
-    setSites((current) => current.map((site) => orderById.has(site.id) ? { ...site, sort_order: orderById.get(site.id)! } : site));
+    const orderField = categoryId === "favorites" && supportsFavoriteOrder ? "favorite_sort_order" : "sort_order";
+    const withOrder = arrayMove(filteredSites, sourceIndex, targetIndex)
+      .map((site, index) => ({ ...site, [orderField]: index }));
+    const orderById = new Map(withOrder.map((site, index) => [site.id, index]));
+
+    setSites((current) => current.map((site) => orderById.has(site.id) ? { ...site, [orderField]: orderById.get(site.id)! } : site));
     const results = await Promise.all(
-      withOrder.map((site) => supabase.from("navigator_sites").update({ sort_order: site.sort_order }).eq("id", site.id)),
+      withOrder.map((site) => supabase.from("navigator_sites").update({ [orderField]: site[orderField] }).eq("id", site.id)),
     );
     const error = results.find((result) => result.error)?.error;
     if (error) {
@@ -405,6 +432,7 @@ export function NavDirectory() {
           <DndContext
             sensors={siteSensors}
             collisionDetection={closestCenter}
+            modifiers={[restrictToViewport]}
             onDragStart={() => { blockSiteOpenUntil.current = Number.POSITIVE_INFINITY; }}
             onDragCancel={() => { blockSiteOpenUntil.current = Date.now() + 500; }}
             onDragEnd={(event) => {
