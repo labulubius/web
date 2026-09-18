@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <SiteShell active="/" title="Home">
       <div className="welcome-layout">
-        <aside className="places-sidebar">
+        <aside className="places-sidebar" id="places-sidebar">
           <h2>Places</h2>
           <nav>
             <Link className="selected" href="/"><Folder size={16} /> Home</Link>

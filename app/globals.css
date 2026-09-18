@@ -103,6 +103,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 
 .tool-bar { align-items: center; background: var(--window); border-bottom: 1px solid var(--separator); display: flex; min-height: 48px; padding: 4px 7px; }
 .tool-bar nav { align-items: stretch; display: flex; gap: 2px; }
+.sidebar-toggle { align-items: center; align-self: stretch; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--link); cursor: pointer; display: flex; justify-content: center; margin-right: 2px; min-width: 38px; padding: 4px 7px; }
+.sidebar-toggle:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--separator); }
+.sidebar-toggle:active { background: color-mix(in srgb, var(--accent) 28%, var(--button)); border-color: var(--accent); }
 .tool-bar nav a { align-items: center; border: 1px solid transparent; border-radius: 4px; color: var(--text); display: flex; flex-direction: column; font-size: 10px; gap: 2px; min-width: 58px; padding: 4px 7px; text-decoration: none; }
 .tool-bar nav a:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--separator); }
 .tool-bar nav a.active { background: color-mix(in srgb, var(--accent) 25%, var(--button)); border-color: var(--accent); }
@@ -153,8 +156,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .show-desktop { margin: 0 6px; }
 
 /* Home */
-.welcome-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100%; }
-.places-sidebar { background: var(--window); border-right: 1px solid var(--separator); padding: 13px 8px; }
+.welcome-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
+.places-sidebar { background: var(--window); border-right: 1px solid var(--separator); min-width: 0; overflow: hidden; padding: 13px 8px; transition: border-color 180ms ease, padding 180ms ease; }
+.plasma-desktop[data-sidebar-collapsed="true"] .welcome-layout { grid-template-columns: 0 minmax(0, 1fr); }
+.plasma-desktop[data-sidebar-collapsed="true"] .places-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
 .places-sidebar h2 { color: var(--text-muted); font-size: 11px; font-weight: 500; margin: 8px 9px 5px; }
 .places-sidebar nav { display: flex; flex-direction: column; gap: 1px; }
 .places-sidebar a { align-items: center; border-radius: 3px; color: var(--text); display: flex; font-size: 12px; gap: 8px; padding: 7px 9px; text-decoration: none; }
@@ -215,6 +220,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .menu-bar { display: none; }
   .tool-bar { min-height: 43px; }
   .tool-bar nav a { min-width: 43px; padding: 5px; }
+  .sidebar-toggle { display: none; }
   .tool-bar nav a span, .toolbar-context, .theme-control span { display: none; }
   .theme-control { justify-content: center; padding: 4px; width: 34px; }
   .status-bar { display: none; }
