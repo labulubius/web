@@ -143,7 +143,7 @@ export function NavDirectory() {
   const [message, setMessage] = useState("");
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
-  const suppressSiteNavigation = useRef(false);
+  const suppressSiteNavigationUntil = useRef(0);
   const siteSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -400,11 +400,11 @@ export function NavDirectory() {
           <DndContext
             sensors={siteSensors}
             collisionDetection={closestCenter}
-            onDragStart={() => { suppressSiteNavigation.current = true; }}
-            onDragCancel={() => { window.setTimeout(() => { suppressSiteNavigation.current = false; }, 0); }}
+            onDragStart={() => { suppressSiteNavigationUntil.current = Number.POSITIVE_INFINITY; }}
+            onDragCancel={() => { suppressSiteNavigationUntil.current = Date.now() + 800; }}
             onDragEnd={(event) => {
               void handleSiteDragEnd(event);
-              window.setTimeout(() => { suppressSiteNavigation.current = false; }, 0);
+              suppressSiteNavigationUntil.current = Date.now() + 800;
             }}
           >
             <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
@@ -419,7 +419,7 @@ export function NavDirectory() {
                     onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                     onDelete={() => void deleteSite(site)}
                     onFavorite={() => void toggleFavorite(site)}
-                    shouldSuppressNavigation={() => suppressSiteNavigation.current}
+                    shouldSuppressNavigation={() => Date.now() < suppressSiteNavigationUntil.current}
                   />
                 ))}
               </div>
