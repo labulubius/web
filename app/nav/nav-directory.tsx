@@ -5,7 +5,6 @@ import {
   Compass,
   GripVertical,
   Globe2,
-  Github,
   LayoutGrid,
   Pencil,
   Plus,
@@ -58,8 +57,8 @@ function SiteCard({
       <a className="site-card-link" href={site.url} rel="noreferrer" target="_blank">
         <span className="site-logo">
           {useGitHubIcon
-            ? <Github className="site-logo-fallback" size={28} strokeWidth={1.6} aria-hidden="true" />
-            : <Globe2 className="site-logo-fallback" size={25} strokeWidth={1.5} aria-hidden="true" />}
+            ? <span className="site-logo-github" aria-hidden="true" />
+            : <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />}
           {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {icon && (
