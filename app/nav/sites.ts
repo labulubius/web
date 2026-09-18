@@ -2,6 +2,7 @@ export type Category = {
   id: string;
   name: string;
   sort_order: number;
+  is_published: boolean;
 };
 
 export type Site = {
