@@ -14,6 +14,7 @@ import {
   rectSortingStrategy,
   SortableContext,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -56,6 +57,51 @@ const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect 
   );
   return next;
 };
+
+function SortableCategoryRow({
+  category,
+  active,
+  isAdmin,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  category: Category;
+  active: boolean;
+  isAdmin: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+    disabled: !isAdmin,
+  });
+
+  return (
+    <div
+      className={`category-row${isAdmin ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
+    >
+      <button
+        className={active ? "active" : ""}
+        onClick={onSelect}
+        type="button"
+        {...(isAdmin ? attributes : {})}
+        {...(isAdmin ? listeners : {})}
+      >
+        {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
+      </button>
+      {isAdmin && (
+        <span className="category-actions" onPointerDown={(event) => event.stopPropagation()}>
+          <button type="button" onClick={onEdit} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>
+          <button type="button" onClick={onDelete} aria-label={`Delete ${category.name}`}><Trash2 size={12} /></button>
+        </span>
+      )}
+    </div>
+  );
+}
 
 function SiteCard({
   site,
@@ -163,9 +209,10 @@ export function NavDirectory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
-  const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
   const blockSiteOpenUntil = useRef(0);
+  const categorySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+  );
   const siteSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
   );
@@ -308,20 +355,15 @@ export function NavDirectory() {
     }
   }
 
-  async function reorderCategory(targetId: string, after: boolean) {
-    if (!draggingCategoryId || draggingCategoryId === targetId) return;
-    const reordered = [...categories];
-    const sourceIndex = reordered.findIndex((category) => category.id === draggingCategoryId);
-    if (sourceIndex < 0) return;
-    const [moved] = reordered.splice(sourceIndex, 1);
-    const targetIndex = reordered.findIndex((category) => category.id === targetId);
-    if (targetIndex < 0) return;
-    reordered.splice(targetIndex + (after ? 1 : 0), 0, moved);
-    const withOrder = reordered.map((category, index) => ({ ...category, sort_order: index }));
+  async function handleCategoryDragEnd(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) return;
+    const sourceIndex = categories.findIndex((category) => category.id === event.active.id);
+    const targetIndex = categories.findIndex((category) => category.id === event.over?.id);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const withOrder = arrayMove(categories, sourceIndex, targetIndex)
+      .map((category, index) => ({ ...category, sort_order: index }));
 
     setCategories(withOrder);
-    setDraggingCategoryId(null);
-    setCategoryDropTarget(null);
     const results = await Promise.all(
       withOrder.map((category) => supabase.from("navigator_categories").update({ sort_order: category.sort_order }).eq("id", category.id)),
     );
@@ -373,42 +415,21 @@ export function NavDirectory() {
               <Star size={16} fill={categoryId === "favorites" ? "currentColor" : "none"} /><span>Favorites</span>
             </button>
           </div>
-          {categories.map((category) => (
-            <div
-              className={`category-row${draggingCategoryId === category.id ? " dragging" : ""}`}
-              data-drop-position={categoryDropTarget?.id === category.id ? (categoryDropTarget.after ? "after" : "before") : undefined}
-              draggable={isAdmin}
-              key={category.id}
-              onDragStart={(event) => {
-                setDraggingCategoryId(category.id);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", category.id);
-              }}
-              onDragOver={(event) => {
-                if (!isAdmin || draggingCategoryId === category.id) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-                const bounds = event.currentTarget.getBoundingClientRect();
-                setCategoryDropTarget({ id: category.id, after: event.clientY > bounds.top + bounds.height / 2 });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const bounds = event.currentTarget.getBoundingClientRect();
-                void reorderCategory(category.id, event.clientY > bounds.top + bounds.height / 2);
-              }}
-              onDragEnd={() => { setDraggingCategoryId(null); setCategoryDropTarget(null); }}
-            >
-              <button className={categoryId === category.id ? "active" : ""} onClick={() => setCategoryId(category.id)} type="button">
-                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
-              </button>
-              {isAdmin && (
-                <span className="category-actions">
-                  <button type="button" onClick={() => { setEditingCategory(category); setDialog("category"); }} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>
-                  <button type="button" onClick={() => void deleteCategory(category)} aria-label={`Delete ${category.name}`}><Trash2 size={12} /></button>
-                </span>
-              )}
-            </div>
-          ))}
+          <DndContext sensors={categorySensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleCategoryDragEnd(event)}>
+            <SortableContext items={categories.map((category) => category.id)} strategy={verticalListSortingStrategy}>
+              {categories.map((category) => (
+                <SortableCategoryRow
+                  category={category}
+                  active={categoryId === category.id}
+                  isAdmin={isAdmin}
+                  key={category.id}
+                  onSelect={() => setCategoryId(category.id)}
+                  onEdit={() => { setEditingCategory(category); setDialog("category"); }}
+                  onDelete={() => void deleteCategory(category)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </nav>
       </aside>
 
