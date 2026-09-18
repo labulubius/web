@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Compass,
   GripVertical,
+  Globe2,
   LayoutGrid,
   Pencil,
   Plus,
@@ -17,16 +18,6 @@ import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
 type Dialog = "site" | "category" | null;
-
-function initialsFor(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
 
 function automaticIcon(url: string) {
   try {
@@ -57,10 +48,21 @@ function SiteCard({
     <article className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}`}>
       <a className="site-card-link" href={site.url} rel="noreferrer" target="_blank">
         <span className="site-logo">
-          <span>{initialsFor(site.name)}</span>
+          <Globe2 className="site-logo-fallback" size={25} strokeWidth={1.5} aria-hidden="true" />
           {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {icon && <img alt="" src={icon} onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+          {icon && (
+            <img
+              alt=""
+              src={icon}
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+              onLoad={(event) => {
+                if (!site.icon_url && event.currentTarget.naturalWidth <= 16 && event.currentTarget.naturalHeight <= 16) {
+                  event.currentTarget.style.display = "none";
+                }
+              }}
+            />
+          )}
         </span>
         <span className="site-card-copy">
           <strong>{site.name}</strong>
