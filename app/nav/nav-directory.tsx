@@ -134,7 +134,7 @@ export function NavDirectory() {
     if (error) {
       setMessage(error.message.includes("navigator_") ? "Navigator database has not been initialized yet." : error.message);
     } else {
-      setCategories((categoryResult.data ?? []).map((category) => ({ ...category, is_published: category.is_published !== false })) as Category[]);
+      setCategories((categoryResult.data ?? []) as Category[]);
       setSites((siteResult.data ?? []).map((site) => ({ ...site, is_favorite: site.is_favorite === true })) as Site[]);
       setMessage("");
     }
@@ -166,6 +166,7 @@ export function NavDirectory() {
   }, [categories, categoryId, query, sites]);
 
   const canReorderSites = isAdmin && categoryId !== "favorites" && query.trim() === "";
+  const supportsCategoryVisibility = categories.some((category) => typeof category.is_published === "boolean");
 
   function closeDialog() {
     setDialog(null);
@@ -207,10 +208,10 @@ export function NavDirectory() {
     setSaving(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const values = {
-      name: String(form.get("name") ?? "").trim(),
-      is_published: form.get("is_published") === "on",
-    };
+    const name = String(form.get("name") ?? "").trim();
+    const values = supportsCategoryVisibility
+      ? { name, is_published: form.get("is_published") === "on" }
+      : { name };
     const result = editingCategory
       ? await supabase.from("navigator_categories").update(values).eq("id", editingCategory.id)
       : await supabase.from("navigator_categories").insert({ ...values, sort_order: categories.length });
@@ -430,7 +431,7 @@ export function NavDirectory() {
             {dialog === "category" && (
               <form onSubmit={handleCategorySave}>
                 <label>Group name<input name="name" defaultValue={editingCategory?.name ?? ""} maxLength={60} autoFocus required /></label>
-                <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingCategory?.is_published ?? true} /> Visible to guests</label>
+                {supportsCategoryVisibility && <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingCategory?.is_published ?? true} /> Visible to guests</label>}
                 {message && <p className="form-error" role="alert">{message}</p>}
                 <footer><button type="button" onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
               </form>
