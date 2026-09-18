@@ -3,7 +3,7 @@
 import {
   ArrowUpRight,
   Compass,
-  FolderPlus,
+  GripVertical,
   LayoutGrid,
   Pencil,
   Plus,
@@ -88,6 +88,8 @@ export function NavDirectory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
 
   const loadDirectory = useCallback(async () => {
     const [categoryResult, siteResult] = await Promise.all([
@@ -186,6 +188,30 @@ export function NavDirectory() {
     }
   }
 
+  async function reorderCategory(targetId: string, after: boolean) {
+    if (!draggingCategoryId || draggingCategoryId === targetId) return;
+    const reordered = [...categories];
+    const sourceIndex = reordered.findIndex((category) => category.id === draggingCategoryId);
+    if (sourceIndex < 0) return;
+    const [moved] = reordered.splice(sourceIndex, 1);
+    const targetIndex = reordered.findIndex((category) => category.id === targetId);
+    if (targetIndex < 0) return;
+    reordered.splice(targetIndex + (after ? 1 : 0), 0, moved);
+    const withOrder = reordered.map((category, index) => ({ ...category, sort_order: index }));
+
+    setCategories(withOrder);
+    setDraggingCategoryId(null);
+    setCategoryDropTarget(null);
+    const results = await Promise.all(
+      withOrder.map((category) => supabase.from("navigator_categories").update({ sort_order: category.sort_order }).eq("id", category.id)),
+    );
+    const error = results.find((result) => result.error)?.error;
+    if (error) {
+      setMessage(`Could not reorder groups: ${error.message}`);
+      await loadDirectory();
+    }
+  }
+
   function openNewSite() {
     setEditingSite(null);
     setMessage("");
@@ -206,9 +232,32 @@ export function NavDirectory() {
             </button>
           </div>
           {categories.map((category) => (
-            <div className="category-row" key={category.id}>
+            <div
+              className={`category-row${draggingCategoryId === category.id ? " dragging" : ""}`}
+              data-drop-position={categoryDropTarget?.id === category.id ? (categoryDropTarget.after ? "after" : "before") : undefined}
+              draggable={isAdmin}
+              key={category.id}
+              onDragStart={(event) => {
+                setDraggingCategoryId(category.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", category.id);
+              }}
+              onDragOver={(event) => {
+                if (!isAdmin || draggingCategoryId === category.id) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                const bounds = event.currentTarget.getBoundingClientRect();
+                setCategoryDropTarget({ id: category.id, after: event.clientY > bounds.top + bounds.height / 2 });
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                void reorderCategory(category.id, event.clientY > bounds.top + bounds.height / 2);
+              }}
+              onDragEnd={() => { setDraggingCategoryId(null); setCategoryDropTarget(null); }}
+            >
               <button className={categoryId === category.id ? "active" : ""} onClick={() => setCategoryId(category.id)} type="button">
-                <LayoutGrid size={16} /><span>{category.name}</span><small>{sites.filter((site) => site.category_id === category.id).length}</small>
+                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span><small>{sites.filter((site) => site.category_id === category.id).length}</small>
               </button>
               {isAdmin && (
                 <span className="category-actions">
@@ -230,12 +279,7 @@ export function NavDirectory() {
               <input aria-label="Search websites" onChange={(event) => setQuery(event.target.value)} placeholder="Search…" type="search" value={query} />
               {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}
             </label>
-            {isAdmin && (
-              <>
-                <button className="directory-action" type="button" onClick={() => { setEditingCategory(null); setDialog("category"); }}><FolderPlus size={15} /> Group</button>
-                <button className="directory-action primary" type="button" onClick={openNewSite} disabled={categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>
-              </>
-            )}
+            {isAdmin && <button className="directory-action primary" type="button" onClick={openNewSite} disabled={categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>}
           </div>
         </header>
 

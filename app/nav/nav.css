@@ -8,6 +8,11 @@
 .sidebar-heading button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .directory-sidebar nav { display: flex; flex-direction: column; gap: 1px; }
 .category-row { align-items: center; display: flex; min-width: 204px; position: relative; }
+.category-row[draggable="true"], .category-row[draggable="true"] > button { cursor: grab; }
+.category-row.dragging { opacity: .42; }
+.category-row[data-drop-position]::before { background: var(--accent); border-radius: 2px; content: ""; height: 2px; left: 4px; position: absolute; right: 4px; z-index: 2; }
+.category-row[data-drop-position="before"]::before { top: -1px; }
+.category-row[data-drop-position="after"]::before { bottom: -1px; }
 .category-row > button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: grid; flex: 1; font-size: 12px; gap: 8px; grid-template-columns: auto 1fr auto; min-height: 33px; min-width: 0; padding: 6px 9px; text-align: left; }
 .category-row > button svg { color: var(--link); }
 .category-row > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
