@@ -17,7 +17,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Compass,
-  EyeOff,
   GripVertical,
   Globe2,
   LayoutGrid,
@@ -373,7 +372,7 @@ export function NavDirectory() {
               onDragEnd={() => { setDraggingCategoryId(null); setCategoryDropTarget(null); }}
             >
               <button className={categoryId === category.id ? "active" : ""} onClick={() => setCategoryId(category.id)} type="button">
-                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>{isAdmin && !category.is_published && <EyeOff className="category-visibility-icon" size={13} aria-label="Hidden from guests" />}
+                {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
               </button>
               {isAdmin && (
                 <span className="category-actions">
