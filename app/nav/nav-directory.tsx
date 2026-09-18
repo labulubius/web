@@ -346,9 +346,23 @@ export function NavDirectory() {
   }
 
   async function deleteCategory(category: Category) {
-    if (!window.confirm(`Delete the “${category.name}” group?`)) return;
-    const { error } = await supabase.from("navigator_categories").delete().eq("id", category.id);
-    if (error) setMessage("Move or delete the websites in this group before deleting it.");
+    const siteCount = sites.filter((site) => site.category_id === category.id).length;
+    const siteLabel = siteCount === 1 ? "website" : "websites";
+    if (!window.confirm(`Delete the “${category.name}” group and its ${siteCount} ${siteLabel}? This cannot be undone.`)) return;
+
+    let { error } = await supabase.from("navigator_categories").delete().eq("id", category.id);
+
+    // Support databases that have not applied the cascading foreign-key migration yet.
+    if (error?.code === "23503") {
+      const siteResult = await supabase.from("navigator_sites").delete().eq("category_id", category.id);
+      if (siteResult.error) {
+        setMessage(`Could not delete the group websites: ${siteResult.error.message}`);
+        return;
+      }
+      ({ error } = await supabase.from("navigator_categories").delete().eq("id", category.id));
+    }
+
+    if (error) setMessage(`Could not delete the group: ${error.message}`);
     else {
       if (categoryId === category.id) setCategoryId("favorites");
       await loadDirectory();
