@@ -48,14 +48,17 @@
 
 .site-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .site-card { background: var(--view); border: 1px solid var(--separator); border-radius: 4px; min-height: 86px; position: relative; }
-.site-card.reorderable, .site-card.reorderable .site-card-link { cursor: grab; }
-.site-card.dragging { box-shadow: 0 10px 24px rgba(0, 0, 0, .24); cursor: grabbing; opacity: .9; }
+.site-card.dragging { box-shadow: 0 10px 24px rgba(0, 0, 0, .24); opacity: .9; }
 .site-card:hover { background: color-mix(in srgb, var(--accent) 12%, var(--view)); border-color: var(--accent); }
 .site-card:active { background: color-mix(in srgb, var(--accent) 26%, var(--view)); }
-.site-card-link { align-items: center; color: var(--text); display: grid; gap: 12px; grid-template-columns: auto 1fr; min-height: 84px; padding: 11px; text-decoration: none; }
-.site-card:has(.site-card-actions) .site-card-link { padding-right: 69px; }
-.site-card.admin .site-card-link { padding-right: 101px; }
-.site-logo { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 6px; color: var(--link); display: flex; font-size: 11px; font-weight: 600; height: 44px; justify-content: center; overflow: hidden; position: relative; width: 44px; }
+.site-card-body { align-items: center; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr); min-height: 84px; padding: 11px; }
+.site-card:has(.site-card-actions) .site-card-body { padding-right: 69px; }
+.site-card.admin .site-card-body { padding-right: 101px; }
+.site-card-link { align-items: center; align-self: stretch; color: var(--text); display: flex; min-width: 0; text-decoration: none; }
+.site-logo { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 6px; color: var(--link); display: flex; font-size: 11px; font-weight: 600; height: 44px; justify-content: center; overflow: hidden; padding: 0; position: relative; width: 44px; }
+.site-logo-link { text-decoration: none; }
+.site-logo-drag { cursor: grab; }
+.site-logo-drag:active { cursor: grabbing; }
 .site-logo-fallback { color: var(--link); }
 .site-logo img { background: var(--window); height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; }
 .site-card-copy { display: flex; flex-direction: column; min-width: 0; }

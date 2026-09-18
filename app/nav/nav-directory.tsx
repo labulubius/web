@@ -30,7 +30,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
@@ -52,7 +52,6 @@ function SiteCard({
   onEdit,
   onDelete,
   onFavorite,
-  shouldSuppressNavigation,
 }: {
   site: Site;
   category?: Category;
@@ -61,61 +60,67 @@ function SiteCard({
   onEdit: () => void;
   onDelete: () => void;
   onFavorite: () => void;
-  shouldSuppressNavigation: () => boolean;
 }) {
   const icon = site.icon_url || automaticIcon(site.url);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
     id: site.id,
     disabled: !canReorder,
   });
+  const logo = (
+    <>
+      <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
+      {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
+      {icon && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          alt=""
+          draggable={false}
+          src={icon}
+          onError={(event) => { event.currentTarget.style.display = "none"; }}
+          onLoad={(event) => {
+            if (!site.icon_url && event.currentTarget.naturalWidth <= 16 && event.currentTarget.naturalHeight <= 16) {
+              event.currentTarget.style.display = "none";
+            }
+          }}
+        />
+      )}
+    </>
+  );
 
   return (
     <article
       className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
-      {...(canReorder ? attributes : {})}
-      {...(canReorder ? listeners : {})}
     >
-      <a
-        className="site-card-link"
-        draggable={false}
-        href={site.url}
-        rel="noreferrer"
-        target="_blank"
-        onClick={(event) => {
-          if (shouldSuppressNavigation()) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        }}
-      >
-        <span className="site-logo">
-          <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
-          {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
-          {icon && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              alt=""
-              draggable={false}
-              src={icon}
-              onError={(event) => { event.currentTarget.style.display = "none"; }}
-              onLoad={(event) => {
-                if (!site.icon_url && event.currentTarget.naturalWidth <= 16 && event.currentTarget.naturalHeight <= 16) {
-                  event.currentTarget.style.display = "none";
-                }
-              }}
-            />
-          )}
-        </span>
-        <span className="site-card-copy">
-          <strong>{site.name}</strong>
-          <small>{site.description || site.url}</small>
-          <em>{category?.name ?? "Uncategorized"}</em>
-        </span>
-      </a>
+      <div className="site-card-body">
+        {canReorder ? (
+          <button
+            className="site-logo site-logo-drag"
+            ref={setActivatorNodeRef}
+            type="button"
+            title={`Drag to reorder ${site.name}`}
+            aria-label={`Drag to reorder ${site.name}`}
+            {...attributes}
+            {...listeners}
+          >
+            {logo}
+          </button>
+        ) : (
+          <a className="site-logo site-logo-link" href={site.url} rel="noreferrer" target="_blank" aria-label={`Open ${site.name}`}>
+            {logo}
+          </a>
+        )}
+        <a className="site-card-link" draggable={false} href={site.url} rel="noreferrer" target="_blank">
+          <span className="site-card-copy">
+            <strong>{site.name}</strong>
+            <small>{site.description || site.url}</small>
+            <em>{category?.name ?? "Uncategorized"}</em>
+          </span>
+        </a>
+      </div>
       {(isAdmin || site.is_favorite) && (
-        <span className="site-card-actions" onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+        <span className="site-card-actions">
           {isAdmin ? (
             <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
           ) : (
@@ -143,7 +148,6 @@ export function NavDirectory() {
   const [message, setMessage] = useState("");
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
-  const suppressSiteNavigationUntil = useRef(0);
   const siteSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -400,11 +404,8 @@ export function NavDirectory() {
           <DndContext
             sensors={siteSensors}
             collisionDetection={closestCenter}
-            onDragStart={() => { suppressSiteNavigationUntil.current = Number.POSITIVE_INFINITY; }}
-            onDragCancel={() => { suppressSiteNavigationUntil.current = Date.now() + 800; }}
             onDragEnd={(event) => {
               void handleSiteDragEnd(event);
-              suppressSiteNavigationUntil.current = Date.now() + 800;
             }}
           >
             <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
@@ -419,7 +420,6 @@ export function NavDirectory() {
                     onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                     onDelete={() => void deleteSite(site)}
                     onFavorite={() => void toggleFavorite(site)}
-                    shouldSuppressNavigation={() => Date.now() < suppressSiteNavigationUntil.current}
                   />
                 ))}
               </div>
