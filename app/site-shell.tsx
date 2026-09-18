@@ -68,6 +68,7 @@ export function SiteShell({
               title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
             >
               <Menu size={20} />
+              <span>Sidebar</span>
             </button>
           )}
           <nav aria-label="Main navigation">
