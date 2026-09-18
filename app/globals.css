@@ -113,6 +113,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .tool-bar nav a svg { color: var(--link); }
 .toolbar-spacer { flex: 1; }
 .toolbar-context { align-items: center; color: var(--text-muted); display: flex; font-size: 11px; gap: 6px; margin-right: 10px; }
+.toolbar-account-slot { display: flex; margin-right: 6px; }
 .theme-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 7px; min-height: 30px; padding: 4px 9px; }
 .theme-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .theme-control:active { background: color-mix(in srgb, var(--accent) 33%, var(--button)); }

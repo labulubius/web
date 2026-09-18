@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, Home, Info, Menu, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -77,7 +77,7 @@ export function SiteShell({
             ))}
           </nav>
           <div className="toolbar-spacer" />
-          {active === "/nav" && <span className="toolbar-context"><Search size={15} /> Directory</span>}
+          {active === "/nav" && <div className="toolbar-account-slot" id="nav-toolbar-account" />}
           <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${themeMode}`} aria-label={`Color theme: ${themeMode}. Click to change.`}>
             <ThemeIcon size={17} /><span>{themeMode === "system" ? "System theme" : `${themeMode} theme`}</span>
           </button>

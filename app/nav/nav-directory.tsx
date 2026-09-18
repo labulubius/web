@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { getSupabaseBrowserClient } from "../lib/supabase";
 import type { Category, Site } from "./sites";
 
@@ -94,6 +95,7 @@ export function NavDirectory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [toolbarAccountTarget, setToolbarAccountTarget] = useState<HTMLElement | null>(null);
 
   const loadDirectory = useCallback(async () => {
     const [categoryResult, siteResult] = await Promise.all([
@@ -124,6 +126,7 @@ export function NavDirectory() {
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
+      setToolbarAccountTarget(document.getElementById("nav-toolbar-account"));
       void Promise.all([
         loadDirectory(),
         supabase.auth.getUser().then(({ data }) => syncUser(data.user)),
@@ -278,11 +281,6 @@ export function NavDirectory() {
                 <button className="directory-action primary" type="button" onClick={openNewSite} disabled={categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>
               </>
             )}
-            {user ? (
-              <button className="account-control" type="button" onClick={() => void supabase.auth.signOut()} title={`Sign out ${user.email ?? ""}`}><User size={15} /><span>{isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} /></button>
-            ) : (
-              <button className="account-control" type="button" onClick={() => { setMessage(""); setDialog("login"); }}><LogIn size={15} /><span>Sign in</span></button>
-            )}
           </div>
         </header>
 
@@ -311,6 +309,15 @@ export function NavDirectory() {
           </div>
         )}
       </section>
+
+      {toolbarAccountTarget && createPortal(
+        user ? (
+          <button className="account-control" type="button" onClick={() => void supabase.auth.signOut()} title={`Sign out ${user.email ?? ""}`}><User size={15} /><span>{isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} /></button>
+        ) : (
+          <button className="account-control" type="button" onClick={() => { setMessage(""); setDialog("login"); }}><LogIn size={15} /><span>Sign in</span></button>
+        ),
+        toolbarAccountTarget,
+      )}
 
       {dialog && (
         <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
