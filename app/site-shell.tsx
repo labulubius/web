@@ -3,6 +3,7 @@
 import { Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import { AccountControl, SiteAuthProvider } from "./site-auth";
 
 type Theme = "light" | "dark";
 type ThemeMode = Theme | "system";
@@ -49,7 +50,8 @@ export function SiteShell({
   const ThemeIcon = themeMode === "system" ? Monitor : themeMode === "light" ? Sun : Moon;
 
   return (
-    <div
+    <SiteAuthProvider>
+      <div
       className="plasma-desktop"
       data-theme={theme}
       data-sidebar-collapsed={sidebarCollapsed}
@@ -77,7 +79,7 @@ export function SiteShell({
             ))}
           </nav>
           <div className="toolbar-spacer" />
-          {active === "/nav" && <div className="toolbar-account-slot" id="nav-toolbar-account" />}
+          <div className="toolbar-account-slot"><AccountControl /></div>
           <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${themeMode}`} aria-label={`Color theme: ${themeMode}. Click to change.`}>
             <ThemeIcon size={17} /><span>{themeMode === "system" ? "System theme" : `${themeMode} theme`}</span>
           </button>
@@ -89,6 +91,7 @@ export function SiteShell({
           <span>Labulubius Workspace</span>
         </footer>
       </main>
-    </div>
+      </div>
+    </SiteAuthProvider>
   );
 }

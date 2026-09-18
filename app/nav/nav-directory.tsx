@@ -5,22 +5,17 @@ import {
   Compass,
   FolderPlus,
   LayoutGrid,
-  LogIn,
-  LogOut,
   Pencil,
   Plus,
   Search,
   Trash2,
-  User,
   X,
 } from "lucide-react";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { getSupabaseBrowserClient } from "../lib/supabase";
+import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
-type Dialog = "login" | "site" | "category" | null;
+type Dialog = "site" | "category" | null;
 
 function initialsFor(name: string) {
   return name
@@ -82,20 +77,17 @@ function SiteCard({
 }
 
 export function NavDirectory() {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const { supabase, isAdmin } = useSiteAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("all");
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [toolbarAccountTarget, setToolbarAccountTarget] = useState<HTMLElement | null>(null);
 
   const loadDirectory = useCallback(async () => {
     const [categoryResult, siteResult] = await Promise.all([
@@ -114,33 +106,10 @@ export function NavDirectory() {
     setLoading(false);
   }, [supabase]);
 
-  const syncUser = useCallback(async (nextUser: SupabaseUser | null) => {
-    setUser(nextUser);
-    if (!nextUser) {
-      setIsAdmin(false);
-      return;
-    }
-    const { data, error } = await supabase.rpc("navigator_is_admin");
-    setIsAdmin(!error && data === true);
-  }, [supabase]);
-
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => {
-      setToolbarAccountTarget(document.getElementById("nav-toolbar-account"));
-      void Promise.all([
-        loadDirectory(),
-        supabase.auth.getUser().then(({ data }) => syncUser(data.user)),
-      ]);
-    }, 0);
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void syncUser(session?.user ?? null).then(loadDirectory);
-    });
-    return () => {
-      window.clearTimeout(initialLoad);
-      listener.subscription.unsubscribe();
-    };
-  }, [loadDirectory, supabase, syncUser]);
+    const initialLoad = window.setTimeout(() => void loadDirectory(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [isAdmin, loadDirectory]);
 
   const filteredSites = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -157,20 +126,6 @@ export function NavDirectory() {
     setEditingSite(null);
     setEditingCategory(null);
     setMessage("");
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setMessage("");
-    const form = new FormData(event.currentTarget);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(form.get("email") ?? "").trim(),
-      password: String(form.get("password") ?? ""),
-    });
-    setSaving(false);
-    if (error) setMessage(error.message);
-    else closeDialog();
   }
 
   async function handleSiteSave(event: FormEvent<HTMLFormElement>) {
@@ -310,31 +265,13 @@ export function NavDirectory() {
         )}
       </section>
 
-      {toolbarAccountTarget && createPortal(
-        user ? (
-          <button className="account-control" type="button" onClick={() => void supabase.auth.signOut()} title={`Sign out ${user.email ?? ""}`}><User size={15} /><span>{isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} /></button>
-        ) : (
-          <button className="account-control" type="button" onClick={() => { setMessage(""); setDialog("login"); }}><LogIn size={15} /><span>Sign in</span></button>
-        ),
-        toolbarAccountTarget,
-      )}
-
       {dialog && (
         <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
           <section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
             <header>
-              <h2 id="dialog-title">{dialog === "login" ? "Owner sign in" : dialog === "site" ? `${editingSite ? "Edit" : "Add"} website` : `${editingCategory ? "Edit" : "Add"} group`}</h2>
+              <h2 id="dialog-title">{dialog === "site" ? `${editingSite ? "Edit" : "Add"} website` : `${editingCategory ? "Edit" : "Add"} group`}</h2>
               <button type="button" onClick={closeDialog} aria-label="Close"><X size={17} /></button>
             </header>
-
-            {dialog === "login" && (
-              <form onSubmit={handleLogin}>
-                <label>Email<input name="email" type="email" autoComplete="username" required /></label>
-                <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-                {message && <p className="form-error" role="alert">{message}</p>}
-                <footer><button type="button" onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Signing in…" : "Sign in"}</button></footer>
-              </form>
-            )}
 
             {dialog === "category" && (
               <form onSubmit={handleCategorySave}>
