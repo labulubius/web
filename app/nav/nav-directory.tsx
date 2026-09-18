@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowUpRight,
   Compass,
   EyeOff,
   GripVertical,
@@ -89,7 +88,6 @@ function SiteCard({
           <small>{site.description || site.url}</small>
           <em>{category?.name ?? "Uncategorized"}</em>
         </span>
-        <ArrowUpRight size={16} aria-hidden="true" />
       </a>
       {(isAdmin || site.is_favorite) && (
         <span className="site-card-actions">
