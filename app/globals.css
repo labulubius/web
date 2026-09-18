@@ -103,7 +103,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 
 .tool-bar { align-items: center; background: var(--window); border-bottom: 1px solid var(--separator); display: flex; min-height: 48px; padding: 4px 7px; }
 .tool-bar nav { align-items: stretch; display: flex; gap: 2px; }
-.sidebar-toggle { align-items: center; align-self: stretch; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--link); cursor: pointer; display: flex; flex-direction: column; justify-content: flex-start; margin-right: 2px; min-width: 38px; padding: 4px 7px; }
+.sidebar-toggle { align-items: center; align-self: stretch; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--link); cursor: pointer; display: flex; flex-direction: column; justify-content: flex-start; margin-right: 2px; min-width: 58px; padding: 4px 7px; }
 .sidebar-toggle:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--separator); }
 .sidebar-toggle:active { background: color-mix(in srgb, var(--accent) 28%, var(--button)); border-color: var(--accent); }
 .tool-bar nav a { align-items: center; border: 1px solid transparent; border-radius: 4px; color: var(--text); display: flex; flex-direction: column; font-size: 10px; gap: 2px; min-width: 58px; padding: 4px 7px; text-decoration: none; }
