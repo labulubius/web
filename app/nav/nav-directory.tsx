@@ -1,6 +1,23 @@
 "use client";
 
 import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Compass,
   EyeOff,
   GripVertical,
@@ -13,7 +30,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
@@ -32,40 +49,33 @@ function SiteCard({
   category,
   isAdmin,
   canReorder,
-  isDragging,
-  dropPosition,
   onEdit,
   onDelete,
   onFavorite,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
 }: {
   site: Site;
   category?: Category;
   isAdmin: boolean;
   canReorder: boolean;
-  isDragging: boolean;
-  dropPosition?: "before" | "after";
   onEdit: () => void;
   onDelete: () => void;
   onFavorite: () => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
-  onDragOver: (event: DragEvent<HTMLElement>) => void;
-  onDrop: (event: DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
 }) {
   const icon = site.icon_url || automaticIcon(site.url);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: site.id,
+    disabled: !canReorder,
+  });
 
   return (
     <article
       className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
-      data-drop-position={dropPosition}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
+      {...(canReorder ? attributes : {})}
+      {...(canReorder ? listeners : {})}
     >
-      <a className="site-card-link" href={site.url} rel="noreferrer" target="_blank">
+      <a className="site-card-link" draggable={false} href={site.url} rel="noreferrer" target="_blank">
         <span className="site-logo">
           <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
           {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
@@ -73,6 +83,7 @@ function SiteCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt=""
+              draggable={false}
               src={icon}
               onError={(event) => { event.currentTarget.style.display = "none"; }}
               onLoad={(event) => {
@@ -90,8 +101,7 @@ function SiteCard({
         </span>
       </a>
       {(isAdmin || site.is_favorite) && (
-        <span className="site-card-actions">
-          {canReorder && <button className="site-drag-handle" draggable type="button" onDragStart={onDragStart} onDragEnd={onDragEnd} aria-label={`Reorder ${site.name}`} title="Drag to reorder"><GripVertical size={14} /></button>}
+        <span className="site-card-actions" onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
           {isAdmin ? (
             <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
           ) : (
@@ -119,8 +129,10 @@ export function NavDirectory() {
   const [message, setMessage] = useState("");
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [categoryDropTarget, setCategoryDropTarget] = useState<{ id: string; after: boolean } | null>(null);
-  const [draggingSiteId, setDraggingSiteId] = useState<string | null>(null);
-  const [siteDropTarget, setSiteDropTarget] = useState<{ id: string; after: boolean } | null>(null);
+  const siteSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const loadDirectory = useCallback(async () => {
     const [categoryResult, siteResult] = await Promise.all([
@@ -272,23 +284,19 @@ export function NavDirectory() {
     }
   }
 
-  async function reorderSite(targetId: string, after: boolean) {
-    if (!canReorderSites || !draggingSiteId || draggingSiteId === targetId) return;
+  async function handleSiteDragEnd(event: DragEndEvent) {
+    if (!canReorderSites || !event.over || event.active.id === event.over.id) return;
     const categorySites = sites
       .filter((site) => site.category_id === categoryId)
       .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
-    const sourceIndex = categorySites.findIndex((site) => site.id === draggingSiteId);
-    if (sourceIndex < 0) return;
-    const [moved] = categorySites.splice(sourceIndex, 1);
-    const targetIndex = categorySites.findIndex((site) => site.id === targetId);
-    if (targetIndex < 0) return;
-    categorySites.splice(targetIndex + (after ? 1 : 0), 0, moved);
-    const withOrder = categorySites.map((site, index) => ({ ...site, sort_order: index }));
+    const sourceIndex = categorySites.findIndex((site) => site.id === event.active.id);
+    const targetIndex = categorySites.findIndex((site) => site.id === event.over?.id);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const withOrder = arrayMove(categorySites, sourceIndex, targetIndex)
+      .map((site, index) => ({ ...site, sort_order: index }));
     const orderById = new Map(withOrder.map((site) => [site.id, site.sort_order]));
 
     setSites((current) => current.map((site) => orderById.has(site.id) ? { ...site, sort_order: orderById.get(site.id)! } : site));
-    setDraggingSiteId(null);
-    setSiteDropTarget(null);
     const results = await Promise.all(
       withOrder.map((site) => supabase.from("navigator_sites").update({ sort_order: site.sort_order }).eq("id", site.id)),
     );
@@ -374,40 +382,24 @@ export function NavDirectory() {
         {loading ? (
           <div className="empty-state"><p>Loading navigator…</p></div>
         ) : filteredSites.length > 0 ? (
-          <div className="site-grid">
-            {filteredSites.map((site) => (
-              <SiteCard
-                key={site.id}
-                site={site}
-                category={categories.find((item) => item.id === site.category_id)}
-                isAdmin={isAdmin}
-                canReorder={canReorderSites}
-                isDragging={draggingSiteId === site.id}
-                dropPosition={siteDropTarget?.id === site.id ? (siteDropTarget.after ? "after" : "before") : undefined}
-                onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
-                onDelete={() => void deleteSite(site)}
-                onFavorite={() => void toggleFavorite(site)}
-                onDragStart={(event) => {
-                  setDraggingSiteId(site.id);
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", site.id);
-                }}
-                onDragOver={(event) => {
-                  if (!canReorderSites || draggingSiteId === site.id) return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  setSiteDropTarget({ id: site.id, after: event.clientX > bounds.left + bounds.width / 2 });
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  void reorderSite(site.id, event.clientX > bounds.left + bounds.width / 2);
-                }}
-                onDragEnd={() => { setDraggingSiteId(null); setSiteDropTarget(null); }}
-              />
-            ))}
-          </div>
+          <DndContext sensors={siteSensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleSiteDragEnd(event)}>
+            <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
+              <div className="site-grid">
+                {filteredSites.map((site) => (
+                  <SiteCard
+                    key={site.id}
+                    site={site}
+                    category={categories.find((item) => item.id === site.category_id)}
+                    isAdmin={isAdmin}
+                    canReorder={canReorderSites}
+                    onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
+                    onDelete={() => void deleteSite(site)}
+                    onFavorite={() => void toggleFavorite(site)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         ) : (
           <div className="empty-state">
             <Compass size={48} strokeWidth={1.2} />
