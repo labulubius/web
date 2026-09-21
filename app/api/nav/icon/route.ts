@@ -335,37 +335,6 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
-  try {
-    const supabase = await getAdminClient(request);
-    if (!supabase) return Response.json({ error: "Unauthorized." }, { status: 401 });
-
-    const { data: sites, error } = await supabase.from("navigator_sites").select("id,url,icon_url");
-    if (error) throw error;
-    const { url: supabaseUrl } = getSupabaseConfiguration();
-    const pending = (sites ?? []).filter((site) => !site.icon_url || !isManagedIconUrl(site.icon_url, supabaseUrl));
-    const results: Array<{ id: string; status: string }> = [];
-
-    for (let index = 0; index < pending.length; index += 3) {
-      const batch = pending.slice(index, index + 3);
-      const batchResults = await Promise.all(batch.map(async (site) => {
-        try {
-          const result = await storeIcon(supabase, site.id, site.url, site.icon_url);
-          return { id: site.id, status: result.status };
-        } catch {
-          return { id: site.id, status: "error" };
-        }
-      }));
-      results.push(...batchResults);
-    }
-
-    return Response.json({ processed: results.length, results });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not backfill website icons.";
-    return Response.json({ error: message }, { status: 500 });
-  }
-}
-
 export async function DELETE(request: Request) {
   try {
     const supabase = await getAdminClient(request);
