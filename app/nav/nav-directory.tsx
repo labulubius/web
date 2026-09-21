@@ -35,14 +35,6 @@ import type { Category, Site } from "./sites";
 
 type Dialog = "site" | "category" | null;
 
-function automaticIcon(url: string) {
-  try {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(new URL(url).hostname)}&sz=128`;
-  } catch {
-    return "";
-  }
-}
-
 const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect }) => {
   if (!draggingNodeRect || !windowRect) return transform;
 
@@ -122,7 +114,7 @@ function SiteCard({
   onFavorite: () => void;
   shouldBlockOpen: () => boolean;
 }) {
-  const icon = site.icon_url || automaticIcon(site.url);
+  const icon = site.icon_url;
   const didDrag = useRef(false);
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: site.id,
@@ -168,11 +160,6 @@ function SiteCard({
               draggable={false}
               src={icon}
               onError={(event) => { event.currentTarget.style.display = "none"; }}
-              onLoad={(event) => {
-                if (!site.icon_url && event.currentTarget.naturalWidth <= 16 && event.currentTarget.naturalHeight <= 16) {
-                  event.currentTarget.style.display = "none";
-                }
-              }}
             />
           )}
         </span>
