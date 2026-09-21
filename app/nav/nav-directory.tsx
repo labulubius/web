@@ -258,6 +258,24 @@ export function NavDirectory() {
     setMessage("");
   }
 
+  async function requestIconImport(method: "POST" | "DELETE", siteId: string, sourceUrl?: string | null) {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw new Error("Your administrator session has expired.");
+
+    const response = await fetch("/api/nav/icon", {
+      method,
+      headers: {
+        Authorization: `Bearer ${data.session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ siteId, sourceUrl }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(result?.error ?? "Could not store the website icon.");
+    }
+  }
+
   async function handleSiteSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -277,12 +295,23 @@ export function NavDirectory() {
       : values;
     const result = editingSite
       ? await supabase.from("navigator_sites").update(siteValues).eq("id", editingSite.id)
-      : await supabase.from("navigator_sites").insert({ ...values, sort_order: categorySiteCount });
-    setSaving(false);
-    if (result.error) setMessage(result.error.message);
-    else {
+      : await supabase.from("navigator_sites").insert({ ...values, sort_order: categorySiteCount }).select("id").single();
+    if (result.error) {
+      setSaving(false);
+      setMessage(result.error.message);
+      return;
+    }
+
+    const siteId = editingSite?.id ?? result.data?.id;
+    try {
+      if (!siteId) throw new Error("The saved website ID was not returned.");
+      await requestIconImport("POST", siteId, values.icon_url);
+      setSaving(false);
       closeDialog();
       await loadDirectory();
+    } catch (error) {
+      setSaving(false);
+      setMessage(`Website saved, but its icon could not be stored: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
 
@@ -310,7 +339,10 @@ export function NavDirectory() {
     if (!window.confirm(`Delete “${site.name}”?`)) return;
     const { error } = await supabase.from("navigator_sites").delete().eq("id", site.id);
     if (error) setMessage(error.message);
-    else await loadDirectory();
+    else {
+      await requestIconImport("DELETE", site.id).catch(() => undefined);
+      await loadDirectory();
+    }
   }
 
   async function toggleFavorite(site: Site) {
@@ -351,6 +383,8 @@ export function NavDirectory() {
 
     if (error) setMessage(`Could not delete the group: ${error.message}`);
     else {
+      const deletedSiteIds = sites.filter((site) => site.category_id === category.id).map((site) => site.id);
+      await Promise.allSettled(deletedSiteIds.map((siteId) => requestIconImport("DELETE", siteId)));
       if (categoryId === category.id) setCategoryId("favorites");
       await loadDirectory();
     }
