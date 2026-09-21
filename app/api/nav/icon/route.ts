@@ -279,6 +279,35 @@ async function removeStoredIcons(supabase: Awaited<ReturnType<typeof getAdminCli
   }
 }
 
+type AdminClient = NonNullable<Awaited<ReturnType<typeof getAdminClient>>>;
+
+async function storeIcon(supabase: AdminClient, siteId: string, siteUrl: string, sourceUrl: string | null) {
+  const icon = await discoverIcon(siteUrl, sourceUrl);
+  if (!icon) {
+    const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: null }).eq("id", siteId);
+    if (updateError) throw updateError;
+    await removeStoredIcons(supabase, siteId);
+    return { status: "fallback", iconUrl: null };
+  }
+
+  const path = `sites/${siteId}-${randomUUID()}.${icon.extension}`;
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, icon.bytes, {
+    cacheControl: "31536000",
+    contentType: icon.contentType,
+    upsert: false,
+  });
+  if (uploadError) throw uploadError;
+
+  const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: publicUrlData.publicUrl }).eq("id", siteId);
+  if (updateError) {
+    await supabase.storage.from(BUCKET).remove([path]);
+    throw updateError;
+  }
+  await removeStoredIcons(supabase, siteId, path);
+  return { status: "stored", iconUrl: publicUrlData.publicUrl };
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await getAdminClient(request);
@@ -299,32 +328,40 @@ export async function POST(request: Request) {
       return Response.json({ status: "unchanged", iconUrl: sourceUrl });
     }
 
-    const icon = await discoverIcon(site.url, sourceUrl);
-    if (!icon) {
-      const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: null }).eq("id", siteId);
-      if (updateError) throw updateError;
-      await removeStoredIcons(supabase, siteId);
-      return Response.json({ status: "fallback", iconUrl: null });
-    }
-
-    const path = `sites/${siteId}-${randomUUID()}.${icon.extension}`;
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, icon.bytes, {
-      cacheControl: "31536000",
-      contentType: icon.contentType,
-      upsert: false,
-    });
-    if (uploadError) throw uploadError;
-
-    const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: publicUrlData.publicUrl }).eq("id", siteId);
-    if (updateError) {
-      await supabase.storage.from(BUCKET).remove([path]);
-      throw updateError;
-    }
-    await removeStoredIcons(supabase, siteId, path);
-    return Response.json({ status: "stored", iconUrl: publicUrlData.publicUrl });
+    return Response.json(await storeIcon(supabase, siteId, site.url, sourceUrl));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not import the website icon.";
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const supabase = await getAdminClient(request);
+    if (!supabase) return Response.json({ error: "Unauthorized." }, { status: 401 });
+
+    const { data: sites, error } = await supabase.from("navigator_sites").select("id,url,icon_url");
+    if (error) throw error;
+    const { url: supabaseUrl } = getSupabaseConfiguration();
+    const pending = (sites ?? []).filter((site) => !site.icon_url || !isManagedIconUrl(site.icon_url, supabaseUrl));
+    const results: Array<{ id: string; status: string }> = [];
+
+    for (let index = 0; index < pending.length; index += 3) {
+      const batch = pending.slice(index, index + 3);
+      const batchResults = await Promise.all(batch.map(async (site) => {
+        try {
+          const result = await storeIcon(supabase, site.id, site.url, site.icon_url);
+          return { id: site.id, status: result.status };
+        } catch {
+          return { id: site.id, status: "error" };
+        }
+      }));
+      results.push(...batchResults);
+    }
+
+    return Response.json({ processed: results.length, results });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not backfill website icons.";
     return Response.json({ error: message }, { status: 500 });
   }
 }

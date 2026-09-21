@@ -197,6 +197,7 @@ export function NavDirectory() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const blockSiteOpenUntil = useRef(0);
+  const iconBackfillStarted = useRef(false);
   const categorySensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
   );
@@ -225,6 +226,21 @@ export function NavDirectory() {
     const initialLoad = window.setTimeout(() => void loadDirectory(), 0);
     return () => window.clearTimeout(initialLoad);
   }, [isAdmin, loadDirectory]);
+
+  useEffect(() => {
+    if (!isAdmin || loading || iconBackfillStarted.current) return;
+    iconBackfillStarted.current = true;
+
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return;
+      const response = await fetch("/api/nav/icon", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      });
+      if (response.ok) await loadDirectory();
+    })();
+  }, [isAdmin, loading, loadDirectory, supabase]);
 
   const filteredSites = useMemo(() => {
     const keyword = query.trim().toLowerCase();
