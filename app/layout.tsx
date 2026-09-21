@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Sans_Mono } from "next/font/google";
 import "./globals.css";
+import { SiteAuthProvider } from "./site-auth";
 
 const notoSans = Noto_Sans({
   variable: "--font-noto-sans",
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${notoSans.variable} ${notoMono.variable}`}>
-      <body>{children}</body>
+      <body><SiteAuthProvider>{children}</SiteAuthProvider></body>
     </html>
   );
 }

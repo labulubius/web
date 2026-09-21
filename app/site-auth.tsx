@@ -28,7 +28,10 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data, error } = await supabase.rpc("navigator_is_admin");
+    let { data, error } = await supabase.rpc("site_is_admin");
+    if (error) {
+      ({ data, error } = await supabase.rpc("navigator_is_admin"));
+    }
     setIsAdmin(!error && data === true);
     setLoading(false);
   }, [supabase]);
@@ -97,7 +100,7 @@ export function AccountControl() {
         <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialogOpen(false); }}>
           <section className="breeze-dialog auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title">
             <header>
-              <h2 id="auth-dialog-title">Owner sign in</h2>
+              <h2 id="auth-dialog-title">Site owner sign in</h2>
               <button type="button" onClick={() => setDialogOpen(false)} aria-label="Close"><X size={17} /></button>
             </header>
             <form onSubmit={handleLogin}>
