@@ -3,6 +3,21 @@
 :root {
   --background: #dceaf3;
   --foreground: #232629;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --background: #141618;
+  --foreground: #fcfcfc;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] {
+    --background: #141618;
+    --foreground: #fcfcfc;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
@@ -46,7 +61,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 
 .plasma-desktop::before { display: none; }
 
-.plasma-desktop[data-theme="dark"] {
+html[data-theme="dark"] .plasma-desktop {
   --window: #202326;
   --window-alt: #292c30;
   --view: #141618;
@@ -63,6 +78,27 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   --frame: rgba(252, 252, 252, .18);
   --separator: rgba(252, 252, 252, .12);
   background: var(--window);
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] .plasma-desktop {
+    --window: #202326;
+    --window-alt: #292c30;
+    --view: #141618;
+    --view-alt: #1d1f22;
+    --button: #292c30;
+    --header: #292c30;
+    --header-alt: #202326;
+    --tooltip: #292c30;
+    --text: #fcfcfc;
+    --text-muted: #a1a9b1;
+    --accent: #3daee9;
+    --accent-soft: #1e5774;
+    --link: #1d99f3;
+    --frame: rgba(252, 252, 252, .18);
+    --separator: rgba(252, 252, 252, .12);
+    background: var(--window);
+  }
 }
 
 .breeze-window {

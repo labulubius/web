@@ -2,11 +2,12 @@
 
 import { Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
 
-type Theme = "light" | "dark";
-type ThemeMode = Theme | "system";
+type ThemeMode = "light" | "dark" | "system";
+
+const subscribeToHydration = () => () => {};
 
 const navigation = [
   { href: "/", label: "Home", icon: Home },
@@ -25,36 +26,29 @@ export function SiteShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "system";
-    return (window.localStorage.getItem("site-theme-mode") as ThemeMode | null) ?? "system";
+    const storedMode = window.localStorage.getItem("site-theme-mode");
+    return storedMode === "light" || storedMode === "dark" ? storedMode : "system";
   });
-  const [systemTheme, setSystemTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
-  const theme = themeMode === "system" ? systemTheme : themeMode;
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+  const displayedThemeMode = hydrated ? themeMode : "system";
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncTheme = () => setSystemTheme(media.matches ? "dark" : "light");
-    syncTheme();
-    media.addEventListener("change", syncTheme);
-    return () => media.removeEventListener("change", syncTheme);
-  }, []);
+    document.documentElement.dataset.theme = themeMode;
+  }, [themeMode]);
 
   function cycleThemeMode() {
     const next: ThemeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
     setThemeMode(next);
+    document.documentElement.dataset.theme = next;
     window.localStorage.setItem("site-theme-mode", next);
   }
 
-  const ThemeIcon = themeMode === "system" ? Monitor : themeMode === "light" ? Sun : Moon;
+  const ThemeIcon = displayedThemeMode === "system" ? Monitor : displayedThemeMode === "light" ? Sun : Moon;
 
   return (
     <div
       className="plasma-desktop"
-      data-theme={theme}
       data-sidebar-collapsed={sidebarCollapsed}
-      suppressHydrationWarning
     >
       <main className="breeze-window">
         <div className="tool-bar">
@@ -79,8 +73,8 @@ export function SiteShell({
           </nav>
           <div className="toolbar-spacer" />
           <div className="toolbar-account-slot"><AccountControl /></div>
-          <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${themeMode}`} aria-label={`Color theme: ${themeMode}. Click to change.`}>
-            <ThemeIcon size={17} /><span>{themeMode === "system" ? "System theme" : `${themeMode} theme`}</span>
+          <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${displayedThemeMode}`} aria-label={`Color theme: ${displayedThemeMode}. Click to change.`}>
+            <ThemeIcon size={17} /><span>{displayedThemeMode === "system" ? "System theme" : `${displayedThemeMode} theme`}</span>
           </button>
         </div>
 

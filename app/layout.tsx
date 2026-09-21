@@ -21,9 +21,25 @@ export const metadata: Metadata = {
   description: "A personal workspace for useful links, ideas, and open technologies.",
 };
 
+const themeInitScript = `
+  (function () {
+    try {
+      var mode = localStorage.getItem("site-theme-mode");
+      if (mode !== "light" && mode !== "dark" && mode !== "system") mode = "system";
+      document.documentElement.dataset.theme = mode;
+    } catch (_) {}
+  })();
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${notoSans.variable} ${notoMono.variable}`}>
+    <html
+      lang="en"
+      className={`${notoSans.variable} ${notoMono.variable}`}
+      data-theme="system"
+      suppressHydrationWarning
+    >
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head>
       <body><SiteAuthProvider>{children}</SiteAuthProvider></body>
     </html>
   );
