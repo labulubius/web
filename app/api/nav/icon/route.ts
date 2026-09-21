@@ -263,31 +263,76 @@ function isManagedIconUrl(value: string, supabaseUrl: string) {
   return value.startsWith(`${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}/`);
 }
 
-async function removeStoredIcons(supabase: Awaited<ReturnType<typeof getAdminClient>>, siteId: string, except?: string) {
-  if (!supabase) return;
-  const { data, error } = await supabase.storage.from(BUCKET).list("sites", { limit: 1000, search: siteId });
-  if (error) throw error;
-  const paths = (data ?? [])
-    .map(({ name }) => `sites/${name}`)
-    .filter((path) => {
-      const name = path.slice("sites/".length);
-      return (name.startsWith(`${siteId}.`) || name.startsWith(`${siteId}-`)) && path !== except;
-    });
-  if (paths.length > 0) {
-    const { error: removeError } = await supabase.storage.from(BUCKET).remove(paths);
-    if (removeError) throw removeError;
+type AdminClient = NonNullable<Awaited<ReturnType<typeof getAdminClient>>>;
+
+async function retryStorageOperation(operation: () => Promise<void>) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await operation();
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150 * 2 ** attempt));
+    }
+  }
+  throw lastError;
+}
+
+async function removeStoragePaths(supabase: AdminClient, paths: string[]) {
+  if (paths.length === 0) return;
+  await retryStorageOperation(async () => {
+    const { error } = await supabase.storage.from(BUCKET).remove(paths);
+    if (error) throw error;
+  });
+}
+
+async function removeStoredIcons(supabase: AdminClient, siteId: string) {
+  await retryStorageOperation(async () => {
+    const { data, error } = await supabase.storage.from(BUCKET).list("sites", { limit: 1000, search: siteId });
+    if (error) throw error;
+    const paths = (data ?? [])
+      .map(({ name }) => `sites/${name}`)
+      .filter((path) => {
+        const name = path.slice("sites/".length);
+        return name.startsWith(`${siteId}.`) || name.startsWith(`${siteId}-`);
+      });
+    if (paths.length > 0) {
+      const { error: removeError } = await supabase.storage.from(BUCKET).remove(paths);
+      if (removeError) throw removeError;
+    }
+  });
+}
+
+function managedIconPath(value: string | null, supabaseUrl: string) {
+  if (!value || !isManagedIconUrl(value, supabaseUrl)) return null;
+  try {
+    const url = new URL(value);
+    const marker = `/storage/v1/object/public/${BUCKET}/`;
+    const path = decodeURIComponent(url.pathname.slice(url.pathname.indexOf(marker) + marker.length));
+    return path.startsWith("sites/") && !path.includes("..") ? path : null;
+  } catch {
+    return null;
   }
 }
 
-type AdminClient = NonNullable<Awaited<ReturnType<typeof getAdminClient>>>;
+async function updateIconIfCurrent(supabase: AdminClient, siteId: string, previousIconUrl: string | null, nextIconUrl: string | null) {
+  const query = supabase.from("navigator_sites").update({ icon_url: nextIconUrl }).eq("id", siteId);
+  const result = previousIconUrl === null
+    ? await query.is("icon_url", null).select("id").maybeSingle()
+    : await query.eq("icon_url", previousIconUrl).select("id").maybeSingle();
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error("The website icon changed during import. Please try again.");
+}
 
-async function storeIcon(supabase: AdminClient, siteId: string, siteUrl: string, sourceUrl: string | null) {
+async function storeIcon(supabase: AdminClient, siteId: string, siteUrl: string, sourceUrl: string | null, previousIconUrl: string | null) {
+  const { url: supabaseUrl } = getSupabaseConfiguration();
+  const previousPath = managedIconPath(previousIconUrl, supabaseUrl);
   const icon = await discoverIcon(siteUrl, sourceUrl);
   if (!icon) {
-    const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: null }).eq("id", siteId);
-    if (updateError) throw updateError;
-    await removeStoredIcons(supabase, siteId);
-    return { status: "fallback", iconUrl: null };
+    return previousIconUrl
+      ? { status: "retained", iconUrl: previousIconUrl }
+      : { status: "fallback", iconUrl: null };
   }
 
   const path = `sites/${siteId}-${randomUUID()}.${icon.extension}`;
@@ -299,12 +344,13 @@ async function storeIcon(supabase: AdminClient, siteId: string, siteUrl: string,
   if (uploadError) throw uploadError;
 
   const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  const { error: updateError } = await supabase.from("navigator_sites").update({ icon_url: publicUrlData.publicUrl }).eq("id", siteId);
-  if (updateError) {
-    await supabase.storage.from(BUCKET).remove([path]);
-    throw updateError;
+  try {
+    await updateIconIfCurrent(supabase, siteId, previousIconUrl, publicUrlData.publicUrl);
+  } catch (error) {
+    await removeStoragePaths(supabase, [path]);
+    throw error;
   }
-  await removeStoredIcons(supabase, siteId, path);
+  if (previousPath && previousPath !== path) await removeStoragePaths(supabase, [previousPath]);
   return { status: "stored", iconUrl: publicUrlData.publicUrl };
 }
 
@@ -320,15 +366,15 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid website ID." }, { status: 400 });
     }
 
-    const { data: site, error: siteError } = await supabase.from("navigator_sites").select("url").eq("id", siteId).single();
+    const { data: site, error: siteError } = await supabase.from("navigator_sites").select("url,icon_url").eq("id", siteId).single();
     if (siteError || !site) return Response.json({ error: "Website not found." }, { status: 404 });
 
     const { url: supabaseUrl } = getSupabaseConfiguration();
-    if (sourceUrl && isManagedIconUrl(sourceUrl, supabaseUrl)) {
+    if (sourceUrl && sourceUrl === site.icon_url && isManagedIconUrl(sourceUrl, supabaseUrl)) {
       return Response.json({ status: "unchanged", iconUrl: sourceUrl });
     }
 
-    return Response.json(await storeIcon(supabase, siteId, site.url, sourceUrl));
+    return Response.json(await storeIcon(supabase, siteId, site.url, sourceUrl, site.icon_url));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not import the website icon.";
     return Response.json({ error: message }, { status: 500 });
@@ -336,6 +382,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  let websiteDeleted = false;
   try {
     const supabase = await getAdminClient(request);
     if (!supabase) return Response.json({ error: "Unauthorized." }, { status: 401 });
@@ -345,10 +392,16 @@ export async function DELETE(request: Request) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(siteId)) {
       return Response.json({ error: "Invalid website ID." }, { status: 400 });
     }
+    const { error: deleteError } = await supabase.from("navigator_sites").delete().eq("id", siteId);
+    if (deleteError) throw deleteError;
+    websiteDeleted = true;
     await removeStoredIcons(supabase, siteId);
     return Response.json({ status: "deleted" });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not remove the website icon.";
+    const detail = error instanceof Error ? error.message : "Unknown error";
+    const message = websiteDeleted
+      ? `Website deleted, but its stored icon could not be removed: ${detail}`
+      : `Could not delete the website: ${detail}`;
     return Response.json({ error: message }, { status: 500 });
   }
 }

@@ -159,6 +159,7 @@ function SiteCard({
               alt=""
               draggable={false}
               src={icon}
+              onLoad={(event) => { event.currentTarget.style.display = ""; }}
               onError={(event) => { event.currentTarget.style.display = "none"; }}
             />
           )}
@@ -281,12 +282,12 @@ export function NavDirectory() {
     setSaving(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
+    const iconSourceUrl = String(form.get("icon_url") ?? "").trim() || null;
     const values = {
       name: String(form.get("name") ?? "").trim(),
       url: String(form.get("url") ?? "").trim(),
       description: String(form.get("description") ?? "").trim(),
       category_id: String(form.get("category_id") ?? ""),
-      icon_url: String(form.get("icon_url") ?? "").trim() || null,
       is_published: form.get("is_published") === "on",
     };
     const categorySiteCount = sites.filter((site) => site.category_id === values.category_id).length;
@@ -295,7 +296,7 @@ export function NavDirectory() {
       : values;
     const result = editingSite
       ? await supabase.from("navigator_sites").update(siteValues).eq("id", editingSite.id)
-      : await supabase.from("navigator_sites").insert({ ...values, sort_order: categorySiteCount }).select("id").single();
+      : await supabase.from("navigator_sites").insert({ ...values, icon_url: null, sort_order: categorySiteCount }).select("id").single();
     if (result.error) {
       setSaving(false);
       setMessage(result.error.message);
@@ -305,7 +306,7 @@ export function NavDirectory() {
     const siteId = editingSite?.id ?? result.data?.id;
     try {
       if (!siteId) throw new Error("The saved website ID was not returned.");
-      await requestIconImport("POST", siteId, values.icon_url);
+      await requestIconImport("POST", siteId, iconSourceUrl);
       setSaving(false);
       closeDialog();
       await loadDirectory();
@@ -337,10 +338,11 @@ export function NavDirectory() {
 
   async function deleteSite(site: Site) {
     if (!window.confirm(`Delete “${site.name}”?`)) return;
-    const { error } = await supabase.from("navigator_sites").delete().eq("id", site.id);
-    if (error) setMessage(error.message);
-    else {
-      await requestIconImport("DELETE", site.id).catch(() => undefined);
+    try {
+      await requestIconImport("DELETE", site.id);
+      await loadDirectory();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete the website and its icon.");
       await loadDirectory();
     }
   }
@@ -369,22 +371,18 @@ export function NavDirectory() {
     const siteLabel = siteCount === 1 ? "website" : "websites";
     if (!window.confirm(`Delete the “${category.name}” group and its ${siteCount} ${siteLabel}? This cannot be undone.`)) return;
 
-    let { error } = await supabase.from("navigator_categories").delete().eq("id", category.id);
-
-    // Support databases that have not applied the cascading foreign-key migration yet.
-    if (error?.code === "23503") {
-      const siteResult = await supabase.from("navigator_sites").delete().eq("category_id", category.id);
-      if (siteResult.error) {
-        setMessage(`Could not delete the group websites: ${siteResult.error.message}`);
-        return;
-      }
-      ({ error } = await supabase.from("navigator_categories").delete().eq("id", category.id));
+    const categorySites = sites.filter((site) => site.category_id === category.id);
+    try {
+      for (const site of categorySites) await requestIconImport("DELETE", site.id);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete all group websites and icons.");
+      await loadDirectory();
+      return;
     }
 
+    const { error } = await supabase.from("navigator_categories").delete().eq("id", category.id);
     if (error) setMessage(`Could not delete the group: ${error.message}`);
     else {
-      const deletedSiteIds = sites.filter((site) => site.category_id === category.id).map((site) => site.id);
-      await Promise.allSettled(deletedSiteIds.map((siteId) => requestIconImport("DELETE", siteId)));
       if (categoryId === category.id) setCategoryId("favorites");
       await loadDirectory();
     }
