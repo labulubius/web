@@ -69,13 +69,6 @@ export function AccountControl() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  function openDialog() {
-    setError("");
-    setMessage("");
-    setDialogOpen(true);
-  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,45 +84,14 @@ export function AccountControl() {
     else setDialogOpen(false);
   }
 
-  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const password = String(form.get("newPassword") ?? "");
-    const confirmation = String(form.get("confirmPassword") ?? "");
-
-    setError("");
-    setMessage("");
-    if (password !== confirmation) {
-      setError("The new passwords do not match.");
-      return;
-    }
-
-    setSaving(true);
-    const result = await supabase.auth.updateUser({ password });
-    setSaving(false);
-    if (result.error) {
-      setError(result.error.message);
-      return;
-    }
-
-    formElement.reset();
-    setMessage("Password updated successfully.");
-  }
-
-  async function handleSignOut() {
-    setDialogOpen(false);
-    await supabase.auth.signOut();
-  }
-
   return (
     <>
       {user ? (
-        <button className="account-control" type="button" onClick={openDialog} title={`Manage ${user.email ?? "account"}`}>
-          <UserIcon size={15} /><span>{isAdmin ? "Owner" : "Read only"}</span>
+        <button className="account-control" type="button" onClick={() => void supabase.auth.signOut()} title={`Sign out ${user.email ?? ""}`}>
+          <UserIcon size={15} /><span>{isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} />
         </button>
       ) : (
-        <button className="account-control" type="button" disabled={loading} onClick={openDialog}>
+        <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }}>
           <LogIn size={15} /><span>{loading ? "Account" : "Sign in"}</span>
         </button>
       )}
@@ -138,32 +100,18 @@ export function AccountControl() {
         <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialogOpen(false); }}>
           <section className="breeze-dialog auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title">
             <header>
-              <h2 id="auth-dialog-title">{user ? "Account settings" : "Site owner sign in"}</h2>
+              <h2 id="auth-dialog-title">Site owner sign in</h2>
               <button type="button" onClick={() => setDialogOpen(false)} aria-label="Close"><X size={17} /></button>
             </header>
-            {user ? (
-              <form onSubmit={handlePasswordChange}>
-                <p className="account-email"><UserIcon size={15} /> {user.email}</p>
-                <label>New password<input name="newPassword" type="password" autoComplete="new-password" minLength={6} autoFocus required /></label>
-                <label>Confirm new password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={6} required /></label>
-                {error && <p className="form-error" role="alert">{error}</p>}
-                {message && <p className="form-success" role="status">{message}</p>}
-                <footer>
-                  <button type="button" onClick={() => void handleSignOut()}><LogOut size={13} /> Sign out</button>
-                  <button className="primary" type="submit" disabled={saving}>{saving ? "Updating…" : "Update password"}</button>
-                </footer>
-              </form>
-            ) : (
-              <form onSubmit={handleLogin}>
-                <label>Email<input name="email" type="email" autoComplete="username" autoFocus required /></label>
-                <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-                {error && <p className="form-error" role="alert">{error}</p>}
-                <footer>
-                  <button type="button" onClick={() => setDialogOpen(false)}>Cancel</button>
-                  <button className="primary" type="submit" disabled={saving}>{saving ? "Signing in…" : "Sign in"}</button>
-                </footer>
-              </form>
-            )}
+            <form onSubmit={handleLogin}>
+              <label>Email<input name="email" type="email" autoComplete="username" autoFocus required /></label>
+              <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
+              {error && <p className="form-error" role="alert">{error}</p>}
+              <footer>
+                <button type="button" onClick={() => setDialogOpen(false)}>Cancel</button>
+                <button className="primary" type="submit" disabled={saving}>{saving ? "Signing in…" : "Sign in"}</button>
+              </footer>
+            </form>
           </section>
         </div>
       )}
