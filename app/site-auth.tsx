@@ -28,10 +28,7 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    let { data, error } = await supabase.rpc("site_is_admin");
-    if (error) {
-      ({ data, error } = await supabase.rpc("navigator_is_admin"));
-    }
+    const { data, error } = await supabase.rpc("site_is_admin");
     setIsAdmin(!error && data === true);
     setLoading(false);
   }, [supabase]);
