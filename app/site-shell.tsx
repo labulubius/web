@@ -68,7 +68,7 @@ export function SiteShell({
           <nav aria-label="Main navigation">
             {navigation.map(({ href, label, icon: Icon }) => (
               <Fragment key={href}>
-                <Link className={active === href ? "active" : ""} href={href} aria-current={active === href ? "page" : undefined}>
+                <Link className={active === href ? "active" : ""} href={`https://www.labulubius.com${href}`} aria-current={active === href ? "page" : undefined}>
                   <Icon size={18} /><span>{label}</span>
                 </Link>
                 {href === "/nav" && isAdmin && <Link className={active === "/drive" ? "active" : ""} href="https://drive.labulubius.com/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
