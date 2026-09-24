@@ -1,9 +1,9 @@
 "use client";
 
-import { Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
+import { Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AccountControl } from "./site-auth";
+import { AccountControl, useSiteAuth } from "./site-auth";
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -23,6 +23,7 @@ export function SiteShell({
   active: string;
   title: string;
 }) {
+  const { isAdmin } = useSiteAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "system";
@@ -70,6 +71,7 @@ export function SiteShell({
                 <Icon size={18} /><span>{label}</span>
               </Link>
             ))}
+            {isAdmin && <Link className={active === "/drive" ? "active" : ""} href="/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
           </nav>
           <div className="toolbar-spacer" />
           <div className="toolbar-account-slot"><AccountControl /></div>
