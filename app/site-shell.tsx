@@ -71,7 +71,7 @@ export function SiteShell({
                 <Link className={active === href ? "active" : ""} href={href} aria-current={active === href ? "page" : undefined}>
                   <Icon size={18} /><span>{label}</span>
                 </Link>
-                {href === "/nav" && isAdmin && <Link className={active === "/drive" ? "active" : ""} href="/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
+                {href === "/nav" && isAdmin && <Link className={active === "/drive" ? "active" : ""} href="https://drive.labulubius.com/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
               </Fragment>
             ))}
           </nav>
