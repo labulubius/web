@@ -2,7 +2,7 @@
 
 import { Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl, useSiteAuth } from "./site-auth";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -67,11 +67,13 @@ export function SiteShell({
           </button>
           <nav aria-label="Main navigation">
             {navigation.map(({ href, label, icon: Icon }) => (
-              <Link className={active === href ? "active" : ""} href={href} key={href} aria-current={active === href ? "page" : undefined}>
-                <Icon size={18} /><span>{label}</span>
-              </Link>
+              <Fragment key={href}>
+                <Link className={active === href ? "active" : ""} href={href} aria-current={active === href ? "page" : undefined}>
+                  <Icon size={18} /><span>{label}</span>
+                </Link>
+                {href === "/nav" && isAdmin && <Link className={active === "/drive" ? "active" : ""} href="/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
+              </Fragment>
             ))}
-            {isAdmin && <Link className={active === "/drive" ? "active" : ""} href="/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
           </nav>
           <div className="toolbar-spacer" />
           <div className="toolbar-account-slot"><AccountControl /></div>
