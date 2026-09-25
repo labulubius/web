@@ -1,5 +1,6 @@
 import { ArrowRight, Compass, ExternalLink, Info } from "lucide-react";
 import Link from "next/link";
+import { DriveShortcut } from "./drive-shortcut";
 import { PlacesSidebar } from "./places-sidebar";
 import { SiteShell } from "./site-shell";
 
@@ -27,6 +28,7 @@ export default function Home() {
               <span><strong>Open Web Navigator</strong><small>Browse a curated collection of useful websites and open resources</small></span>
               <ArrowRight size={18} />
             </Link>
+            <DriveShortcut />
             <Link href="/about" className="action-row">
               <span className="action-icon"><Info size={24} /></span>
               <span><strong>About this workspace</strong><small>Learn about this website, its design choices, and its purpose</small></span>

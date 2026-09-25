@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, File, Folder, FolderPlus, HardDrive, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Download, File, Folder, FolderPlus, HardDrive, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import "./drive.css";
@@ -102,20 +102,27 @@ export function DriveManager() {
 
   return (
     <section className="drive-view">
-      <header className="drive-header"><div><h1><HardDrive size={22} /> Private Drive</h1><p>Files are stored on this web server. Maximum 20 MB per file.</p></div>
-        <div className="drive-actions"><button onClick={createFolder} disabled={busy} type="button"><FolderPlus size={16} /> New folder</button><button onClick={() => fileInput.current?.click()} disabled={busy} type="button"><Upload size={16} /> Upload</button><input ref={fileInput} type="file" multiple hidden onChange={(event) => upload(event.target.files)} /></div>
+      <header className="drive-header">
+        <div><p className="drive-eyebrow">PERSONAL WORKSPACE / ADMINISTRATOR</p><h1><HardDrive size={22} /> Private Drive</h1><p>Private files on this server · 20 MB per file</p></div>
+        <div className="drive-actions"><button onClick={createFolder} disabled={busy} type="button"><FolderPlus size={16} /> New folder</button><button onClick={() => fileInput.current?.click()} disabled={busy} type="button"><Upload size={16} /> Upload files</button><input ref={fileInput} type="file" multiple hidden onChange={(event) => upload(event.target.files)} /></div>
       </header>
-      <nav className="drive-breadcrumbs" aria-label="Drive path"><button type="button" onClick={() => setParts([])}>Drive</button>{parts.map((part, index) => <span key={index}> / <button type="button" onClick={() => setParts(parts.slice(0, index + 1))}>{part}</button></span>)}</nav>
+      <div className="drive-location">
+        <button className="drive-back" type="button" onClick={() => setParts(parts.slice(0, -1))} disabled={parts.length === 0} aria-label="Go to parent folder" title="Go to parent folder"><ArrowLeft size={17} /></button>
+        <nav className="drive-breadcrumbs" aria-label="Drive path"><button type="button" onClick={() => setParts([])}>Drive</button>{parts.map((part, index) => <span key={index}> / <button type="button" onClick={() => setParts(parts.slice(0, index + 1))} aria-current={index === parts.length - 1 ? "location" : undefined}>{part}</button></span>)}</nav>
+        <button className="drive-refresh" type="button" onClick={() => void reload()} disabled={loadingList || busy} aria-label="Refresh files" title="Refresh files"><RefreshCw size={16} /></button>
+      </div>
       {error && <p className="drive-error" role="alert">{error}</p>}
-      {loadingList ? <p>Loading files…</p> : entries.length === 0 ? <p className="drive-empty">This folder is empty.</p> :
+      <div className="drive-list-heading"><strong>{parts.at(-1) ?? "My files"}</strong><span>{loadingList ? "Loading…" : `${entries.length} ${entries.length === 1 ? "item" : "items"}`}</span></div>
+      {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
+        <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
         <ul className="drive-list">{entries.map((entry) => <li key={entry.name}>
           <span className="drive-file-icon">{entry.type === "folder" ? <Folder size={21} /> : <File size={21} />}</span>
           {entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => setParts([...parts, entry.name])}>{entry.name}</button> : <span className="drive-name">{entry.name}</span>}
           <span className="drive-detail">{entry.type === "file" ? `${(entry.size / 1024).toFixed(1)} KB` : "Folder"}</span>
           <span className="drive-detail">{new Date(entry.modified).toLocaleDateString()}</span>
-          {entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>}
-          <button className="drive-icon-button" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={17} /></button>
-        </li>)}</ul>}
+          <span className="drive-row-actions">{entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>}
+          <button className="drive-icon-button drive-delete" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={17} /></button></span>
+        </li>)}</ul></div>}
     </section>
   );
 }

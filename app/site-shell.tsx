@@ -2,7 +2,7 @@
 
 import { Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl, useSiteAuth } from "./site-auth";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -12,6 +12,7 @@ const subscribeToHydration = () => () => {};
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
+  { href: "/drive", label: "Drive", icon: HardDrive, adminOnly: true },
   { href: "/about", label: "About", icon: Info },
 ];
 
@@ -66,13 +67,10 @@ export function SiteShell({
             <span>Sidebar</span>
           </button>
           <nav aria-label="Main navigation">
-            {navigation.map(({ href, label, icon: Icon }) => (
-              <Fragment key={href}>
-                <Link className={active === href ? "active" : ""} href={`https://labulubius.com${href}`} aria-current={active === href ? "page" : undefined}>
-                  <Icon size={18} /><span>{label}</span>
-                </Link>
-                {href === "/nav" && isAdmin && <Link className={active === "/drive" ? "active" : ""} href="https://drive.labulubius.com/drive" aria-current={active === "/drive" ? "page" : undefined}><HardDrive size={18} /><span>Drive</span></Link>}
-              </Fragment>
+            {navigation.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => (
+              <Link key={href} className={active === href ? "active" : ""} href={`https://labulubius.com${href}`} aria-current={active === href ? "page" : undefined} title={label}>
+                <Icon size={18} /><span>{label}</span>
+              </Link>
             ))}
           </nav>
           <div className="toolbar-spacer" />

@@ -1,22 +1,46 @@
-.drive-view { margin: 0 auto; max-width: 1080px; padding: 28px; }
-.drive-header { align-items: center; display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--separator); padding-bottom: 18px; }
-.drive-header h1 { align-items: center; display: flex; gap: 9px; font-size: 21px; font-weight: 500; margin: 0; }
+.drive-view { margin: 0 auto; max-width: 1080px; padding: 36px 28px; width: 100%; }
+.drive-header { align-items: flex-end; display: flex; justify-content: space-between; gap: 20px; padding-bottom: 24px; }
+.drive-header .drive-eyebrow { color: var(--link); font-size: 10px; font-weight: 600; letter-spacing: .08em; margin: 0 0 8px; }
+.drive-header h1 { align-items: center; display: flex; gap: 9px; font-size: 24px; font-weight: 500; margin: 0; }
+.drive-header h1 svg { color: var(--link); }
 .drive-header p, .drive-view > p { color: var(--text-muted); font-size: 12px; }
-.drive-actions { display: flex; gap: 8px; }
-.drive-actions button, .drive-icon-button { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; padding: 7px 10px; }
-.drive-actions button:disabled, .drive-icon-button:disabled { cursor: wait; opacity: .5; }
-.drive-actions button:hover, .drive-icon-button:hover { border-color: var(--accent); }
-.drive-breadcrumbs { color: var(--text-muted); font-size: 12px; margin: 17px 0; overflow-wrap: anywhere; }
+.drive-header h1 + p { margin: 7px 0 0; }
+.drive-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.drive-actions button, .drive-icon-button, .drive-back, .drive-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; }
+.drive-actions button:hover, .drive-icon-button:hover, .drive-back:hover, .drive-refresh:hover { border-color: var(--accent); }
+.drive-actions button:disabled, .drive-icon-button:disabled, .drive-back:disabled, .drive-refresh:disabled { cursor: default; opacity: .45; }
+.drive-location { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 10px; min-height: 43px; padding: 5px 9px; }
+.drive-back, .drive-refresh { background: transparent; border-color: transparent; flex-shrink: 0; padding: 5px; }
+.drive-breadcrumbs { color: var(--text-muted); flex: 1; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
 .drive-breadcrumbs button { background: none; border: 0; color: var(--link); cursor: pointer; padding: 3px; }
+.drive-breadcrumbs button[aria-current="location"] { color: var(--text); font-weight: 600; }
 .drive-breadcrumbs button:hover, .drive-name:hover:is(button) { text-decoration: underline; }
-.drive-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--separator); border-radius: 4px; }
-.drive-list li { align-items: center; display: flex; gap: 12px; min-height: 54px; padding: 7px 12px; }
+.drive-list-heading { align-items: baseline; display: flex; gap: 12px; justify-content: space-between; padding: 22px 2px 10px; }
+.drive-list-heading strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.drive-list-heading span { color: var(--text-muted); flex-shrink: 0; font-size: 11px; }
+.drive-list-wrap { border: 1px solid var(--separator); border-radius: 5px; overflow: hidden; }
+.drive-columns { background: var(--view-alt); border-bottom: 1px solid var(--separator); color: var(--text-muted); display: grid; font-size: 11px; grid-template-columns: minmax(0, 1fr) 90px 90px 76px; gap: 12px; padding: 9px 12px; }
+.drive-columns span:not(:first-child) { text-align: right; }
+.drive-list { list-style: none; margin: 0; padding: 0; }
+.drive-list li { align-items: center; display: flex; gap: 12px; min-height: 55px; padding: 7px 12px; }
 .drive-list li + li { border-top: 1px solid var(--separator); }
-.drive-file-icon { color: var(--link); display: flex; }
+.drive-list li:hover { background: color-mix(in srgb, var(--accent) 7%, var(--view)); }
+.drive-file-icon { color: var(--link); display: flex; flex-shrink: 0; }
 .drive-name { background: none; border: 0; color: var(--text); flex: 1; font-size: 13px; min-width: 0; overflow-wrap: anywhere; padding: 0; text-align: left; }
 button.drive-name { color: var(--link); cursor: pointer; }
-.drive-detail { color: var(--text-muted); font-size: 11px; min-width: 70px; text-align: right; }
-.drive-icon-button { flex-shrink: 0; padding: 5px; }
-.drive-error { background: color-mix(in srgb, var(--negative) 12%, var(--view)); border: 1px solid var(--negative); border-radius: 4px; padding: 9px; }
-.drive-empty { border: 1px dashed var(--separator); padding: 40px; text-align: center; }
-@media (max-width: 650px) { .drive-view { padding: 16px; } .drive-header { align-items: flex-start; flex-direction: column; } .drive-detail { display: none; } }
+.drive-detail { color: var(--text-muted); flex-shrink: 0; font-size: 11px; text-align: right; width: 90px; }
+.drive-row-actions { align-items: center; display: flex; flex-shrink: 0; gap: 4px; justify-content: flex-end; width: 76px; }
+.drive-icon-button { padding: 5px; }
+.drive-delete:hover { border-color: var(--negative); color: var(--negative); }
+.drive-error { background: color-mix(in srgb, var(--negative) 12%, var(--view)); border: 1px solid var(--negative); border-radius: 4px; font-size: 12px; margin: 12px 0 0; padding: 9px; }
+.drive-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 12px; gap: 7px; padding: 42px 16px; text-align: center; }
+.drive-empty svg { color: var(--link); }
+.drive-empty strong { color: var(--text); font-size: 13px; }
+@media (max-width: 650px) {
+  .drive-view { padding: 22px 16px; }
+  .drive-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .drive-actions { width: 100%; }
+  .drive-actions button { flex: 1; }
+  .drive-columns { grid-template-columns: minmax(0, 1fr) 76px; }
+  .drive-columns span:nth-child(2), .drive-columns span:nth-child(3), .drive-detail { display: none; }
+}
