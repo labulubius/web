@@ -21,7 +21,9 @@ export function DriveManager() {
   const api = useCallback(async (url: string, options: RequestInit = {}) => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw new Error("Session expired. Please sign in again.");
-    const response = await fetch(url, {
+    // The main site runs on Vercel; Drive files live on the web server.
+    const origin = window.location.hostname === "labulubius.com" ? "https://drive.labulubius.com" : "";
+    const response = await fetch(`${origin}${url}`, {
       ...options,
       headers: { ...options.headers, Authorization: `Bearer ${data.session.access_token}` },
       cache: "no-store",

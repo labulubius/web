@@ -1,10 +1,13 @@
 import { readdir, lstat, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { driveError, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName } from "../../lib/drive-server";
+import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../lib/drive-server";
 
 export const runtime = "nodejs";
 
+export function OPTIONS(request: Request) { return drivePreflight(request); }
+
 export async function GET(request: Request) {
+  return withDriveCors(request, async () => {
   try {
     if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
     const parts = segments(new URL(request.url).searchParams.get("path") ?? "");
@@ -19,9 +22,11 @@ export async function GET(request: Request) {
     entries.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "folder" ? -1 : 1));
     return Response.json({ entries }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
+  });
 }
 
 export async function POST(request: Request) {
+  return withDriveCors(request, async () => {
   try {
     if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
     const body = await request.json() as { path?: unknown; name?: unknown };
@@ -32,9 +37,11 @@ export async function POST(request: Request) {
     await mkdir(path.join(parent, body.name));
     return Response.json({ ok: true }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
+  });
 }
 
 export async function DELETE(request: Request) {
+  return withDriveCors(request, async () => {
   try {
     if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
     const body = await request.json() as { path?: unknown };
@@ -45,4 +52,5 @@ export async function DELETE(request: Request) {
     await rm(target, { recursive: true });
     return Response.json({ ok: true }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
+  });
 }

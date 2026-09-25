@@ -1,10 +1,13 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
-import { driveError, MAX_UPLOAD_BYTES, privateHeaders, requireDriveAdmin, resolveDrivePath, segments } from "../../../lib/drive-server";
+import { driveError, drivePreflight, MAX_UPLOAD_BYTES, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, withDriveCors } from "../../../lib/drive-server";
 
 export const runtime = "nodejs";
 
+export function OPTIONS(request: Request) { return drivePreflight(request); }
+
 export async function GET(request: Request) {
+  return withDriveCors(request, async () => {
   try {
     if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
     const parts = segments(new URL(request.url).searchParams.get("path") ?? "");
@@ -27,4 +30,5 @@ export async function GET(request: Request) {
       });
     } finally { await handle.close(); }
   } catch (error) { return driveError(error); }
+  });
 }

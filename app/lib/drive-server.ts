@@ -4,6 +4,32 @@ import { createClient } from "@supabase/supabase-js";
 import { lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
 
+const DRIVE_UI_ORIGIN = "https://labulubius.com";
+
+// The UI runs on Vercel; storage and these APIs run on the web server.
+export async function withDriveCors(request: Request, handler: () => Promise<Response>): Promise<Response> {
+  const response = await handler();
+  if (request.headers.get("origin") === DRIVE_UI_ORIGIN) {
+    response.headers.set("Access-Control-Allow-Origin", DRIVE_UI_ORIGIN);
+    response.headers.append("Vary", "Origin");
+  }
+  return response;
+}
+
+export function drivePreflight(request: Request): Response {
+  if (request.headers.get("origin") !== DRIVE_UI_ORIGIN) return new Response(null, { status: 403 });
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": DRIVE_UI_ORIGIN,
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Authorization, Content-Type",
+      "Access-Control-Max-Age": "600",
+      "Vary": "Origin",
+    },
+  });
+}
+
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024;
 

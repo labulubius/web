@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { open, link, lstat, unlink } from "node:fs/promises";
 import path from "node:path";
-import { driveError, driveRoot, MAX_REQUEST_BYTES, MAX_UPLOAD_BYTES, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName } from "../../../lib/drive-server";
+import { driveError, drivePreflight, driveRoot, MAX_REQUEST_BYTES, MAX_UPLOAD_BYTES, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
 
 export const runtime = "nodejs";
 
+export function OPTIONS(request: Request) { return drivePreflight(request); }
+
 export async function POST(request: Request) {
+  return withDriveCors(request, async () => {
   try {
     if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
     const declared = Number(request.headers.get("content-length") ?? 0);
@@ -45,4 +48,5 @@ export async function POST(request: Request) {
     }
     return Response.json({ ok: true }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
+  });
 }
