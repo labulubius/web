@@ -65,6 +65,10 @@ export function driveError(error: unknown) {
   const code = (error as NodeJS.ErrnoException).code;
   const message = error instanceof Error ? error.message : "Drive operation failed.";
   const known = message.startsWith("Invalid") || message.startsWith("File") || message.startsWith("Folder") || message.startsWith("Upload") || message.startsWith("Name") || message.startsWith("Cannot");
+  if (!known && code !== "ENOENT" && code !== "EEXIST") {
+    // Do not log the request, authorization header, or bearer token.
+    console.error("Drive operation failed:", { code, name: error instanceof Error ? error.name : "UnknownError", message });
+  }
   return Response.json({ error: code === "ENOENT" ? "File or folder not found." : code === "EEXIST" ? "Name already exists." : known ? message : "Drive operation failed." }, {
     status: code === "ENOENT" ? 404 : code === "EEXIST" ? 409 : known ? 400 : 500,
     headers: { "Cache-Control": "no-store" },

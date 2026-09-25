@@ -14,6 +14,7 @@ export function DriveManager() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loadingList, setLoadingList] = useState(true);
+  const [listFailed, setListFailed] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const path = parts.join("/");
 
@@ -27,7 +28,7 @@ export function DriveManager() {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => null) as { error?: string } | null;
-      throw new Error(body?.error ?? "Drive request failed.");
+      throw new Error(`${body?.error ?? "Drive request failed."} (HTTP ${response.status})`);
     }
     return response;
   }, [supabase]);
@@ -35,13 +36,17 @@ export function DriveManager() {
   const reload = useCallback(async () => {
     if (!isAdmin) return;
     setLoadingList(true);
+    setListFailed(false);
     try {
       const response = await api(`/api/drive?path=${encodeURIComponent(path)}`);
       const data = await response.json() as { entries: Entry[] };
       setEntries(data.entries);
       setError("");
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load files."); }
-    finally { setLoadingList(false); }
+    } catch (failure) {
+      setEntries([]);
+      setListFailed(true);
+      setError(failure instanceof Error ? failure.message : "Could not load files.");
+    } finally { setLoadingList(false); }
   }, [api, isAdmin, path]);
 
   useEffect(() => { const timer = window.setTimeout(() => void reload(), 0); return () => window.clearTimeout(timer); }, [reload]);
@@ -112,8 +117,8 @@ export function DriveManager() {
         <button className="drive-refresh" type="button" onClick={() => void reload()} disabled={loadingList || busy} aria-label="Refresh files" title="Refresh files"><RefreshCw size={16} /></button>
       </div>
       {error && <p className="drive-error" role="alert">{error}</p>}
-      <div className="drive-list-heading"><strong>{parts.at(-1) ?? "My files"}</strong><span>{loadingList ? "Loading…" : `${entries.length} ${entries.length === 1 ? "item" : "items"}`}</span></div>
-      {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
+      <div className="drive-list-heading"><strong>{parts.at(-1) ?? "My files"}</strong><span>{loadingList ? "Loading…" : listFailed ? "Unavailable" : `${entries.length} ${entries.length === 1 ? "item" : "items"}`}</span></div>
+      {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : listFailed ? <p className="drive-empty">Could not load files. Check the error above and try Refresh files.</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
         <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
         <ul className="drive-list">{entries.map((entry) => <li key={entry.name}>
           <span className="drive-file-icon">{entry.type === "folder" ? <Folder size={21} /> : <File size={21} />}</span>
