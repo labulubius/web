@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder, FolderOpen, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Trash2, X } from "lucide-react";
+import { Folder, FolderOpen, LayoutGrid, Pencil, Plus, RefreshCw, Rss, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
@@ -136,7 +136,16 @@ export function NewsReader() {
   }
 
   if (loading) return <div className="news-access">Checking your account…</div>;
-  if (!isAdmin) return <div className="news-access"><Newspaper size={30} /><h1>Private News</h1><p>Sign in with the site owner account to read News.</p></div>;
+  if (!isAdmin) return <div className="news-layout">
+    <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
+      <div className="news-sidebar-heading"><h2>Categories</h2><button type="button" disabled aria-label="Add category"><Plus size={14} /></button></div>
+      <div className="news-category-row"><button className="news-all active" type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
+    </aside>
+    <section className="news-content" inert>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>News</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled aria-label="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled><Plus size={15} /> RSS</button></div></header>
+      <p className="news-empty">Articles are private to the administrator.</p>
+    </section>
+  </div>;
 
   const editedCategory = dialog?.kind === "category" ? categories.find((cat) => cat.id === dialog.id) : undefined;
   const editedFeed = dialog?.kind === "feed" ? feeds.find((feed) => feed.id === dialog.id) : undefined;

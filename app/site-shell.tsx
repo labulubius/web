@@ -3,7 +3,7 @@
 import { Compass, HardDrive, Home, Info, Menu, MessagesSquare, Monitor, Moon, Newspaper, Share2, StickyNote, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AccountControl, useSiteAuth } from "./site-auth";
+import { AccountControl } from "./site-auth";
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -21,11 +21,11 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
-  { href: "/news", label: "News", icon: Newspaper, adminOnly: true },
+  { href: "/news", label: "News", icon: Newspaper },
   { href: "/forums", label: "Forums", icon: MessagesSquare },
-  { href: "/drive", label: "Drive", icon: HardDrive, adminOnly: true },
-  { href: "/share", label: "Share", icon: Share2, adminOnly: true },
-  { href: "/note", label: "Note", icon: StickyNote, adminOnly: true },
+  { href: "/drive", label: "Drive", icon: HardDrive },
+  { href: "/share", label: "Share", icon: Share2 },
+  { href: "/note", label: "Note", icon: StickyNote },
   { href: "/about", label: "About", icon: Info },
 ];
 
@@ -37,7 +37,6 @@ export function SiteShell({
   active: string;
   title: string;
 }) {
-  const { isAdmin } = useSiteAuth();
   const [sidebarPreference, setSidebarPreference] = useState(() => ({
     page: active,
     collapsed: readSidebarCollapsed(active),
@@ -97,7 +96,7 @@ export function SiteShell({
             <span>Sidebar</span>
           </button>
           <nav aria-label="Main navigation">
-            {navigation.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => (
+            {navigation.map(({ href, label, icon: Icon }) => (
               <Link key={href} className={active === href ? "active" : ""} href={`https://labulubius.com${href}`} aria-current={active === href ? "page" : undefined} title={label}>
                 <Icon size={18} /><span>{label}</span>
               </Link>

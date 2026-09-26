@@ -77,7 +77,10 @@ export function ShareManager() {
 
   const visible = entries.filter((entry) => entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   if (loading) return <section className="share-view"><p>Checking account…</p></section>;
-  if (!isAdmin) return <section className="share-view"><h1>Public Share</h1><p>Only the site owner can manage shared files. Sign in to continue.</p></section>;
+  if (!isAdmin) return <section className="share-view" inert>
+    <header className="share-header"><div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1><p>Files here are public to anyone with a link · 20 MB per file</p></div><button type="button" className="share-button" disabled><Upload size={16} /> Upload files</button></header>
+    <div className="share-toolbar"><label>Search shared files <input type="search" placeholder="Search by name…" disabled /></label><span>Files are private to the administrator.</span><button type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>
+  </section>;
 
   return <section className="share-view">
     <header className="share-header">

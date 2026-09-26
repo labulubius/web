@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageCircle, MessagesSquare } from "lucide-react";
 import { SiteShell } from "../site-shell";
+import { ForumsInteraction } from "./forums-interaction";
 import { forumSources, latestTopics, type ForumTopic, type ForumSource } from "../lib/forums";
 import "./forums.css";
 
@@ -27,7 +28,7 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
         {forumSources.map((source) => <Link className={sourceId === source.id ? "selected" : ""} href={`/forums?source=${source.id}`} key={source.id}>{source.name}</Link>)}
         <p>Public conversations. Replies remain on their original sites.</p>
       </aside>
-      <section className="forums-content">
+      <ForumsInteraction className="forums-content">
         <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>Forums</h1><p>Recent discussions across the web · updated about every 5 minutes</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
         {failed.length > 0 && <p className="forums-warning" role="status">Could not load: {failed.join(", ")}. Try again later.</p>}
         {topics.length === 0 && <p className="forums-empty">No discussions available right now.</p>}
@@ -38,7 +39,7 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
             <div className="forums-topic-foot"><span><MessageCircle size={14} aria-hidden="true" /> {topic.reply_count} replies</span>{topic.closed && <span>Closed</span>}<a href={`${source.origin}/t/${topic.id}`} target="_blank" rel="noopener noreferrer">Original discussion ↗</a></div>
           </article>)}
         </div>
-      </section>
+      </ForumsInteraction>
     </div>
   </SiteShell>;
 }

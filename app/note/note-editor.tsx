@@ -113,7 +113,10 @@ export function NoteEditor() {
   }
 
   if (loading) return <section className="note-view"><p>Checking account…</p></section>;
-  if (!isAdmin) return <section className="note-view"><h1>Private Note</h1><p>Only the site owner can read or edit this note. Sign in to continue.</p></section>;
+  if (!isAdmin) return <section className="note-view" inert>
+    <header className="note-header"><div><h1>Private Note</h1><p>Plain text · Private to Owner · Autosaved</p></div></header>
+    <textarea className="note-text" aria-label="Private note (administrator only)" disabled value="" placeholder="Private to the administrator" readOnly />
+  </section>;
 
   return (
     <section className="note-view">

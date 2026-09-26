@@ -85,12 +85,10 @@ function SortableCategoryRow({
       >
         {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
       </button>
-      {isAdmin && (
-        <span className="category-actions" onPointerDown={(event) => event.stopPropagation()}>
-          <button type="button" onClick={onEdit} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>
-          <button type="button" onClick={onDelete} aria-label={`Delete ${category.name}`}><Trash2 size={12} /></button>
-        </span>
-      )}
+      <span className="category-actions" onPointerDown={(event) => event.stopPropagation()}>
+        <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>
+        <button type="button" disabled={!isAdmin} onClick={onDelete} aria-label={`Delete ${category.name}`}><Trash2 size={12} /></button>
+      </span>
     </div>
   );
 }
@@ -170,17 +168,11 @@ function SiteCard({
           <em>{category?.name ?? "Uncategorized"}</em>
         </span>
       </div>
-      {(isAdmin || site.is_favorite) && (
-        <span className="site-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          {isAdmin ? (
-            <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
-          ) : (
-            <span className="favorite-indicator" title="Favorite"><Star size={14} fill="currentColor" /></span>
-          )}
-          {isAdmin && <button type="button" onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>}
-          {isAdmin && <button type="button" onClick={onDelete} aria-label={`Delete ${site.name}`} title="Delete website"><Trash2 size={14} /></button>}
-        </span>
-      )}
+      <span className="site-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+        <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" disabled={!isAdmin} onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
+        <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>
+        <button type="button" disabled={!isAdmin} onClick={onDelete} aria-label={`Delete ${site.name}`} title="Delete website"><Trash2 size={14} /></button>
+      </span>
     </article>
   );
 }
@@ -440,7 +432,7 @@ export function NavDirectory() {
       <aside className="directory-sidebar" id="page-sidebar">
         <div className="sidebar-heading">
           <h2>Categories</h2>
-          {isAdmin && <button type="button" onClick={() => { setEditingCategory(null); setDialog("category"); }} aria-label="Add group" title="Add group"><Plus size={14} /></button>}
+          <button type="button" disabled={!isAdmin} onClick={() => { setEditingCategory(null); setDialog("category"); }} aria-label="Add group" title="Add group"><Plus size={14} /></button>
         </div>
         <nav aria-label="Website categories">
           <div className="category-row">
@@ -466,7 +458,7 @@ export function NavDirectory() {
         </nav>
       </aside>
 
-      <section className="directory-content">
+      <section className="directory-content" inert={!isAdmin}>
         <header className="directory-header">
           <div><h1>{categoryId === "favorites" ? "Favorites" : categories.find((item) => item.id === categoryId)?.name}</h1><p>{filteredSites.length} items</p></div>
           <div className="directory-tools">
@@ -475,7 +467,7 @@ export function NavDirectory() {
               <input aria-label="Search websites" onChange={(event) => setQuery(event.target.value)} placeholder="Search…" type="search" value={query} />
               {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}
             </label>
-            {isAdmin && <button className="directory-action primary" type="button" onClick={openNewSite} disabled={categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>}
+            <button className="directory-action primary" type="button" onClick={openNewSite} disabled={!isAdmin || categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>
           </div>
         </header>
 

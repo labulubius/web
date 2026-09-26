@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "../../../site-shell";
+import { ForumsInteraction } from "../../forums-interaction";
 import { forumSource, forumThread, postText, threadPosts } from "../../../lib/forums";
 import "../../forums.css";
 
@@ -17,7 +18,7 @@ export default async function DiscussionPage({ params, searchParams }: PageProps
   const page = typeof rawPage === "string" && /^[1-9]\d{0,3}$/.test(rawPage) ? Number(rawPage) : 1;
   let thread;
   try { thread = await forumThread(source, id); }
-  catch { return <SiteShell active="/forums" title="Forums"><div className="forums-detail"><Link href="/forums">← Forums</Link><p className="forums-warning">This discussion could not be loaded right now. <a href={`${source.origin}/t/${id}`}>Open the original ↗</a></p></div></SiteShell>; }
+  catch { return <SiteShell active="/forums" title="Forums"><ForumsInteraction as="div" className="forums-detail"><Link href="/forums">← Forums</Link><p className="forums-warning">This discussion could not be loaded right now. <a href={`${source.origin}/t/${id}`}>Open the original ↗</a></p></ForumsInteraction></SiteShell>; }
   const ids = thread.post_stream.stream;
   const pages = Math.ceil(ids.length / pageSize);
   if (page > pages || pages === 0) notFound();
@@ -29,7 +30,7 @@ export default async function DiscussionPage({ params, searchParams }: PageProps
   posts.sort((a, b) => a.post_number - b.post_number);
   const original = `${source.origin}/t/${id}`;
   return <SiteShell active="/forums" title="Forums">
-    <div className="forums-detail">
+    <ForumsInteraction as="div" className="forums-detail">
       <Link className="forums-back" href="/forums">← All forums</Link>
       <p className="section-label">{source.name.toUpperCase()}</p>
       <h1>{thread.title}</h1>
@@ -44,6 +45,6 @@ export default async function DiscussionPage({ params, searchParams }: PageProps
         {page < pages && <Link href={`/forums/${sourceId}/${id}?page=${page + 1}`}>Next 20 →</Link>}
       </nav>
       <p className="forums-note">Text-only preview; images, formatting and interactive content are available on the original forum. Replies and edits may appear after the next refresh.</p>
-    </div>
+    </ForumsInteraction>
   </SiteShell>;
 }

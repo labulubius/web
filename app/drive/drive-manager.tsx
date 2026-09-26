@@ -105,7 +105,13 @@ export function DriveManager() {
   }
 
   if (loading) return <section className="drive-view"><p>Checking account…</p></section>;
-  if (!isAdmin) return <section className="drive-view"><h1>Private Drive</h1><p>This drive is available only to the site administrator. Sign in to continue.</p></section>;
+  if (!isAdmin) return <section className="drive-view" inert>
+    <header className="drive-header">
+      <div><p className="drive-eyebrow">PERSONAL WORKSPACE / ADMINISTRATOR</p><h1><HardDrive size={22} /> Private Drive</h1><p>Private files on this server · 20 MB per file</p></div>
+      <div className="drive-actions"><button type="button" disabled><FolderPlus size={16} /> New folder</button><button type="button" disabled><Upload size={16} /> Upload files</button></div>
+    </header>
+    <div className="drive-location"><button className="drive-back" type="button" disabled aria-label="Go to parent folder"><ArrowLeft size={17} /></button><nav className="drive-breadcrumbs" aria-label="Drive path"><button type="button" disabled>Drive</button></nav><button className="drive-refresh" type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>
+  </section>;
 
   return (
     <section className="drive-view">
