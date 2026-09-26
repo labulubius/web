@@ -1,12 +1,13 @@
-.drive-view { margin: 0 auto; max-width: 1080px; padding: 36px 28px; width: 100%; }
-.drive-header { align-items: flex-end; display: flex; justify-content: space-between; gap: 20px; padding-bottom: 24px; }
+.drive-view { margin: 0 auto; max-width: 1080px; padding: 22px; width: 100%; }
+.drive-header { align-items: flex-end; border-bottom: 1px solid var(--separator); display: flex; gap: 18px; justify-content: space-between; margin-bottom: 16px; padding-bottom: 13px; }
 .drive-header .drive-eyebrow { color: var(--link); font-size: 10px; font-weight: 600; letter-spacing: .08em; margin: 0 0 8px; }
-.drive-header h1 { align-items: center; display: flex; gap: 9px; font-size: 24px; font-weight: 500; margin: 0; }
+.drive-header h1 { align-items: center; display: flex; gap: 8px; font-size: 20px; font-weight: 500; margin: 0; }
 .drive-header h1 svg { color: var(--link); }
 .drive-header p, .drive-view > p { color: var(--text-muted); font-size: 12px; }
-.drive-header h1 + p { margin: 7px 0 0; }
-.drive-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.drive-actions button, .drive-icon-button, .drive-back, .drive-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; }
+.drive-header h1 + p { font-size: 10px; margin: 3px 0 0; }
+.drive-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.drive-actions button, .drive-icon-button, .drive-back, .drive-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; }
+.drive-actions button { font-size: 11px; height: 32px; padding: 0 9px; }
 .drive-actions button:hover, .drive-icon-button:hover, .drive-back:hover, .drive-refresh:hover { border-color: var(--accent); }
 .drive-actions button:disabled, .drive-icon-button:disabled, .drive-back:disabled, .drive-refresh:disabled { cursor: default; opacity: .45; }
 .drive-location { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 10px; min-height: 43px; padding: 5px 9px; }
@@ -30,15 +31,15 @@
 button.drive-name { color: var(--link); cursor: pointer; }
 .drive-detail { color: var(--text-muted); flex-shrink: 0; font-size: 11px; text-align: right; width: 90px; }
 .drive-row-actions { align-items: center; display: flex; flex-shrink: 0; gap: 4px; justify-content: flex-end; width: 76px; }
-.drive-icon-button { padding: 5px; }
+.drive-icon-button { height: 26px; padding: 0; width: 26px; }
 .drive-delete:hover { border-color: var(--negative); color: var(--negative); }
 .drive-error { background: color-mix(in srgb, var(--negative) 12%, var(--view)); border: 1px solid var(--negative); border-radius: 4px; font-size: 12px; margin: 12px 0 0; padding: 9px; }
-.drive-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 12px; gap: 7px; padding: 42px 16px; text-align: center; }
+.drive-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 11px; gap: 7px; justify-content: center; min-height: 310px; padding: 42px 16px; text-align: center; }
 .drive-empty svg { color: var(--link); }
 .drive-empty strong { color: var(--text); font-size: 13px; }
 @media (max-width: 650px) {
-  .drive-view { padding: 22px 16px; }
-  .drive-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .drive-view { padding: 15px 11px; }
+  .drive-header { align-items: flex-start; flex-direction: column; gap: 10px; }
   .drive-actions { width: 100%; }
   .drive-actions button { flex: 1; }
   .drive-columns { grid-template-columns: minmax(0, 1fr) 76px; }

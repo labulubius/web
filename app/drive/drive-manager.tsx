@@ -110,7 +110,7 @@ export function DriveManager() {
   return (
     <section className="drive-view">
       <header className="drive-header">
-        <div><p className="drive-eyebrow">PERSONAL WORKSPACE / ADMINISTRATOR</p><h1><HardDrive size={22} /> Private Drive</h1><p>Private files on this server · 20 MB per file</p></div>
+        <div><p className="drive-eyebrow">PERSONAL WORKSPACE / ADMINISTRATOR</p><h1><HardDrive size={20} /> Private Drive</h1><p>Private files on this server · 20 MB per file</p></div>
         <div className="drive-actions"><button onClick={createFolder} disabled={busy} type="button"><FolderPlus size={16} /> New folder</button><button onClick={() => fileInput.current?.click()} disabled={busy} type="button"><Upload size={16} /> Upload files</button><input ref={fileInput} type="file" multiple hidden onChange={(event) => upload(event.target.files)} /></div>
       </header>
       <div className="drive-location">
@@ -120,15 +120,15 @@ export function DriveManager() {
       </div>
       {error && <p className="drive-error" role="alert">{error}</p>}
       <div className="drive-list-heading"><strong>{parts.at(-1) ?? "My files"}</strong><span>{loadingList ? "Loading…" : listFailed ? "Unavailable" : `${entries.length} ${entries.length === 1 ? "item" : "items"}`}</span></div>
-      {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : listFailed ? <p className="drive-empty">Could not load files. Check the error above and try Refresh files.</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
+      {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : listFailed ? <p className="drive-empty">Could not load files. Check the error above and try Refresh files.</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={48} strokeWidth={1.2} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
         <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
         <ul className="drive-list">{entries.map((entry) => <li key={entry.name}>
           <span className="drive-file-icon">{entry.type === "folder" ? <Folder size={21} /> : <File size={21} />}</span>
           {entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => setParts([...parts, entry.name])}>{entry.name}</button> : <span className="drive-name">{entry.name}</span>}
           <span className="drive-detail">{entry.type === "file" ? `${(entry.size / 1024).toFixed(1)} KB` : "Folder"}</span>
           <span className="drive-detail">{new Date(entry.modified).toLocaleDateString()}</span>
-          <span className="drive-row-actions">{entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>}
-          <button className="drive-icon-button drive-delete" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={17} /></button></span>
+          <span className="drive-row-actions">{entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={14} /></button>}
+          <button className="drive-icon-button drive-delete" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={14} /></button></span>
         </li>)}</ul></div>}
     </section>
   );

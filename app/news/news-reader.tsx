@@ -152,7 +152,7 @@ export function NewsReader() {
           </div>
           <div id={`news-feeds-${category.id}`} hidden={collapsedCategories.includes(category.id)}>
           {items.map((feed) => <div key={feed.id} className="news-source-row">
-            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} disabled={saving} onChange={() => void toggleSource(feed.id)} /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
+            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} disabled={saving} onChange={() => void toggleSource(feed.id)} /><Rss size={16} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
             <span className="news-feed-actions"><button type="button" title={`Edit ${feed.title}`} aria-label={`Edit ${feed.title}`} onClick={() => setDialog({ kind: "feed", id: feed.id })}><Pencil size={12} /></button>
             <button type="button" title={`Unsubscribe ${feed.title}`} aria-label={`Unsubscribe ${feed.title}`} onClick={() => void removeFeed(feed)}><Trash2 size={12} /></button></span>
           </div>)}
@@ -162,7 +162,7 @@ export function NewsReader() {
       {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span>{saving && <span role="status">Saving…</span>}</div>}
     </aside>
     <section className="news-content">
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={15} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
       {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Use the RSS button above to add your first subscription." : "Create a category, then use the RSS button above to add a subscription."}</p></div>}

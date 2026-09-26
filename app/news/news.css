@@ -23,7 +23,7 @@
 .news-source-list { max-height: min(65vh, 650px); overflow-y: auto; }
 .news-source-list section { margin-top: 8px; }
 .news-source-row { align-items: center; display: flex; min-height: 33px; min-width: 0; padding-left: 10px; position: relative; }
-.news-source { align-items: center; border-radius: 3px; color: var(--text); cursor: pointer; display: flex; flex: 1; font-size: 11px; gap: 6px; min-height: 33px; min-width: 0; padding: 5px 53px 5px 9px; }
+.news-source { align-items: center; border-radius: 3px; color: var(--text); cursor: pointer; display: flex; flex: 1; font-size: 12px; gap: 8px; min-height: 33px; min-width: 0; padding: 5px 53px 5px 9px; }
 .news-source:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .news-source input { accent-color: var(--link); flex: none; margin: 0; }
 .news-source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -39,6 +39,7 @@
 .news-heading-actions button { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 6px; height: 32px; justify-content: center; padding: 0 9px; white-space: nowrap; }
 .news-heading-actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .news-heading-actions button:disabled { cursor: default; opacity: .5; }
+.news-heading-actions button[aria-label="Refresh articles"] { padding: 0; width: 32px; }
 .news-heading-actions .news-add-action, .news-heading-actions .news-add-action:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: white; }
 .news-article { border-top: 1px solid var(--separator); padding: 18px 0; }
 .news-article h2 { font-size: 17px; font-weight: 500; line-height: 1.4; margin: 7px 0; }
