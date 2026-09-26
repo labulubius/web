@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
+import { Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Newspaper, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl, useSiteAuth } from "./site-auth";
@@ -12,6 +12,7 @@ const subscribeToHydration = () => () => {};
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
+  { href: "/news", label: "News", icon: Newspaper, adminOnly: true },
   { href: "/drive", label: "Drive", icon: HardDrive, adminOnly: true },
   { href: "/about", label: "About", icon: Info },
 ];
