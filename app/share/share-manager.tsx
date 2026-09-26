@@ -19,7 +19,6 @@ export function ShareManager() {
   const [loadingList, setLoadingList] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
   const [progress, setProgress] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
@@ -103,13 +102,11 @@ export function ShareManager() {
     catch { setError("Clipboard unavailable. Open the link and copy it from the address bar."); }
   }
 
-  const query = search.toLocaleLowerCase();
-  const folders = directory.folders.filter((item) => item.name.toLocaleLowerCase().includes(query));
-  const entries = directory.entries.filter((item) => item.name.toLocaleLowerCase().includes(query));
+  const { folders, entries } = directory;
   if (loading) return <section className="share-view"><p>Checking account…</p></section>;
   if (!isAdmin) return <section className="share-view" inert>
     <header className="share-header"><div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1><p>Files here are public to anyone with a link · 20 MB per file</p></div><div className="share-header-actions"><button type="button" className="share-button" disabled><FolderPlus size={16} /> New folder</button><button type="button" className="share-button" disabled><Upload size={16} /> Upload files</button></div></header>
-    <div className="share-toolbar"><label>Search shared files <input type="search" placeholder="Search by name…" disabled /></label><span>Files are private to the administrator.</span><button type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>
+    <div className="share-location"><button className="share-back" type="button" disabled aria-label="Parent folder"><ArrowLeft size={17} /></button><nav className="share-breadcrumbs" aria-label="Share path"><button type="button" disabled>Share</button></nav><button className="share-refresh" type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>
   </section>;
 
   return <section className="share-view">
@@ -120,20 +117,19 @@ export function ShareManager() {
         <button type="button" className="share-button" onClick={() => input.current?.click()} disabled={busy}><Upload size={16} /> Upload files</button></div>
       <input type="file" ref={input} multiple hidden onChange={(event) => void upload(event.target.files)} />
     </header>
-    <nav className="share-breadcrumbs" aria-label="Share path"><button type="button" disabled={!folderId || busy} onClick={() => setFolderId(directory.breadcrumbs.at(-2)?.id ?? null)} title="Parent folder" aria-label="Parent folder"><ArrowLeft size={16} /></button><button type="button" onClick={() => setFolderId(null)}>Share</button>{directory.breadcrumbs.map((folder) => <span key={folder.id}> / <button type="button" onClick={() => setFolderId(folder.id)}>{folder.name}</button></span>)}</nav>
-    <div className="share-toolbar">
-      <label>Search this folder <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name…" /></label>
-      <span>{directory.folders.length + directory.entries.length} items · {(directory.used / (1024 * 1024)).toFixed(1)} MB used</span>
-      <button type="button" title="Refresh" aria-label="Refresh files" onClick={() => void reload()} disabled={busy || loadingList}><RefreshCw size={16} /></button>
+    <div className="share-location">
+      <button className="share-back" type="button" disabled={!folderId || busy} onClick={() => setFolderId(directory.breadcrumbs.at(-2)?.id ?? null)} title="Parent folder" aria-label="Parent folder"><ArrowLeft size={17} /></button>
+      <nav className="share-breadcrumbs" aria-label="Share path"><button type="button" onClick={() => setFolderId(null)}>Share</button>{directory.breadcrumbs.map((folder) => <span key={folder.id}> / <button type="button" onClick={() => setFolderId(folder.id)} aria-current={folder.id === folderId ? "location" : undefined}>{folder.name}</button></span>)}</nav>
+      <button className="share-refresh" type="button" title="Refresh files" aria-label="Refresh files" onClick={() => void reload()} disabled={busy || loadingList}><RefreshCw size={16} /></button>
     </div>
     {progress && <p className="share-notice" role="status">{progress}</p>}
     {message && <p className="share-notice" role="status">{message}</p>}
     {error && <p className="share-error" role="alert">{error}</p>}
-    {loadingList ? <p className="share-notice" role="status">Loading folder…</p> : !folders.length && !entries.length ? <div className="share-empty"><Share2 size={29} /><strong>{search ? "No matching items" : "Nothing shared here yet"}</strong><span>{search ? "Try another search." : "Upload a file or create a folder to get started."}</span></div> :
+    {loadingList ? <p className="share-notice" role="status">Loading folder…</p> : !folders.length && !entries.length ? <div className="share-empty"><Share2 size={29} /><strong>Nothing shared here yet</strong><span>Upload a file or create a folder to get started.</span></div> :
       <ul className="share-grid">
         {folders.map((folder) => {
           const url = `${endpoint}/s/${folder.id}`;
-          return <li key={folder.id} className="share-card"><button type="button" className="share-folder-preview" onClick={() => { setSearch(""); setFolderId(folder.id); }} title={`Open ${folder.name}`}><Folder size={42} /></button>
+          return <li key={folder.id} className="share-card"><button type="button" className="share-folder-preview" onClick={() => setFolderId(folder.id)} title={`Open ${folder.name}`}><Folder size={42} /></button>
             <div className="share-card-body"><strong title={folder.name}>{folder.name}</strong><span>Folder · {new Date(folder.created).toLocaleDateString()}</span><div className="share-card-actions">
               <button type="button" onClick={() => setFolderId(folder.id)} title="Open folder"><Folder size={15} /> Open</button>
               <button type="button" onClick={() => void copy(url, "Folder link")} title="Copy public folder link"><Link2 size={15} /> Link</button>

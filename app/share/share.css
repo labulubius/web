@@ -6,17 +6,15 @@
 .share-header h1 svg { color: var(--link); }
 .share-header h1 + p { color: var(--text-muted); font-size: 12px; margin: 7px 0 0; }
 .share-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.share-breadcrumbs { align-items: center; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px; margin-bottom: 16px; }
-.share-breadcrumbs button { background: transparent; border: 0; color: var(--link); cursor: pointer; font: inherit; padding: 3px; }
-.share-breadcrumbs button:disabled { color: var(--text-muted); cursor: default; }
-.share-breadcrumbs span { color: var(--text-muted); overflow-wrap: anywhere; }
-.share-button, .share-toolbar button, .share-card-actions button, .share-card-actions a { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
-.share-button:hover, .share-toolbar button:hover, .share-card-actions button:hover, .share-card-actions a:hover { border-color: var(--accent); }
-.share-button:disabled, .share-toolbar button:disabled, .share-card-actions button:disabled { cursor: default; opacity: .45; }
-.share-toolbar { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 14px; padding: 9px; }
-.share-toolbar label { color: var(--text-muted); flex: 1; font-size: 11px; }
-.share-toolbar input { background: var(--view); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); display: block; font: inherit; font-size: 13px; margin-top: 5px; max-width: 350px; padding: 7px; width: 100%; }
-.share-toolbar span { color: var(--text-muted); font-size: 11px; }
+.share-button, .share-card-actions button, .share-card-actions a, .share-back, .share-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
+.share-button:hover, .share-card-actions button:hover, .share-card-actions a:hover, .share-back:hover, .share-refresh:hover { border-color: var(--accent); }
+.share-button:disabled, .share-card-actions button:disabled, .share-back:disabled, .share-refresh:disabled { cursor: default; opacity: .45; }
+.share-location { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 10px; min-height: 43px; padding: 5px 9px; }
+.share-back, .share-refresh { background: transparent; border-color: transparent; flex-shrink: 0; padding: 5px; }
+.share-breadcrumbs { color: var(--text-muted); flex: 1; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.share-breadcrumbs button { background: none; border: 0; color: var(--link); cursor: pointer; padding: 3px; }
+.share-breadcrumbs button[aria-current="location"] { color: var(--text); font-weight: 600; }
+.share-breadcrumbs button:hover { text-decoration: underline; }
 .share-notice, .share-error { border: 1px solid var(--accent); border-radius: 4px; color: var(--text); font-size: 12px !important; margin: 12px 0 0; padding: 9px; }
 .share-error { border-color: var(--negative); }
 .share-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 12px; gap: 7px; margin-top: 20px; padding: 42px 16px; text-align: center; }
@@ -47,4 +45,4 @@
 .share-public-list a { color: var(--link); flex: 1; min-width: 0; overflow-wrap: anywhere; text-decoration: none; }
 .share-public-list a:hover { text-decoration: underline; }
 .share-public-list span { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
-@media (max-width: 650px) { .share-view { padding: 22px 16px; } .share-header { align-items: flex-start; flex-direction: column; gap: 16px; } .share-toolbar { align-items: flex-start; flex-wrap: wrap; } .share-toolbar label { flex-basis: 100%; } .share-toolbar input { max-width: none; } }
+@media (max-width: 650px) { .share-view { padding: 22px 16px; } .share-header { align-items: flex-start; flex-direction: column; gap: 16px; } }
