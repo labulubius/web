@@ -9,7 +9,8 @@ import "./news.css";
 type Category = { id: string; name: string };
 type Dialog = { kind: "category" | "feed"; id?: string } | null;
 type Directory = { feeds: NewsFeed[]; categories: Category[]; selected: string[] };
-type PublicDirectory = { feeds: { title: string; category: string }[]; categories: { name: string }[] };
+type PublicDirectory = { feeds: { title: string; category: string; checked: boolean }[]; categories: { name: string }[] };
+type PublicArticle = Omit<NewsArticle, "feedId"> & { category: string };
 
 export function NewsReader() {
   const { supabase, loading, isAdmin } = useSiteAuth();
@@ -30,6 +31,9 @@ export function NewsReader() {
   const [publicCategory, setPublicCategory] = useState<string | null>(null);
   const [publicCollapsed, setPublicCollapsed] = useState<string[]>([]);
   const [publicError, setPublicError] = useState(false);
+  const [publicArticles, setPublicArticles] = useState<PublicArticle[]>([]);
+  const [publicArticlesBusy, setPublicArticlesBusy] = useState(true);
+  const [publicArticlesError, setPublicArticlesError] = useState(false);
 
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -77,15 +81,27 @@ export function NewsReader() {
     if (loading || isAdmin) return;
     const controller = new AbortController();
     void (async () => {
-      try {
-        const response = await fetch("/api/news?view=sidebar", { cache: "no-store", signal: controller.signal });
-        if (!response.ok) throw new Error("Sidebar unavailable.");
-        const data = await response.json() as PublicDirectory;
-        if (!Array.isArray(data.categories) || !Array.isArray(data.feeds)) throw new Error("Invalid sidebar.");
-        if (!controller.signal.aborted) { setPublicDirectory(data); setPublicError(false); }
-      } catch {
-        if (!controller.signal.aborted) setPublicError(true);
-      }
+      setPublicArticlesBusy(true);
+      const [sidebar, articles] = await Promise.allSettled([
+        fetch("/api/news?view=sidebar", { cache: "no-store", signal: controller.signal }).then(async (response) => {
+          if (!response.ok) throw new Error("Sidebar unavailable.");
+          const data = await response.json() as PublicDirectory;
+          if (!Array.isArray(data.categories) || !Array.isArray(data.feeds)) throw new Error("Invalid sidebar.");
+          return data;
+        }),
+        fetch("/api/news?view=publicArticles", { cache: "no-store", signal: controller.signal }).then(async (response) => {
+          if (!response.ok) throw new Error("Articles unavailable.");
+          const data = await response.json() as { articles: PublicArticle[] };
+          if (!Array.isArray(data.articles)) throw new Error("Invalid articles.");
+          return data.articles;
+        }),
+      ]);
+      if (controller.signal.aborted) return;
+      if (sidebar.status === "fulfilled") { setPublicDirectory(sidebar.value); setPublicError(false); }
+      else setPublicError(true);
+      if (articles.status === "fulfilled") { setPublicArticles(articles.value); setPublicArticlesError(false); }
+      else setPublicArticlesError(true);
+      setPublicArticlesBusy(false);
     })();
     return () => controller.abort();
   }, [loading, isAdmin]);
@@ -161,6 +177,7 @@ export function NewsReader() {
   if (!isAdmin) {
     const publicCategories = publicDirectory?.categories.filter(({ name }) =>
       name !== "Uncategorized" || publicDirectory.feeds.some((feed) => feed.category === name)) ?? [];
+    const publicVisible = publicCategory ? publicArticles.filter((article) => article.category === publicCategory) : publicArticles;
     return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
       <div className="news-sidebar-heading"><h2>Categories</h2><button type="button" disabled aria-label="Add category"><Plus size={14} /></button></div>
@@ -174,16 +191,23 @@ export function NewsReader() {
             {name !== "Uncategorized" && <span className="news-category-actions"><button type="button" disabled aria-label={`Rename ${name}`}><Pencil size={12} /></button><button type="button" disabled aria-label={`Delete ${name}`}><Trash2 size={12} /></button></span>}
           </div>
           {!publicCollapsed.includes(name) && publicDirectory?.feeds.filter((feed) => feed.category === name).map((feed, index) => <div key={`${name}-${index}`} className="news-source-row">
-            <label className="news-source"><input type="checkbox" disabled /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
+            <label className="news-source"><input type="checkbox" checked={feed.checked} disabled readOnly /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
             <span className="news-feed-actions"><button type="button" disabled aria-label={`Edit ${feed.title}`}><Pencil size={12} /></button><button type="button" disabled aria-label={`Unsubscribe ${feed.title}`}><Trash2 size={12} /></button></span>
           </div>)}
         </section>)}
       </div>
-      {!publicDirectory && <div className="news-source-actions">{publicError ? "Sources are temporarily unavailable." : "Loading sources…"}</div>}
+      {publicDirectory ? <div className="news-source-actions"><span>{publicDirectory.feeds.filter((feed) => feed.checked).length} of {publicDirectory.feeds.length} selected</span></div> : <div className="news-source-actions">{publicError ? "Sources are temporarily unavailable." : "Loading sources…"}</div>}
     </aside>
     <section className="news-content" inert>
       <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{publicCategory ?? "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled aria-label="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled><Plus size={15} /> RSS</button></div></header>
-      <p className="news-empty">Articles are private to the administrator.</p>
+      {publicArticlesError && <p className="news-error" role="alert">Articles are temporarily unavailable.</p>}
+      {publicArticlesBusy && <p className="news-empty">Loading articles…</p>}
+      {!publicArticlesBusy && !publicArticlesError && !publicVisible.length && <p className="news-empty">No articles here yet.</p>}
+      <div className="news-articles">{publicVisible.map((article) => <article className="news-article" key={article.id}>
+        <div className="news-meta"><span>{article.source}</span>{article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}</div>
+        <h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>
+        {article.summary && <p>{article.summary}</p>}
+      </article>)}</div>
     </section>
   </div>;
   }

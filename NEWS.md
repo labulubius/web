@@ -1,8 +1,8 @@
-# Private News
+# News permissions
 
 `https://labulubius.com/news` uses the existing Supabase sign-in and `site_is_admin()` role. Requests to same-origin `/api/news` on Vercel relay over the existing Cloudflare Tunnel to the `web` host. Only the web host accesses FreshRSS at `127.0.0.1:8080` and its Docker PostgreSQL database; credentials stay in the root-readable `/etc/labulubius/news.env` EnvironmentFile of `labulubius-web.service`. The browser never receives API secrets.
 
-The public, read-only `/api/news?view=sidebar` exposes category names and subscription titles to nadmin (including signed-out visitors), but not feed IDs/URLs, selection preferences or articles. Its output is cached for 30 seconds on the web host. Nadmin can switch/collapse categories; subscription checkboxes and management controls remain disabled. All other News API views and writes still require admin authentication.
+The public, read-only `/api/news?view=sidebar` exposes category names, subscription titles and the site owner's selected checkboxes to nadmin (including signed-out visitors); it does not expose feed IDs/URLs. `/api/news?view=publicArticles` serves the owner's selected, non-expired articles without authentication. Sidebar metadata is cached for 30 seconds on the web host, but selection is read from disk per request. Nadmin can switch/collapse categories and read articles; checkboxes, management controls and article links remain non-interactive. When there is exactly one preference file it defines the owner; with multiple preference files set `NEWS_PUBLIC_OWNER_ID` on the web host to avoid selecting another admin's preferences. Admin-only News API views and all writes still require admin authentication.
 
 The admin News sidebar supports creating/renaming/deleting FreshRSS categories and adding/editing/deleting subscriptions. Deleting a category **unsubscribes all feeds in it, including hidden feeds, and removes their articles**; unchecking a feed merely hides it from News. Empty categories are created through FreshRSS's own PHP DAO in the local `freshrss` container. Input is validated and only admin-authorized server requests can reach these functions. The source-selection JSON files live outside the checkout at `${NEWS_DATA_DIR:-~/.local/share/labulubius/news}/<user-id>.json` on the web host. Feed names/URLs and articles are owned by FreshRSS, not Supabase. No new Docker container or DNS hostname is required.
 
@@ -16,7 +16,7 @@ To replicate this installation on a fresh, **empty** FreshRSS database: verify s
 
 ## Verification
 
-- Logged out, `/api/news?view=sidebar` returns only category names and feed titles. `/api/news?view=feeds` and `?view=articles` return 401. Admin-only actions are also rejected.
+- Logged out, `/api/news?view=sidebar` shows the owner's checked state and `/api/news?view=publicArticles` shows selected articles. `/api/news?view=feeds` and `?view=articles` still return 401. Admin-only actions are rejected.
 - Signed in as admin: create a category, add an RSS feed to it, check the source, save and reload; rename/move/delete operations reflect in FreshRSS.
 - `/news` only fetches News data from `labulubius.com/api/news`; the tunnel host is only contacted server-to-server.
 - Confirm `labulubius-news-retention.timer` is active, and check hourly run status. There should be no automatic article database backup; if backups are added later, their article contents need their own five-day lifecycle policy.

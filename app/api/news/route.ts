@@ -1,24 +1,23 @@
 import { newsAdmin, newsArticles, newsCategories, newsFeeds, privateNewsHeaders } from "../../lib/news-server";
 import { InvalidNewsInput, manageNews } from "../../lib/news-management";
-import { loadNewsSelection, saveNewsSelection } from "../../lib/news-settings";
+import { loadNewsSelection, loadPublicNewsSelection, saveNewsSelection } from "../../lib/news-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-let sidebarCache: Promise<{ categories: { name: string }[]; feeds: { title: string; category: string }[] }> | null = null;
+async function loadSidebarData() {
+  const [feeds, categories] = await Promise.all([newsFeeds(), newsCategories()]);
+  return { feeds, categories };
+}
+
+let sidebarCache: ReturnType<typeof loadSidebarData> | null = null;
 let sidebarExpires = 0;
 
-function publicSidebar() {
+function sidebarData() {
   if (!sidebarCache || Date.now() >= sidebarExpires) {
     sidebarExpires = Date.now() + 30_000;
-    sidebarCache = Promise.all([newsFeeds(), newsCategories()])
-      .then(([feeds, categories]) => ({
-        categories: categories.map(({ name }) => ({ name })),
-        // Titles can fall back to feed URLs internally; do not reveal those URLs.
-        feeds: feeds.map(({ id, title, category }) => ({ title: title === id ? "Untitled source" : title, category })),
-      }))
-      .catch((error: unknown) => { sidebarCache = null; throw error; });
+    sidebarCache = loadSidebarData().catch((error: unknown) => { sidebarCache = null; throw error; });
   }
   return sidebarCache;
 }
@@ -52,8 +51,25 @@ export async function GET(request: Request) {
     if (process.env.VERCEL) return await relay(request);
     const url = new URL(request.url);
     if (url.searchParams.get("view") === "sidebar") {
-      // Public navigation only: never expose feed IDs/URLs, selections or articles.
-      return Response.json(await publicSidebar(), { headers: privateNewsHeaders });
+      const [{ feeds, categories }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
+      const selected = new Set(selectedIds);
+      return Response.json({
+        categories: categories.map(({ name }) => ({ name })),
+        // Keep feed IDs/URLs private; checked state reflects the owner's selection.
+        feeds: feeds.map(({ id, title, category }) => ({ title: title === id ? "Untitled source" : title, category, checked: selected.has(id) })),
+      }, { headers: privateNewsHeaders });
+    }
+    if (url.searchParams.get("view") === "publicArticles") {
+      const cursor = url.searchParams.get("cursor");
+      if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
+      const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
+      const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
+      const categoryById = new Map(feeds.map((feed) => [feed.id, feed.category]));
+      const result = await newsArticles(selected, cursor);
+      return Response.json({
+        articles: result.articles.map(({ feedId, ...article }) => ({ ...article, category: categoryById.get(feedId) ?? "Uncategorized" })),
+        continuation: result.continuation,
+      }, { headers: privateNewsHeaders });
     }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
