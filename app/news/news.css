@@ -31,9 +31,9 @@
 .news-feed-actions button { align-items: center; background: var(--button); border: 1px solid var(--separator); border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
 .news-feed-actions button:hover { border-color: var(--accent); color: var(--text); }
 .news-source-actions { align-items: center; border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; flex-wrap: wrap; font-size: 10px; gap: 7px; justify-content: space-between; margin-top: 10px; padding-top: 10px; }
-.news-source-actions button, .news-more { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; font-size: 11px; padding: 6px 10px; }
-.news-source-actions button:hover:not(:disabled), .news-more:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
-.news-source-actions button:disabled, .news-more:disabled { cursor: default; opacity: .5; }
+.news-more { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; font-size: 11px; padding: 6px 10px; }
+.news-more:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
+.news-more:disabled { cursor: default; opacity: .5; }
 .news-content { min-width: 0; padding: 22px; }
 .news-heading { align-items: flex-end; border-bottom: 1px solid var(--separator); display: flex; gap: 18px; justify-content: space-between; margin-bottom: 16px; padding-bottom: 13px; }
 .news-heading h1 { font-size: 20px; font-weight: 500; margin: 0; }
@@ -50,8 +50,7 @@
 .news-article p { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
 .news-meta { color: var(--text-muted); display: flex; font-size: 11px; gap: 12px; }
 .news-meta span { color: var(--link); }
-.news-empty, .news-hint, .news-error { border: 1px solid var(--separator); border-radius: 4px; color: var(--text-muted); font-size: 11px; padding: 10px; }
-.news-hint { border-color: var(--accent); }
+.news-empty, .news-error { border: 1px solid var(--separator); border-radius: 4px; color: var(--text-muted); font-size: 11px; padding: 10px; }
 .news-error { border-color: var(--negative); color: var(--negative); }
 .news-empty-state { align-items: center; color: var(--text-muted); display: flex; flex-direction: column; min-height: 310px; justify-content: center; text-align: center; }
 .news-empty-state h2 { color: var(--text); font-size: 16px; font-weight: 500; margin: 13px 0 3px; }

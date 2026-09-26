@@ -120,8 +120,11 @@ function unexpiredIds(items: { id?: string }[]): Promise<Set<string>> {
   // if the retention database cannot be checked rather than exposing expired data.
   return new Promise((resolve, reject) => {
     const sql = `SELECT entry_id FROM public.news_entry_receipt WHERE received_at > NOW() - INTERVAL '5 days' AND entry_id IN (${ids.join(",")});`;
-    execFile("docker", ["exec", "freshrss-postgres", "sh", "-c", `psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c '${sql}'`],
+    const child = execFile("docker", ["exec", "-i", "freshrss-postgres", "sh", "-c",
+      'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'],
       { timeout: 8000, maxBuffer: 65536 }, (error, stdout) => error ? reject(new Error("Article expiration check failed.")) : resolve(new Set(stdout.trim().split("\n"))));
+    child.stdin?.on("error", () => { /* process exit is handled by the callback */ });
+    child.stdin?.end(sql + "\n");
   });
 }
 

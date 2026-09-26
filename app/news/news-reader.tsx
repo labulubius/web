@@ -75,7 +75,6 @@ export function NewsReader() {
     category,
     items: feeds.filter((feed) => feed.category === category.name),
   })), [feeds, displayCategories]);
-  const dirty = selected.length !== saved.length || selected.some((id) => !saved.includes(id));
   const activeName = categories.find((category) => category.id === categoryFilter)?.name;
   const visible = activeName ? articles.filter((article) => feeds.some((feed) => feed.id === article.feedId && feed.category === activeName)) : articles;
 
@@ -85,11 +84,17 @@ export function NewsReader() {
     await loadArticles();
   }
 
-  async function save() {
-    setSaving(true); setError("");
-    try { await saveSelection(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Could not save sources."); }
-    finally { setSaving(false); }
+  async function toggleSource(id: string) {
+    if (saving) return;
+    const next = selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id];
+    setSelected(next);
+    setSaving(true);
+    setError("");
+    try { await saveSelection(next); }
+    catch (failure) {
+      setSelected(saved);
+      setError(failure instanceof Error ? failure.message : "Could not save source selection.");
+    } finally { setSaving(false); }
   }
 
   async function mutate(action: Record<string, string>) {
@@ -145,28 +150,27 @@ export function NewsReader() {
             <button type="button" title={`Delete ${category.name}`} aria-label={`Delete ${category.name}`} onClick={() => void removeCategory(category)}><Trash2 size={12} /></button></span>}
           </div>
           {items.map((feed) => <div key={feed.id} className="news-source-row">
-            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} onChange={() => setSelected((previous) => previous.includes(feed.id) ? previous.filter((id) => id !== feed.id) : [...previous, feed.id])} /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
+            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} disabled={saving} onChange={() => void toggleSource(feed.id)} /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
             <span className="news-feed-actions"><button type="button" title={`Edit ${feed.title}`} aria-label={`Edit ${feed.title}`} onClick={() => setDialog({ kind: "feed", id: feed.id })}><Pencil size={12} /></button>
             <button type="button" title={`Unsubscribe ${feed.title}`} aria-label={`Unsubscribe ${feed.title}`} onClick={() => void removeFeed(feed)}><Trash2 size={12} /></button></span>
           </div>)}
         </section>)}
       </div>
-      {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span><button type="button" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save selection"}</button></div>}
+      {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span>{saving && <span role="status">Saving…</span>}</div>}
     </aside>
     <section className="news-content">
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || dirty} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
-      {dirty && <p className="news-hint">Save your source selection to update the articles.</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
       {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Use the RSS button above to add your first subscription." : "Create a category, then use the RSS button above to add a subscription."}</p></div>}
-      {ready && feeds.length > 0 && !saved.length && <p className="news-empty">Select sources in the sidebar, then save your selection to start reading.</p>}
+      {ready && feeds.length > 0 && !saved.length && <p className="news-empty">Select a source in the sidebar to start reading.</p>}
       {ready && !!saved.length && !visible.length && !busy && !error && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
       <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}>
         <div className="news-meta"><span>{article.source}</span>{article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}</div>
         <h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>
         {article.summary && <p>{article.summary}</p>}
       </article>)}</div>
-      {ready && saved.length > 0 && (cursor || busy) && <button className="news-more" type="button" disabled={busy || dirty} onClick={() => void loadArticles(cursor)}>{busy ? "Loading…" : "Load more"}</button>}
+      {ready && saved.length > 0 && (cursor || busy) && <button className="news-more" type="button" disabled={busy || saving} onClick={() => void loadArticles(cursor)}>{busy ? "Loading…" : "Load more"}</button>}
     </section>
     {dialog && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setDialog(null); }}>
       <section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="news-dialog-title">
