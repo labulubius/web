@@ -3,6 +3,7 @@
 import { ArrowLeft, Copy, Download, ExternalLink, File, Folder, FolderPlus, Link2, RefreshCw, Share2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
+import { uploadInChunks } from "../lib/upload-client";
 import "./share.css";
 
 type Entry = { id: string; name: string; size: number; type: "image" | "file"; created: string; folderId?: string | null };
@@ -57,11 +58,7 @@ export function ShareManager() {
     try {
       for (const [index, file] of selected.entries()) {
         setProgress(`Uploading ${index + 1} of ${selected.length}: ${file.name}`);
-        if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} exceeds the 20 MB limit.`);
-        await api("/api/share", { method: "POST", headers: {
-          "Content-Type": "application/octet-stream", "X-Share-Name": encodeURIComponent(file.name),
-          ...(folderId ? { "X-Share-Folder": folderId } : {}),
-        }, body: file });
+        await uploadInChunks(api, "/api/share/upload", file, folderId ?? "", (sent) => setProgress(`Uploading ${index + 1} of ${selected.length}: ${file.name} (${Math.round(100 * sent / file.size)}%)`), folderId);
       }
       setMessage(`${selected.length} ${selected.length === 1 ? "file" : "files"} shared. Anyone with a link can access them.`);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Upload failed."); }
@@ -104,14 +101,14 @@ export function ShareManager() {
   const { folders, entries } = directory;
   if (loading) return <section className="share-view"><p>Checking account…</p></section>;
   if (!isAdmin) return <section className="share-view" inert>
-    <header className="share-header"><div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1><p>Files here are public to anyone with a link · 20 MB per file</p></div><div className="share-header-actions"><button type="button" className="share-button" disabled><FolderPlus size={16} /> New folder</button><button type="button" className="share-button" disabled><Upload size={16} /> Upload files</button></div></header>
+    <header className="share-header"><div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1><p>Files here are public to anyone with a link · 5 GB total</p></div><div className="share-header-actions"><button type="button" className="share-button" disabled><FolderPlus size={16} /> New folder</button><button type="button" className="share-button" disabled><Upload size={16} /> Upload files</button></div></header>
     <div className="share-location"><button className="share-back" type="button" disabled aria-label="Parent folder"><ArrowLeft size={17} /></button><nav className="share-breadcrumbs" aria-label="Share path"><button type="button" disabled>Share</button></nav><button className="share-refresh" type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>
   </section>;
 
   return <section className="share-view">
     <header className="share-header">
       <div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1>
-        <p>Files and folders are public to anyone with a link · 20 MB per file</p></div>
+        <p>Files and folders are public to anyone with a link · 5 GB total</p></div>
       <div className="share-header-actions"><button type="button" className="share-button" onClick={() => void createFolder()} disabled={busy}><FolderPlus size={16} /> New folder</button>
         <button type="button" className="share-button" onClick={() => input.current?.click()} disabled={busy}><Upload size={16} /> Upload files</button></div>
       <input type="file" ref={input} multiple hidden onChange={(event) => void upload(event.target.files)} />

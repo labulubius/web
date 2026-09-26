@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const dir = parts.length ? await resolveDrivePath(parts) : await driveRoot();
     if (!(await lstat(dir)).isDirectory()) throw new Error("Invalid drive path.");
     const entries = await Promise.all((await readdir(dir, { withFileTypes: true }))
-      .filter((entry) => !entry.name.startsWith(".drive-upload-") && (entry.isFile() || entry.isDirectory()))
+      .filter((entry) => !entry.name.startsWith(".drive-upload-") && entry.name !== ".upload-sessions" && (entry.isFile() || entry.isDirectory()))
       .map(async (entry) => {
         const stat = await lstat(path.join(dir, entry.name));
         return { name: entry.name, type: entry.isDirectory() ? "folder" : "file", size: stat.size, modified: stat.mtime.toISOString() };

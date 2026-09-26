@@ -1,4 +1,4 @@
-import { admin, cors, createFolder, failure, folderContents, preflight, shareHost, upload } from "../../lib/share-server";
+import { admin, cors, createFolder, failure, folderContents, preflight, shareHost } from "../../lib/share-server";
 
 export const runtime = "nodejs";
 export function OPTIONS(request: Request) { return preflight(request); }
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       const values = body as { name?: unknown; parentId?: unknown };
       return cors(request, Response.json({ folder: await createFolder(values.name, values.parentId) }, { status: 201, headers: { "Cache-Control": "no-store" } }));
     }
-    return cors(request, Response.json({ entry: await upload(request) }, { status: 201, headers: { "Cache-Control": "no-store" } }));
+    throw new Error("Invalid upload request. Use chunked upload.");
   }
   catch (error) { return cors(request, failure(error)); }
 }

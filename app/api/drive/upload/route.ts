@@ -1,52 +1,91 @@
-import { randomUUID } from "node:crypto";
-import { constants } from "node:fs";
-import { open, link, lstat, unlink } from "node:fs/promises";
+import { link, lstat, readdir } from "node:fs/promises";
 import path from "node:path";
-import { driveError, drivePreflight, driveRoot, MAX_REQUEST_BYTES, MAX_UPLOAD_BYTES, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
+import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
+import { appendChunk, createSession, discard, loadSession, locked, offset, smallJson, tempPath, TOTAL_BYTES } from "../../../lib/upload-sessions";
 
 export const runtime = "nodejs";
-
 export function OPTIONS(request: Request) { return drivePreflight(request); }
 
-export async function POST(request: Request) {
+async function driveUsed(root: string): Promise<number> {
+  let total = 0;
+  for (const item of await readdir(root, { withFileTypes: true })) {
+    if (item.name === ".upload-sessions") continue;
+    const file = path.join(root, item.name);
+    const stat = await lstat(file);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) total += await driveUsed(file);
+    else if (stat.isFile()) total += stat.size;
+  }
+  return total;
+}
+function idFrom(request: Request) { return new URL(request.url).searchParams.get("id") ?? ""; }
+function respond(request: Request, task: () => Promise<Response>) {
   return withDriveCors(request, async () => {
-  try {
-    if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
-    const declared = Number(request.headers.get("content-length") ?? 0);
-    if (declared > MAX_REQUEST_BYTES) throw new Error("Upload exceeds the 20 MB limit.");
-    if (!request.body) throw new Error("Invalid upload.");
-    const reader = request.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let length = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > MAX_REQUEST_BYTES) { await reader.cancel(); throw new Error("Upload exceeds the 20 MB limit."); }
-      chunks.push(value);
-    }
-    const multipart = new Request(request.url, { method: "POST", headers: { "content-type": request.headers.get("content-type") ?? "" }, body: Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))) });
-    const form = await multipart.formData();
-    const parts = segments(form.get("path"));
-    const file = form.get("file");
-    if (!(file instanceof File)) throw new Error("Invalid upload.");
-    validateName(file.name);
-    if (file.size > MAX_UPLOAD_BYTES) throw new Error("Upload exceeds the 20 MB limit.");
-    const parent = parts.length ? await resolveDrivePath(parts) : await driveRoot();
-    if (!(await lstat(parent)).isDirectory()) throw new Error("Invalid drive path.");
-    const temp = path.join(parent, `.drive-upload-${randomUUID()}`);
-    const destination = path.join(parent, file.name);
-    const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     try {
-      await handle.writeFile(Buffer.from(await file.arrayBuffer()));
-      await handle.close();
-      // Hard-link creation is atomic and fails if the destination already exists.
-      await link(temp, destination);
-    } finally {
-      await handle.close().catch(() => {});
-      await unlink(temp).catch(() => {});
+      if (!await requireDriveAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
+      return await task();
+    } catch (error) { return driveError(error); }
+  });
+}
+export function GET(request: Request) {
+  return respond(request, async () => {
+    const root = await driveRoot();
+    const id = idFrom(request);
+    const session = await loadSession(root, id);
+    return Response.json({ offset: await offset(root, session.id), size: session.size }, { headers: privateHeaders });
+  });
+}
+export function POST(request: Request) {
+  return respond(request, async () => {
+    const root = await driveRoot();
+    const data = await smallJson(request);
+    if (data.action === "start") {
+      validateName(data.name);
+      const parts = segments(data.path);
+      const parent = parts.length ? await resolveDrivePath(parts) : root;
+      if (!(await lstat(parent)).isDirectory()) throw new Error("Invalid drive path.");
+      try { await lstat(path.join(parent, data.name)); throw new Error("Name already exists."); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      const session = await locked(root, async () => createSession(root, await driveUsed(root), data.name as string, data.size as number, data.path as string));
+      return Response.json({ id: session.id, offset: 0 }, { headers: privateHeaders });
     }
-    return Response.json({ ok: true }, { headers: privateHeaders });
-  } catch (error) { return driveError(error); }
+    if (data.action === "finish") {
+      if (typeof data.id !== "string") throw new Error("Invalid upload session.");
+      return locked(root, async () => {
+        const session = await loadSession(root, data.id as string);
+        if (await offset(root, session.id) !== session.size) throw new Error("Upload incomplete.");
+        const parts = segments(session.context);
+        const parent = parts.length ? await resolveDrivePath(parts) : root;
+        if (!(await lstat(parent)).isDirectory()) throw new Error("Invalid drive path.");
+        if (await driveUsed(root) + session.size > TOTAL_BYTES) throw new Error("Storage limit reached (5 GB total).");
+        // Hard link fails atomically if a file with this name appeared during upload.
+        await link(tempPath(root, session.id), path.join(parent, session.name));
+        await discard(root, session.id);
+        return Response.json({ ok: true }, { headers: privateHeaders });
+      });
+    }
+    throw new Error("Invalid upload action.");
+  });
+}
+export function PUT(request: Request) {
+  return respond(request, async () => {
+    const root = await driveRoot();
+    const id = idFrom(request);
+    const expected = Number(new URL(request.url).searchParams.get("offset"));
+    return locked(root, async () => {
+      const session = await loadSession(root, id);
+      const next = await appendChunk(root, session, expected, request);
+      return Response.json({ offset: next }, { headers: privateHeaders });
+    });
+  });
+}
+export function DELETE(request: Request) {
+  return respond(request, async () => {
+    const root = await driveRoot();
+    return locked(root, async () => {
+      const session = await loadSession(root, idFrom(request));
+      await discard(root, session.id);
+      return Response.json({ ok: true }, { headers: privateHeaders });
+    });
   });
 }

@@ -22,16 +22,13 @@ export function drivePreflight(request: Request): Response {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": DRIVE_UI_ORIGIN,
-      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Authorization, Content-Type",
       "Access-Control-Max-Age": "600",
       "Vary": "Origin",
     },
   });
 }
-
-export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
-export const MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024;
 
 export async function requireDriveAdmin(request: Request) {
   const match = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i);
@@ -90,7 +87,7 @@ export async function resolveDrivePath(parts: string[], includeLast = true) {
 export function driveError(error: unknown) {
   const code = (error as NodeJS.ErrnoException).code;
   const message = error instanceof Error ? error.message : "Drive operation failed.";
-  const known = message.startsWith("Invalid") || message.startsWith("File") || message.startsWith("Folder") || message.startsWith("Upload") || message.startsWith("Name") || message.startsWith("Cannot");
+  const known = message.startsWith("Invalid") || message.startsWith("File") || message.startsWith("Folder") || message.startsWith("Upload") || message.startsWith("Name") || message.startsWith("Cannot") || message.startsWith("Storage") || message.startsWith("Not enough");
   if (!known && code !== "ENOENT" && code !== "EEXIST") {
     // Do not log the request, authorization header, or bearer token.
     console.error("Drive operation failed:", { code, name: error instanceof Error ? error.name : "UnknownError", message });

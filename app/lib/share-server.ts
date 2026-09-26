@@ -2,14 +2,13 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir, open, readdir, rename, statfs, unlink } from "node:fs/promises";
+import { link, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
+import { Session, tempPath, TOTAL_BYTES } from "./upload-sessions";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
 const ORIGIN = "https://labulubius.com";
-const MAX_BYTES = 20 * 1024 * 1024;
-const MAX_TOTAL = 5 * 1024 * 1024 * 1024;
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export type ShareEntry = { id: string; name: string; size: number; type: "image" | "file"; created: string; folderId?: string | null };
@@ -94,12 +93,6 @@ export async function list() {
     .map((name) => load(name.slice(0, -5))))).filter((item): item is ShareEntry => item !== null);
   entries.sort((a, b) => b.created.localeCompare(a.created));
   return entries;
-}
-
-function folderIdFrom(value: string | null): string | null {
-  if (!value) return null;
-  if (!ID.test(value)) throw new Error("Invalid folder ID.");
-  return value;
 }
 
 function folderPath(id: string) {
@@ -202,48 +195,27 @@ export async function removeFolder(id: string) {
   return true;
 }
 
-function nameFrom(request: Request) {
-  const raw = request.headers.get("x-share-name");
-  if (!raw || raw.length > 600) throw new Error("Invalid file name.");
-  let name: string;
-  try { name = decodeURIComponent(raw).trim(); } catch { throw new Error("Invalid file name."); }
-  if (!name || name.length > 180 || /[/\\\x00-\x1f\x7f]/.test(name) || name === "." || name === "..") throw new Error("Invalid file name.");
-  return name;
+export async function shareRoot() { return directories(); }
+export async function validateShareTarget(name: unknown, folderId: unknown) {
+  if (typeof name !== "string" || !name || name.length > 180 || /[/\\\x00-\x1f\x7f]/.test(name) || name === "." || name === "..") throw new Error("Invalid file name.");
+  if (folderId !== null && (typeof folderId !== "string" || !ID.test(folderId))) throw new Error("Invalid folder ID.");
+  if (folderId && !await activeFolder(folderId as string)) throw new Error("Folder not found.");
 }
 
-export async function upload(request: Request) {
-  const name = nameFrom(request);
-  const folderId = folderIdFrom(request.headers.get("x-share-folder"));
-  if (folderId && !await activeFolder(folderId)) throw new Error("Folder not found.");
-  if (!request.body || Number(request.headers.get("content-length") || 0) > MAX_BYTES) throw new Error("File exceeds 20 MB.");
+export async function finishShareUpload(session: Session): Promise<ShareEntry> {
+  const name = session.name;
+  const folderId = session.context || null;
+  await validateShareTarget(name, folderId);
   const base = await directories();
-  const items = await list();
-  const used = items.reduce((sum, item) => sum + item.size, 0);
-  const disk = await statfs(base);
-  if (used + MAX_BYTES > MAX_TOTAL || Number(disk.bavail) * Number(disk.bsize) < MAX_BYTES + 4 * 1024 ** 3) throw new Error("Share storage limit reached.");
-  const id = randomUUID();
+  const used = (await list()).reduce((sum, item) => sum + item.size, 0);
+  if (used + session.size > TOTAL_BYTES) throw new Error("Share storage limit reached (5 GB total).");
+  const id = session.id;
   const target = location(id);
-  const temp = path.join(base, "tmp", id);
-  const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-  let length = 0;
+  const temp = tempPath(base, id);
   let committed = false;
   try {
-    const reader = request.body.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        length += value.byteLength;
-        if (length > MAX_BYTES) throw new Error("File exceeds 20 MB.");
-        await handle.writeFile(value);
-      }
-    } catch (error) { await reader.cancel().catch(() => {}); throw error; }
-    await handle.close();
-    if (length === 0) throw new Error("Empty files are not supported.");
-
     let type: ShareEntry["type"] = "file";
-    const declaredImage = /\.(png|jpe?g|webp)$/i.test(name);
-    if (declaredImage) {
+    if (/\.(png|jpe?g|webp)$/i.test(name)) {
       // Only decoded, re-encoded images may ever be rendered inline.
       const image = sharp(temp, { limitInputPixels: 40_000_000, animated: false });
       const info = await image.metadata();
@@ -253,10 +225,10 @@ export async function upload(request: Request) {
       await sharp(target.blob).resize({ width: 320, height: 240, fit: "inside", withoutEnlargement: true }).webp({ quality: 75 }).toFile(target.thumb);
       type = "image";
     } else {
-      await rename(temp, target.blob);
+      await link(temp, target.blob);
     }
     if (folderId && !await activeFolder(folderId)) throw new Error("Folder no longer exists.");
-    const entry: ShareEntry = { id, name, size: length, type, created: new Date().toISOString(), folderId };
+    const entry: ShareEntry = { id, name, size: session.size, type, created: new Date().toISOString(), folderId };
     // Metadata appears last: a partially uploaded file never gets a public link.
     const tempMeta = path.join(base, "tmp", `${id}.json`);
     const metadata = await open(/* turbopackIgnore: true */ tempMeta, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -265,9 +237,7 @@ export async function upload(request: Request) {
     committed = true;
     return entry;
   } finally {
-    await handle.close().catch(() => {});
-    await unlink(temp).catch(() => {});
-    if (!committed) await Promise.all([target.meta, target.blob, target.thumb].map((file) => unlink(file).catch(() => {})));
+    if (!committed) await Promise.all([target.blob, target.thumb].map((file) => unlink(file).catch(() => {})));
   }
 }
 
@@ -327,7 +297,7 @@ export async function publicFile(id: string, request: Request, thumbnail = false
 
 export function failure(error: unknown) {
   const message = error instanceof Error ? error.message : "Share operation failed.";
-  const known = /^(Invalid|File exceeds|Empty files|Share storage|Folder (not found|already exists)|Parent folder (not found|no longer exists))/.test(message);
+  const known = /^(Invalid|File exceeds|Empty files|Share storage|Storage limit|Upload |Not enough|Folder (not found|already exists)|Parent folder (not found|no longer exists))/.test(message);
   if (!known) console.error("Share operation failed:", error instanceof Error ? error.name : "UnknownError");
   return Response.json({ error: known ? message : "Share operation failed." }, { status: known ? 400 : 500, headers: { "Cache-Control": "no-store" } });
 }
