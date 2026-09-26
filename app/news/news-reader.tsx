@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Search, Trash2, X } from "lucide-react";
+import { Folder, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
@@ -22,7 +22,6 @@ export function NewsReader() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
@@ -68,11 +67,10 @@ export function NewsReader() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [api, loading, isAdmin, loadArticles]);
 
-  const groups = useMemo(() => {
-    const query = search.toLowerCase();
-    return categories.map((category) => ({ category, items: feeds.filter((feed) => feed.category === category.name &&
-      (feed.title.toLowerCase().includes(query) || category.name.toLowerCase().includes(query))) }));
-  }, [feeds, categories, search]);
+  const groups = useMemo(() => categories.map((category) => ({
+    category,
+    items: feeds.filter((feed) => feed.category === category.name),
+  })), [feeds, categories]);
   const dirty = selected.length !== saved.length || selected.some((id) => !saved.includes(id));
   const activeName = categories.find((category) => category.id === categoryFilter)?.name;
   const visible = activeName ? articles.filter((article) => feeds.some((feed) => feed.id === article.feedId && feed.category === activeName)) : articles;
@@ -136,7 +134,6 @@ export function NewsReader() {
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
       <div className="news-sidebar-heading"><h2>Categories</h2><button onClick={() => setDialog({ kind: "category" })} disabled={!ready || saving} title="Add category" aria-label="Add category" type="button"><Plus size={14} /></button></div>
       <div className="news-category-row"><button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
-      <label className="news-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a source" aria-label="Find a source" /></label>
       <div className="news-source-list">
         {groups.map(({ category, items }) => <section key={category.id}>
           <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} onClick={() => setCategoryFilter(category.id)}><Folder size={16} /><span>{category.name}</span></button>
