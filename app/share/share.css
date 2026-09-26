@@ -23,13 +23,11 @@
 .share-card { background: var(--view); border: 1px solid var(--separator); border-radius: 5px; min-width: 0; overflow: hidden; }
 .share-preview { align-items: center; background: var(--view-alt); color: var(--link); display: flex; height: 150px; justify-content: center; }
 .share-preview img { height: 100%; object-fit: contain; width: 100%; }
-.share-file-icon { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 6px; display: flex; height: 44px; justify-content: center; width: 44px; }
 .share-card-body { padding: 11px; }
 .share-card-body strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-card-body > span { color: var(--text-muted); display: block; font-size: 11px; margin: 6px 0 12px; }
 .share-card-actions { display: flex; gap: 5px; }
-.share-card-actions button, .share-card-actions a { height: 32px; padding: 0 9px; }
-.share-card-actions a, .share-card-actions .share-remove { height: 26px; padding: 0; width: 26px; }
+.share-card-actions button, .share-card-actions a { min-height: 32px; padding: 5px 7px; }
 .share-card-actions .share-remove { margin-left: auto; }
 .share-card-actions .share-remove:hover { border-color: var(--negative); color: var(--negative); }
 @media (max-width: 650px) { .share-view { padding: 15px 11px; } .share-header { align-items: flex-start; flex-direction: column; gap: 10px; } .share-toolbar { align-items: flex-start; flex-wrap: wrap; } .share-toolbar label { flex-basis: 100%; } .share-toolbar input { max-width: none; } }

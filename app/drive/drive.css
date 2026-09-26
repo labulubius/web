@@ -31,7 +31,7 @@
 button.drive-name { color: var(--link); cursor: pointer; }
 .drive-detail { color: var(--text-muted); flex-shrink: 0; font-size: 11px; text-align: right; width: 90px; }
 .drive-row-actions { align-items: center; display: flex; flex-shrink: 0; gap: 4px; justify-content: flex-end; width: 76px; }
-.drive-icon-button { height: 26px; padding: 0; width: 26px; }
+.drive-icon-button { padding: 5px; }
 .drive-delete:hover { border-color: var(--negative); color: var(--negative); }
 .drive-error { background: color-mix(in srgb, var(--negative) 12%, var(--view)); border: 1px solid var(--negative); border-radius: 4px; font-size: 12px; margin: 12px 0 0; padding: 9px; }
 .drive-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 11px; gap: 7px; justify-content: center; min-height: 310px; padding: 42px 16px; text-align: center; }

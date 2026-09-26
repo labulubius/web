@@ -81,7 +81,7 @@ export function ShareManager() {
 
   return <section className="share-view">
     <header className="share-header">
-      <div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={20} /> Public Share</h1>
+      <div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1>
         <p>Files here are public to anyone with a link · 20 MB per file</p></div>
       <button type="button" className="share-button" onClick={() => input.current?.click()} disabled={busy}><Upload size={16} /> Upload files</button>
       <input type="file" ref={input} multiple hidden onChange={(event) => void upload(event.target.files)} />
@@ -94,17 +94,17 @@ export function ShareManager() {
     {progress && <p className="share-notice" role="status">{progress}</p>}
     {message && <p className="share-notice" role="status">{message}</p>}
     {error && <p className="share-error" role="alert">{error}</p>}
-    {visible.length === 0 ? <div className="share-empty"><Share2 size={48} strokeWidth={1.2} /><strong>{search ? "No matching files" : "Nothing shared yet"}</strong><span>{search ? "Try another search." : "Upload a file to create your first public link."}</span></div> :
+    {visible.length === 0 ? <div className="share-empty"><Share2 size={29} /><strong>{search ? "No matching files" : "Nothing shared yet"}</strong><span>{search ? "Try another search." : "Upload a file to create your first public link."}</span></div> :
       <ul className="share-grid">{visible.map((entry) => {
         const url = `${endpoint}/f/${entry.id}`;
         return <li key={entry.id} className="share-card">
-          <div className="share-preview">{entry.type === "image" ? <img src={`${url}?thumb`} alt="" loading="lazy" /> : <span className="share-file-icon"><File size={40} strokeWidth={1.35} /></span>}</div>
+          <div className="share-preview">{entry.type === "image" ? <img src={`${url}?thumb`} alt="" loading="lazy" /> : <File size={38} />}</div>
           <div className="share-card-body"><strong title={entry.name}>{entry.name}</strong><span>{entry.type === "image" ? "Image" : "Download"} · {(entry.size / 1024).toFixed(1)} KB · {new Date(entry.created).toLocaleDateString()}</span>
             <div className="share-card-actions">
               <button type="button" onClick={() => void copy(url, "Link")} title="Copy public link"><Link2 size={15} /> Link</button>
               {entry.type === "image" && <button type="button" onClick={() => void copy(`![${entry.name}](${url})`, "Markdown")} title="Copy Markdown image"><Copy size={15} /> MD</button>}
-              <a href={url} target="_blank" rel="noopener noreferrer" title={entry.type === "image" ? "Open image" : "Download file"}>{entry.type === "image" ? <ExternalLink size={14} /> : <Download size={14} />}<span className="sr-only">Open {entry.name}</span></a>
-              <button type="button" className="share-remove" onClick={() => void remove(entry)} disabled={busy} title="Remove public file" aria-label={`Remove ${entry.name}`}><Trash2 size={14} /></button>
+              <a href={url} target="_blank" rel="noopener noreferrer" title={entry.type === "image" ? "Open image" : "Download file"}>{entry.type === "image" ? <ExternalLink size={16} /> : <Download size={16} />}<span className="sr-only">Open {entry.name}</span></a>
+              <button type="button" className="share-remove" onClick={() => void remove(entry)} disabled={busy} title="Remove public file" aria-label={`Remove ${entry.name}`}><Trash2 size={16} /></button>
             </div>
           </div>
         </li>;
