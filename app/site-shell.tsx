@@ -37,6 +37,8 @@ export function SiteShell({
   active: string;
   title: string;
 }) {
+  const [mobileSidebar, setMobileSidebar] = useState({ page: active, open: false });
+  const mobileSidebarOpen = mobileSidebar.page === active && mobileSidebar.open;
   const [sidebarPreference, setSidebarPreference] = useState(() => ({
     page: active,
     collapsed: readSidebarCollapsed(active),
@@ -67,6 +69,15 @@ export function SiteShell({
     document.documentElement.dataset.theme = themeMode;
   }, [themeMode]);
 
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileSidebar({ page: active, open: false });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [active, mobileSidebarOpen]);
+
   function cycleThemeMode() {
     const next: ThemeMode = themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system";
     setThemeMode(next);
@@ -80,9 +91,22 @@ export function SiteShell({
     <div
       className="plasma-desktop"
       data-sidebar-collapsed={displayedSidebarCollapsed}
+      data-mobile-sidebar-open={mobileSidebarOpen}
     >
       <main className="breeze-window">
         <div className="tool-bar">
+          <button
+            className="sidebar-toggle mobile-sidebar-toggle"
+            type="button"
+            onClick={() => setMobileSidebar({ page: active, open: !mobileSidebarOpen })}
+            aria-controls="page-sidebar"
+            aria-expanded={mobileSidebarOpen}
+            aria-label={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
+            title={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
+          >
+            <Menu size={20} />
+            <span>Sidebar</span>
+          </button>
           <button
             className="sidebar-toggle"
             type="button"
@@ -109,7 +133,10 @@ export function SiteShell({
           </button>
         </div>
 
-        <div className="application-view">{children}</div>
+        <div className="application-view">
+          {mobileSidebarOpen && <button className="mobile-sidebar-backdrop" type="button" aria-label="Close sidebar" onClick={() => setMobileSidebar({ page: active, open: false })} />}
+          {children}
+        </div>
         <footer className="status-bar">
           <span><span className="status-indicator" /> Ready</span>
           <span>Labulubius Workspace</span>
