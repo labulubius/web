@@ -181,7 +181,7 @@ export function NewsReader() {
     return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
       <div className="news-sidebar-heading"><h2>Categories</h2><button type="button" disabled aria-label="Add category"><Plus size={14} /></button></div>
-      <div className="news-category-row"><button className={`news-all${publicCategory === null ? " active" : ""}`} type="button" onClick={() => setPublicCategory(null)}><LayoutGrid size={16} /><span>All articles</span></button></div>
+      <div className="news-category-row"><button className={`news-all${publicCategory === null ? " active" : ""}`} type="button" onClick={() => setPublicCategory(null)}><LayoutGrid size={16} /><span>Articles</span></button></div>
       <div className="news-source-list">
         {publicCategories.map(({ name }) => <section key={name}>
           <div className="news-category-row"><button type="button" className={publicCategory === name ? "active" : ""} aria-expanded={!publicCollapsed.includes(name)} onClick={() => {
@@ -217,7 +217,7 @@ export function NewsReader() {
   return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
       <div className="news-sidebar-heading"><h2>Categories</h2><button onClick={() => setDialog({ kind: "category" })} disabled={!ready || saving} title="Add category" aria-label="Add category" type="button"><Plus size={14} /></button></div>
-      <div className="news-category-row"><button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
+      <div className="news-category-row"><button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button"><LayoutGrid size={16} /><span>Articles</span></button></div>
       <div className="news-source-list">
         {groups.map(({ category, items }) => <section key={category.id}>
           <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} aria-expanded={!collapsedCategories.includes(category.id)} aria-controls={`news-feeds-${category.id}`} onClick={() => { setCategoryFilter(category.id); setCollapsedCategories((previous) => previous.includes(category.id) ? previous.filter((id) => id !== category.id) : [...previous, category.id]); }}>{collapsedCategories.includes(category.id) ? <Folder size={16} /> : <FolderOpen size={16} />}<span>{category.name}</span></button>
