@@ -1,0 +1,10 @@
+.note-view { width: min(100%, 1100px); margin: 0 auto; padding: clamp(20px, 4vw, 44px); display: flex; flex-direction: column; gap: 16px; min-height: min(760px, 78vh); }
+.note-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.note-header h1 { font-size: 1.5rem; margin: 0 0 6px; }
+.note-header p { margin: 0; opacity: .7; }
+.note-state { font-size: .85rem; white-space: nowrap; opacity: .8; }
+.note-state-error, .note-state-conflict, .note-message { color: #d16e64; opacity: 1; }
+.note-message { margin: 0; }
+.note-retry { align-self: flex-start; padding: 7px 14px; cursor: pointer; }
+.note-text { display: block; flex: 1; width: 100%; min-height: 55vh; padding: 22px; resize: vertical; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; background: color-mix(in srgb, currentColor 3%, transparent); color: inherit; font: 15px/1.7 var(--font-noto-mono), monospace; tab-size: 4; outline-offset: 3px; }
+.note-text:disabled { opacity: .65; }

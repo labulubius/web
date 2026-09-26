@@ -13,4 +13,4 @@ on conflict (user_id) do nothing;
 
 5. In **Authentication → Providers → Email**, disable new-user sign-ups after creating the owner account.
 
-The publishable key is used by the browser. Authorization is enforced by PostgreSQL Row Level Security. Users in `site_admins` are global site administrators; navigator management is currently the first feature granted to that role, and future features can reuse `site_is_admin()`.
+The publishable key is used by the browser. Authorization is enforced by PostgreSQL Row Level Security. Users in `site_admins` are global site administrators. The private note uses `site_is_admin()` for both read and write access. Run `migrations/202609260001_private_note.sql` before opening `/note`; otherwise the editor will show a load error. Never place note content in client-side environment variables or public storage.
