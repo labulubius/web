@@ -112,7 +112,10 @@ function SiteCard({
   onFavorite: () => void;
   shouldBlockOpen: () => boolean;
 }) {
-  const icon = site.icon_url;
+  // Gmail's auto-discovered favicon can change; keep its familiar multicolor M.
+  const icon = site.name.toLowerCase() === "gmail" && /^https?:\/\/mail\.google\.com(?:[:/]|$)/i.test(site.url)
+    ? "/icons/gmail.svg"
+    : site.icon_url;
   const didDrag = useRef(false);
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: site.id,
