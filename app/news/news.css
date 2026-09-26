@@ -28,7 +28,7 @@
 .news-source-check { align-items: center; display: flex; flex: none; min-height: 33px; padding: 5px 5px 5px 19px; }
 .news-source-check input { accent-color: var(--link); cursor: pointer; margin: 0; }
 .news-source-check input:disabled { cursor: default; }
-.news-source-name { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: flex; flex: 1; font-size: 11px; gap: 6px; min-height: 33px; min-width: 0; padding: 5px 53px 5px 1px; text-align: left; }
+.news-source-name { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: flex; flex: 1; font-size: 12px; gap: 6px; min-height: 33px; min-width: 0; padding: 5px 53px 5px 1px; text-align: left; }
 .news-source-name:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .news-source-name.active { background: var(--accent); color: white; }
 .news-source-name.active svg { color: white; }

@@ -20,7 +20,7 @@
 .forums-source-check { align-items: center; display: flex; flex: none; min-height: 33px; padding: 5px 5px 5px 19px; }
 .forums-source-check input { accent-color: var(--link); cursor: pointer; margin: 0; }
 .forums-source-check input:disabled { cursor: default; }
-.forums-source-name { background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; flex: 1; font-size: 11px; min-height: 33px; min-width: 0; overflow: hidden; padding: 5px 53px 5px 1px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.forums-source-name { background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; flex: 1; font-size: 12px; min-height: 33px; min-width: 0; overflow: hidden; padding: 5px 53px 5px 1px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .forums-source-name:hover { background: var(--window-alt); }
 .forums-source-name.active { background: var(--accent); color: white; }
 .forums-row-actions { align-items: center; display: flex; position: absolute; right: 4px; }
