@@ -42,6 +42,23 @@ function publicIP(ip: string): boolean {
   if (family === 4) return !blocked.check(ip, "ipv4");
   return family === 6 && /^[23][0-9a-f]{3}:/i.test(ip) && !blocked.check(ip, "ipv6");
 }
+async function verifiedPublicDns(host: string): Promise<string[]> {
+  // On this host system DNS returns 198.18/15 proxy addresses for external
+  // websites. Resolve the original hostname with a public DoH resolver rather
+  // than accepting the proxy address as proof that the target is public.
+  const answers = await Promise.all(["A", "AAAA"].map(async (type) => {
+    const url = new URL("https://cloudflare-dns.com/dns-query");
+    url.searchParams.set("name", host);
+    url.searchParams.set("type", type);
+    const response = await fetch(url, { headers: { Accept: "application/dns-json" }, cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error("Public DNS lookup failed.");
+    const data = await response.json() as { Status?: number; Answer?: { type?: number; data?: string }[] };
+    if (data.Status !== 0 && data.Status !== 3) throw new Error("Public DNS lookup failed.");
+    return (data.Answer || []).filter((answer) => answer.type === (type === "A" ? 1 : 28) && typeof answer.data === "string").map((answer) => answer.data!);
+  }));
+  return answers.flat();
+}
+
 async function publicURL(value: unknown): Promise<string> {
   const raw = text(value, "URL", 2048);
   let url: URL;
@@ -54,6 +71,13 @@ async function publicURL(value: unknown): Promise<string> {
   let addresses: string[];
   try { addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((entry) => entry.address); }
   catch { return invalid("Host could not be resolved."); }
+  if (!addresses.length) return invalid("URL must resolve to a public address.");
+  const proxyNetwork = new BlockList();
+  proxyNetwork.addSubnet("198.18.0.0", 15, "ipv4");
+  if (!isIP(host) && addresses.every((address) => isIP(address) === 4 && proxyNetwork.check(address, "ipv4"))) {
+    try { addresses = await verifiedPublicDns(host); }
+    catch { return invalid("Could not verify the feed's public address."); }
+  }
   if (!addresses.length || addresses.some((address) => !publicIP(address))) return invalid("URL must resolve to a public address.");
   return url.href;
 }
