@@ -6,9 +6,9 @@
 .share-header h1 svg { color: var(--link); }
 .share-header h1 + p { color: var(--text-muted); font-size: 12px; margin: 7px 0 0; }
 .share-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.share-button, .share-card-actions button, .share-card-actions a, .share-back, .share-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
-.share-button:hover, .share-card-actions button:hover, .share-card-actions a:hover, .share-back:hover, .share-refresh:hover { border-color: var(--accent); }
-.share-button:disabled, .share-card-actions button:disabled, .share-back:disabled, .share-refresh:disabled { cursor: default; opacity: .45; }
+.share-button, .share-row-actions button, .share-row-actions a, .share-back, .share-refresh { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
+.share-button:hover, .share-row-actions button:hover, .share-row-actions a:hover, .share-back:hover, .share-refresh:hover { border-color: var(--accent); }
+.share-button:disabled, .share-row-actions button:disabled, .share-back:disabled, .share-refresh:disabled { cursor: default; opacity: .45; }
 .share-location { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 10px; min-height: 43px; padding: 5px 9px; }
 .share-back, .share-refresh { background: transparent; border-color: transparent; flex-shrink: 0; padding: 5px; }
 .share-breadcrumbs { color: var(--text-muted); flex: 1; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
@@ -18,21 +18,30 @@
 .share-notice, .share-error { border: 1px solid var(--accent); border-radius: 4px; color: var(--text); font-size: 12px !important; margin: 12px 0 0; padding: 9px; }
 .share-error { border-color: var(--negative); }
 .share-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 12px; gap: 7px; margin-top: 20px; padding: 42px 16px; text-align: center; }
+.share-empty[role="status"] { margin-top: 16px; }
 .share-empty svg { color: var(--link); }
 .share-empty strong { color: var(--text); font-size: 13px; }
-.share-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); list-style: none; margin: 20px 0 0; padding: 0; }
-.share-card { background: var(--view); border: 1px solid var(--separator); border-radius: 5px; min-width: 0; overflow: hidden; }
-.share-preview { align-items: center; background: var(--view-alt); color: var(--link); display: flex; height: 150px; justify-content: center; }
-.share-preview img { height: 100%; object-fit: contain; width: 100%; }
-.share-folder-preview { align-items: center; background: var(--view-alt); border: 0; color: var(--link); cursor: pointer; display: flex; height: 150px; justify-content: center; width: 100%; }
-.share-folder-preview:hover { background: var(--window-alt); }
-.share-card-body { padding: 11px; }
-.share-card-body strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.share-card-body > span { color: var(--text-muted); display: block; font-size: 11px; margin: 6px 0 12px; }
-.share-card-actions { display: flex; gap: 5px; }
-.share-card-actions button, .share-card-actions a { font-size: 11px; min-height: 32px; padding: 5px 7px; }
-.share-card-actions .share-remove { margin-left: auto; }
-.share-card-actions .share-remove:hover { border-color: var(--negative); color: var(--negative); }
+.share-list-wrap { border: 1px solid var(--separator); border-radius: 5px; margin-top: 16px; overflow: hidden; }
+.share-columns, .share-list li { display: grid; grid-template-columns: minmax(0, 1fr) 110px 92px 144px; gap: 12px; }
+.share-columns { background: var(--view-alt); border-bottom: 1px solid var(--separator); color: var(--text-muted); font-size: 11px; padding: 9px 12px; }
+.share-columns span:not(:first-child) { text-align: right; }
+.share-list { list-style: none; margin: 0; padding: 0; }
+.share-list li { align-items: center; min-height: 55px; padding: 7px 12px; }
+.share-list li + li { border-top: 1px solid var(--separator); }
+.share-list li:hover { background: color-mix(in srgb, var(--accent) 7%, var(--view)); }
+.share-row-name { align-items: center; display: flex; gap: 12px; min-width: 0; }
+.share-row-name svg { color: var(--link); flex: none; }
+.share-row-name button, .share-row-name span { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.share-row-name button { background: none; border: 0; color: var(--link); cursor: pointer; padding: 0; text-align: left; }
+.share-row-name button:hover { text-decoration: underline; }
+.share-detail { color: var(--text-muted); font-size: 11px; text-align: right; }
+.share-row-actions { align-items: center; display: flex; gap: 4px; justify-content: flex-end; }
+.share-row-actions button, .share-row-actions a { padding: 5px; }
+.share-row-actions .share-remove:hover { border-color: var(--negative); color: var(--negative); }
+@media (max-width: 650px) {
+  .share-columns, .share-list li { grid-template-columns: minmax(0, 1fr) 144px; }
+  .share-columns span:nth-child(2), .share-columns span:nth-child(3), .share-detail { display: none; }
+}
 .share-public-view { margin: 8vh auto; max-width: 760px; padding: 24px; }
 .share-public-view .share-eyebrow { align-items: center; display: flex; gap: 6px; }
 .share-public-view h1 { align-items: center; display: flex; font-size: 24px; font-weight: 500; gap: 10px; overflow-wrap: anywhere; }

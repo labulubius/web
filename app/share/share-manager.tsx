@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- Thumbnails are already optimized on upload and served by the share host. */
 
 import { ArrowLeft, Copy, Download, ExternalLink, File, Folder, FolderPlus, Link2, RefreshCw, Share2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -125,32 +124,39 @@ export function ShareManager() {
     {progress && <p className="share-notice" role="status">{progress}</p>}
     {message && <p className="share-notice" role="status">{message}</p>}
     {error && <p className="share-error" role="alert">{error}</p>}
-    {loadingList ? <p className="share-notice" role="status">Loading folder…</p> : !folders.length && !entries.length ? <div className="share-empty"><Share2 size={29} /><strong>Nothing shared here yet</strong><span>Upload a file or create a folder to get started.</span></div> :
-      <ul className="share-grid">
-        {folders.map((folder) => {
-          const url = `${endpoint}/s/${folder.id}`;
-          return <li key={folder.id} className="share-card"><button type="button" className="share-folder-preview" onClick={() => setFolderId(folder.id)} title={`Open ${folder.name}`}><Folder size={42} /></button>
-            <div className="share-card-body"><strong title={folder.name}>{folder.name}</strong><span>Folder · {new Date(folder.created).toLocaleDateString()}</span><div className="share-card-actions">
-              <button type="button" onClick={() => setFolderId(folder.id)} title="Open folder"><Folder size={15} /> Open</button>
-              <button type="button" onClick={() => void copy(url, "Folder link")} title="Copy public folder link"><Link2 size={15} /> Link</button>
-              <a href={url} target="_blank" rel="noopener noreferrer" title="View public folder"><ExternalLink size={15} /><span className="sr-only">View {folder.name}</span></a>
-              <button type="button" className="share-remove" onClick={() => void removeFolder(folder)} disabled={busy} title="Delete folder and contents" aria-label={`Delete ${folder.name}`}><Trash2 size={16} /></button>
-            </div></div></li>;
-        })}
-        {entries.map((entry) => {
-          const url = `${endpoint}/f/${entry.id}`;
-          return <li key={entry.id} className="share-card">
-            <div className="share-preview">{entry.type === "image" ? <img src={`${url}?thumb`} alt="" loading="lazy" /> : <File size={38} />}</div>
-            <div className="share-card-body"><strong title={entry.name}>{entry.name}</strong><span>{entry.type === "image" ? "Image" : "Download"} · {(entry.size / 1024).toFixed(1)} KB · {new Date(entry.created).toLocaleDateString()}</span>
-              <div className="share-card-actions">
-                <button type="button" onClick={() => void copy(url, "Link")} title="Copy public link"><Link2 size={15} /> Link</button>
-                {entry.type === "image" && <button type="button" onClick={() => void copy(`![${entry.name}](${url})`, "Markdown")} title="Copy Markdown image"><Copy size={15} /> MD</button>}
-                <a href={url} target="_blank" rel="noopener noreferrer" title={entry.type === "image" ? "Open image" : "Download file"}>{entry.type === "image" ? <ExternalLink size={16} /> : <Download size={16} />}<span className="sr-only">Open {entry.name}</span></a>
+    {loadingList ? <p className="share-empty" role="status">Loading folder…</p> : !folders.length && !entries.length ? <div className="share-empty"><Share2 size={29} /><strong>Nothing shared here yet</strong><span>Upload a file or create a folder to get started.</span></div> :
+      <div className="share-list-wrap">
+        <div className="share-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Created</span><span>Actions</span></div>
+        <ul className="share-list">
+          {folders.map((folder) => {
+            const url = `${endpoint}/s/${folder.id}`;
+            return <li key={folder.id}>
+              <div className="share-row-name"><Folder size={21} /><button type="button" onClick={() => setFolderId(folder.id)} title={`Open ${folder.name}`}>{folder.name}</button></div>
+              <span className="share-detail">Folder</span>
+              <span className="share-detail">{new Date(folder.created).toLocaleDateString()}</span>
+              <div className="share-row-actions">
+                <button type="button" onClick={() => setFolderId(folder.id)} title="Open folder" aria-label={`Open ${folder.name}`}><Folder size={16} /></button>
+                <button type="button" onClick={() => void copy(url, "Folder link")} title="Copy public folder link" aria-label={`Copy public link for ${folder.name}`}><Link2 size={16} /></button>
+                <a href={url} target="_blank" rel="noopener noreferrer" title="View public folder" aria-label={`View public folder ${folder.name}`}><ExternalLink size={16} /></a>
+                <button type="button" className="share-remove" onClick={() => void removeFolder(folder)} disabled={busy} title="Delete folder and contents" aria-label={`Delete ${folder.name}`}><Trash2 size={16} /></button>
+              </div>
+            </li>;
+          })}
+          {entries.map((entry) => {
+            const url = `${endpoint}/f/${entry.id}`;
+            return <li key={entry.id}>
+              <div className="share-row-name"><File size={21} /><span title={entry.name}>{entry.name}</span></div>
+              <span className="share-detail">{entry.type === "image" ? "Image" : "File"} · {(entry.size / 1024).toFixed(1)} KB</span>
+              <span className="share-detail">{new Date(entry.created).toLocaleDateString()}</span>
+              <div className="share-row-actions">
+                <button type="button" onClick={() => void copy(url, "Link")} title="Copy public link" aria-label={`Copy public link for ${entry.name}`}><Link2 size={16} /></button>
+                {entry.type === "image" && <button type="button" onClick={() => void copy(`![${entry.name}](${url})`, "Markdown")} title="Copy Markdown image" aria-label={`Copy Markdown image for ${entry.name}`}><Copy size={16} /></button>}
+                <a href={url} target="_blank" rel="noopener noreferrer" title={entry.type === "image" ? "Open image" : "Download file"} aria-label={`${entry.type === "image" ? "Open" : "Download"} ${entry.name}`}>{entry.type === "image" ? <ExternalLink size={16} /> : <Download size={16} />}</a>
                 <button type="button" className="share-remove" onClick={() => void removeFile(entry)} disabled={busy} title="Remove public file" aria-label={`Remove ${entry.name}`}><Trash2 size={16} /></button>
               </div>
-            </div>
-          </li>;
-        })}
-      </ul>}
+            </li>;
+          })}
+        </ul>
+      </div>}
   </section>;
 }
