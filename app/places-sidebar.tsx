@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, Folder, HardDrive, Info, Star } from "lucide-react";
+import { Compass, Folder, HardDrive, Info, Share2, Star } from "lucide-react";
 import { useSiteAuth } from "./site-auth";
 import Link from "next/link";
 
@@ -18,6 +18,9 @@ export function PlacesSidebar({ active }: { active: string }) {
         </Link>
         {isAdmin && <Link className={active === "/drive" ? "selected" : ""} href="/drive">
           <HardDrive size={16} /> Private Drive
+        </Link>}
+        {isAdmin && <Link className={active === "/share" ? "selected" : ""} href="/share">
+          <Share2 size={16} /> Public Share
         </Link>}
         <Link className={active === "/about" ? "selected" : ""} href="/about">
           <Info size={16} /> About
