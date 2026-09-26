@@ -27,7 +27,7 @@
 .news-source:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .news-source input { accent-color: var(--link); flex: none; margin: 0; }
 .news-source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.news-source-actions { align-items: center; border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; flex-wrap: wrap; font-size: 10px; gap: 7px; justify-content: space-between; margin-top: 10px; padding-top: 10px; }
+.news-source-status { color: var(--text-muted); font-size: 10px; margin: 10px 9px; }
 .news-more { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; font-size: 11px; padding: 6px 10px; }
 .news-more:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .news-more:disabled { cursor: default; opacity: .5; }

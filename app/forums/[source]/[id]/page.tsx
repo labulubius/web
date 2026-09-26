@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "../../../site-shell";
 import { ForumsInteraction } from "../../forums-interaction";
-import { forumSource, forumThread, postText, threadPosts } from "../../../lib/forums";
+import { forumThread, postText, threadPosts } from "../../../lib/forums";
+import { loadForumDirectory } from "../../../lib/forums-directory";
 import "../../forums.css";
 
 export const metadata: Metadata = { title: "Discussion · Forums" };
@@ -11,7 +12,7 @@ const pageSize = 20;
 
 export default async function DiscussionPage({ params, searchParams }: PageProps<"/forums/[source]/[id]">) {
   const { source: sourceId, id: rawId } = await params;
-  const source = forumSource(sourceId);
+  const source = (await loadForumDirectory()).sources.find((item) => item.id === sourceId && item.selected);
   if (!source || !/^[1-9]\d{0,11}$/.test(rawId) || !Number.isSafeInteger(Number(rawId))) notFound();
   const id = Number(rawId);
   const { page: rawPage } = await searchParams;

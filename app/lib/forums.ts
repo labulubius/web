@@ -1,11 +1,8 @@
-// Only configured public Discourse hosts are fetched. Never accept a URL from a request.
-export const forumSources = [
-  { id: "openai", name: "OpenAI Community", origin: "https://community.openai.com", latest: "/latest.json?status=open" },
-  { id: "python", name: "Python Discussions", origin: "https://discuss.python.org", latest: "/latest.json" },
-  { id: "discourse", name: "Discourse Meta", origin: "https://meta.discourse.org", latest: "/latest.json" },
-] as const;
+import "server-only";
 
-export type ForumSource = (typeof forumSources)[number];
+import https from "node:https";
+import { publicForumAddress, type ForumSource } from "./forums-directory";
+export type { ForumSource } from "./forums-directory";
 export type ForumTopic = {
   id: number;
   title: string;
@@ -32,14 +29,47 @@ export type ForumThread = {
   post_stream: { posts: ForumPost[]; stream: number[] };
 };
 
-export function forumSource(id: string) {
-  return forumSources.find((source) => source.id === id);
-}
+// Resolve each configured hostname on every request, then pin the verified address
+// for the TLS connection. Never follow redirects to an unchecked host.
+const responseCache = new Map<string, { expires: number; value: Promise<unknown> }>();
 
 async function discourseJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000), headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`Forum responded with HTTP ${response.status}`);
-  return response.json() as Promise<T>;
+  const cached = responseCache.get(url);
+  if (cached && cached.expires > Date.now()) return cached.value as Promise<T>;
+  if (responseCache.size >= 100) responseCache.clear();
+  const value = requestDiscourseJson<T>(url);
+  responseCache.set(url, { expires: Date.now() + 300_000, value });
+  value.catch(() => { if (responseCache.get(url)?.value === value) responseCache.delete(url); });
+  return value;
+}
+
+async function requestDiscourseJson<T>(url: string): Promise<T> {
+  const target = new URL(url);
+  if (target.protocol !== "https:" || target.port || target.username || target.password) throw new Error("Invalid forum URL.");
+  const address = await publicForumAddress(target.hostname);
+  return new Promise<T>((resolve, reject) => {
+    const request = https.get(target, {
+      headers: { Accept: "application/json", "User-Agent": "Labulubius-Forums/1.0" },
+      timeout: 10000,
+      lookup: (_hostname, options, callback) => {
+        const family = address.includes(":") ? 6 : 4;
+        if (typeof options !== "number" && options.all) callback(null, [{ address, family }]);
+        else callback(null, address, family);
+      },
+    }, (response) => {
+      if (response.statusCode !== 200) { response.resume(); reject(new Error(`Forum responded with HTTP ${response.statusCode}.`)); return; }
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (part: string) => {
+        text += part;
+        if (text.length > 2_000_000) request.destroy(new Error("Forum response too large."));
+      });
+      response.on("end", () => { try { resolve(JSON.parse(text) as T); } catch { reject(new Error("Invalid forum response.")); } });
+      response.on("error", reject);
+    });
+    request.on("timeout", () => request.destroy(new Error("Forum timeout.")));
+    request.on("error", reject);
+  });
 }
 
 export async function latestTopics(source: ForumSource): Promise<ForumTopic[]> {

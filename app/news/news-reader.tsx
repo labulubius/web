@@ -196,7 +196,7 @@ export function NewsReader() {
           </div>)}
         </section>)}
       </div>
-      {publicDirectory ? <div className="news-source-actions"><span>{publicDirectory.feeds.filter((feed) => feed.checked).length} of {publicDirectory.feeds.length} selected</span></div> : <div className="news-source-actions">{publicError ? "Sources are temporarily unavailable." : "Loading sources…"}</div>}
+      {!publicDirectory && <div className="news-source-status">{publicError ? "Sources are temporarily unavailable." : "Loading sources…"}</div>}
     </aside>
     <section className="news-content" inert>
       <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{publicCategory ?? "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled aria-label="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled><Plus size={15} /> RSS</button></div></header>
@@ -233,7 +233,7 @@ export function NewsReader() {
           </div>
         </section>)}
       </div>
-      {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span>{saving && <span role="status">Saving…</span>}</div>}
+      {saving && <div className="news-source-status" role="status">Saving…</div>}
     </aside>
     <section className="news-content">
       <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
