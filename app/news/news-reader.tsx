@@ -1,6 +1,6 @@
 "use client";
 
-import { Newspaper, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Folder, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Search, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
@@ -134,30 +134,30 @@ export function NewsReader() {
   const editedFeed = dialog?.kind === "feed" ? feeds.find((feed) => feed.id === dialog.id) : undefined;
   return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
-      <div className="news-sidebar-heading"><h2>Categories</h2><button onClick={() => setDialog({ kind: "category" })} disabled={!ready || saving} title="Add category" aria-label="Add category" type="button"><Plus size={16} /></button></div>
-      <button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button">All articles</button>
+      <div className="news-sidebar-heading"><h2>Categories</h2><button onClick={() => setDialog({ kind: "category" })} disabled={!ready || saving} title="Add category" aria-label="Add category" type="button"><Plus size={14} /></button></div>
+      <div className="news-category-row"><button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
       <label className="news-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a source" aria-label="Find a source" /></label>
       <div className="news-source-list">
         {groups.map(({ category, items }) => <section key={category.id}>
-          <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} onClick={() => setCategoryFilter(category.id)}>{category.name}</button>
-            {category.name !== "Uncategorized" && <><button type="button" title={`Rename ${category.name}`} aria-label={`Rename ${category.name}`} onClick={() => setDialog({ kind: "category", id: category.id })}><Pencil size={13} /></button>
-            <button type="button" title={`Delete ${category.name}`} aria-label={`Delete ${category.name}`} onClick={() => void removeCategory(category)}><Trash2 size={13} /></button></>}
+          <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} onClick={() => setCategoryFilter(category.id)}><Folder size={16} /><span>{category.name}</span></button>
+            {category.name !== "Uncategorized" && <span className="news-category-actions"><button type="button" title={`Rename ${category.name}`} aria-label={`Rename ${category.name}`} onClick={() => setDialog({ kind: "category", id: category.id })}><Pencil size={12} /></button>
+            <button type="button" title={`Delete ${category.name}`} aria-label={`Delete ${category.name}`} onClick={() => void removeCategory(category)}><Trash2 size={12} /></button></span>}
           </div>
           {items.map((feed) => <div key={feed.id} className="news-source-row">
-            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} onChange={() => setSelected((previous) => previous.includes(feed.id) ? previous.filter((id) => id !== feed.id) : [...previous, feed.id])} /><span title={feed.title}>{feed.title}</span></label>
-            <button type="button" title={`Edit ${feed.title}`} aria-label={`Edit ${feed.title}`} onClick={() => setDialog({ kind: "feed", id: feed.id })}><Pencil size={12} /></button>
-            <button type="button" title={`Unsubscribe ${feed.title}`} aria-label={`Unsubscribe ${feed.title}`} onClick={() => void removeFeed(feed)}><Trash2 size={12} /></button>
+            <label className="news-source"><input type="checkbox" checked={selected.includes(feed.id)} onChange={() => setSelected((previous) => previous.includes(feed.id) ? previous.filter((id) => id !== feed.id) : [...previous, feed.id])} /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
+            <span className="news-feed-actions"><button type="button" title={`Edit ${feed.title}`} aria-label={`Edit ${feed.title}`} onClick={() => setDialog({ kind: "feed", id: feed.id })}><Pencil size={12} /></button>
+            <button type="button" title={`Unsubscribe ${feed.title}`} aria-label={`Unsubscribe ${feed.title}`} onClick={() => void removeFeed(feed)}><Trash2 size={12} /></button></span>
           </div>)}
         </section>)}
       </div>
       {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span><button type="button" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save selection"}</button></div>}
     </aside>
     <section className="news-content">
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || dirty} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button type="button" disabled={!ready || saving} onClick={() => setDialog({ kind: "feed" })}><Plus size={16} /> Add RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || dirty} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
       {dirty && <p className="news-hint">Save your source selection to update the articles.</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
-      {ready && feeds.length === 0 && <div className="news-empty"><p>No subscriptions yet. Add your first RSS feed here.</p><button type="button" onClick={() => setDialog({ kind: "feed" })}>Add RSS</button></div>}
+      {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>Add your first RSS feed to start reading.</p><button type="button" onClick={() => setDialog({ kind: "feed" })}>Add RSS</button></div>}
       {ready && feeds.length > 0 && !saved.length && <p className="news-empty">Select sources in the sidebar, then save your selection to start reading.</p>}
       {ready && !!saved.length && !visible.length && !busy && !error && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
       <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}>
