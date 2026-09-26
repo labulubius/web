@@ -158,7 +158,7 @@ export function NewsReader() {
       {error && <p className="news-error" role="alert">{error}</p>}
       {dirty && <p className="news-hint">Save your source selection to update the articles.</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
-      {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Add your first RSS feed to start reading." : "Create a category, then add your first RSS feed."}</p><button type="button" onClick={() => setDialog({ kind: displayCategories.length ? "feed" : "category" })}>{displayCategories.length ? "Add RSS" : "Add category"}</button></div>}
+      {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Use the RSS button above to add your first subscription." : "Create a category, then use the RSS button above to add a subscription."}</p></div>}
       {ready && feeds.length > 0 && !saved.length && <p className="news-empty">Select sources in the sidebar, then save your selection to start reading.</p>}
       {ready && !!saved.length && !visible.length && !busy && !error && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
       <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}>
