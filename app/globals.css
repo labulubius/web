@@ -283,8 +283,9 @@ html[data-theme="dark"] .plasma-desktop {
   .tool-bar nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
   .tool-bar nav a { min-width: 43px; padding: 5px; }
   .sidebar-toggle { display: none; }
-  .plasma-desktop:has(#page-sidebar) .mobile-sidebar-toggle { display: flex; flex: none; min-width: 43px; padding: 5px; }
-  .tool-bar nav a span, .toolbar-context, .theme-control span, .account-control span { display: none; }
+  .mobile-sidebar-toggle { display: flex; flex: none; min-width: 43px; width: 43px; padding: 5px; }
+  .mobile-sidebar-toggle svg { flex: none; }
+  .mobile-sidebar-toggle span, .tool-bar nav a span, .toolbar-context, .theme-control span, .account-control span { display: none; }
   .theme-control { justify-content: center; padding: 4px; width: 34px; }
   .status-bar { display: none; }
   .plasma-panel { border-bottom: 0; border-left: 0; border-radius: 0; border-right: 0; bottom: 0; height: 55px; left: 0; padding: 4px 10px; right: 0; }

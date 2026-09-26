@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, Folder, HardDrive, Info, Share2, Star } from "lucide-react";
+import { Compass, HardDrive, Home, Info, MessagesSquare, Newspaper, Share2, Star, StickyNote } from "lucide-react";
 import { useSiteAuth } from "./site-auth";
 import Link from "next/link";
 
@@ -11,17 +11,16 @@ export function PlacesSidebar({ active }: { active: string }) {
       <h2>Places</h2>
       <nav>
         <Link className={active === "/" ? "selected" : ""} href="/">
-          <Folder size={16} /> Home
+          <Home size={16} /> Home
         </Link>
         <Link className={active === "/nav" ? "selected" : ""} href="/nav">
-          <Compass size={16} /> Web Navigator
+          <Compass size={16} /> Navigator
         </Link>
-        {isAdmin && <Link className={active === "/drive" ? "selected" : ""} href="/drive">
-          <HardDrive size={16} /> Private Drive
-        </Link>}
-        {isAdmin && <Link className={active === "/share" ? "selected" : ""} href="/share">
-          <Share2 size={16} /> Public Share
-        </Link>}
+        <Link href="/news"><Newspaper size={16} /> News</Link>
+        <Link href="/forums"><MessagesSquare size={16} /> Forums</Link>
+        {isAdmin && <Link href="/drive"><HardDrive size={16} /> Drive</Link>}
+        {isAdmin && <Link href="/share"><Share2 size={16} /> Share</Link>}
+        <Link href="/note"><StickyNote size={16} /> Note</Link>
         <Link className={active === "/about" ? "selected" : ""} href="/about">
           <Info size={16} /> About
         </Link>

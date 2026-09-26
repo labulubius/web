@@ -98,13 +98,17 @@ export function SiteShell({
           <button
             className="sidebar-toggle mobile-sidebar-toggle"
             type="button"
-            onClick={() => setMobileSidebar({ page: active, open: !mobileSidebarOpen })}
+            onClick={() => {
+              if (document.getElementById("page-sidebar")) {
+                setMobileSidebar({ page: active, open: !mobileSidebarOpen });
+              }
+            }}
             aria-controls="page-sidebar"
             aria-expanded={mobileSidebarOpen}
             aria-label={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
             title={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
           >
-            <Menu size={20} />
+            <Menu size={18} />
             <span>Sidebar</span>
           </button>
           <button
