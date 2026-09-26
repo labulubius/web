@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Folder, FolderOpen, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Trash2, X } from "lucide-react";
+import { Folder, FolderOpen, LayoutGrid, Newspaper, Pencil, Plus, RefreshCw, Rss, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
@@ -146,7 +146,7 @@ export function NewsReader() {
       <div className="news-category-row"><button className={`news-all${categoryFilter === null ? " active" : ""}`} onClick={() => setCategoryFilter(null)} type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
       <div className="news-source-list">
         {groups.map(({ category, items }) => <section key={category.id}>
-          <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} aria-expanded={!collapsedCategories.includes(category.id)} aria-controls={`news-feeds-${category.id}`} onClick={() => { setCategoryFilter(category.id); setCollapsedCategories((previous) => previous.includes(category.id) ? previous.filter((id) => id !== category.id) : [...previous, category.id]); }}>{collapsedCategories.includes(category.id) ? <Folder size={16} /> : <FolderOpen size={16} />}<span>{category.name}</span><ChevronRight className={collapsedCategories.includes(category.id) ? "news-disclosure" : "news-disclosure expanded"} size={14} /></button>
+          <div className="news-category-row"><button type="button" className={categoryFilter === category.id ? "active" : ""} aria-expanded={!collapsedCategories.includes(category.id)} aria-controls={`news-feeds-${category.id}`} onClick={() => { setCategoryFilter(category.id); setCollapsedCategories((previous) => previous.includes(category.id) ? previous.filter((id) => id !== category.id) : [...previous, category.id]); }}>{collapsedCategories.includes(category.id) ? <Folder size={16} /> : <FolderOpen size={16} />}<span>{category.name}</span></button>
             {category.name !== "Uncategorized" && <span className="news-category-actions"><button type="button" title={`Rename ${category.name}`} aria-label={`Rename ${category.name}`} onClick={() => setDialog({ kind: "category", id: category.id })}><Pencil size={12} /></button>
             <button type="button" title={`Delete ${category.name}`} aria-label={`Delete ${category.name}`} onClick={() => void removeCategory(category)}><Trash2 size={12} /></button></span>}
           </div>
