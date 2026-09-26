@@ -9,6 +9,15 @@ type ThemeMode = "light" | "dark" | "system";
 
 const subscribeToHydration = () => () => {};
 
+function readSidebarCollapsed(page: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(`site-sidebar-collapsed:${page}`) === "true";
+  } catch {
+    return false;
+  }
+}
+
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
@@ -29,7 +38,13 @@ export function SiteShell({
   title: string;
 }) {
   const { isAdmin } = useSiteAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarPreference, setSidebarPreference] = useState(() => ({
+    page: active,
+    collapsed: readSidebarCollapsed(active),
+  }));
+  const sidebarCollapsed = sidebarPreference.page === active
+    ? sidebarPreference.collapsed
+    : readSidebarCollapsed(active);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "system";
     const storedMode = window.localStorage.getItem("site-theme-mode");
@@ -37,6 +52,17 @@ export function SiteShell({
   });
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const displayedThemeMode = hydrated ? themeMode : "system";
+  const displayedSidebarCollapsed = hydrated ? sidebarCollapsed : false;
+
+  function toggleSidebar() {
+    const collapsed = !sidebarCollapsed;
+    setSidebarPreference({ page: active, collapsed });
+    try {
+      window.localStorage.setItem(`site-sidebar-collapsed:${active}`, String(collapsed));
+    } catch {
+      // The button still works when browser storage is unavailable.
+    }
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
@@ -54,18 +80,18 @@ export function SiteShell({
   return (
     <div
       className="plasma-desktop"
-      data-sidebar-collapsed={sidebarCollapsed}
+      data-sidebar-collapsed={displayedSidebarCollapsed}
     >
       <main className="breeze-window">
         <div className="tool-bar">
           <button
             className="sidebar-toggle"
             type="button"
-            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            onClick={toggleSidebar}
             aria-controls="page-sidebar"
-            aria-expanded={!sidebarCollapsed}
-            aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-            title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            aria-expanded={!displayedSidebarCollapsed}
+            aria-label={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            title={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
           >
             <Menu size={20} />
             <span>Sidebar</span>
