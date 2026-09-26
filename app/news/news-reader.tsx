@@ -9,6 +9,7 @@ import "./news.css";
 type Category = { id: string; name: string };
 type Dialog = { kind: "category" | "feed"; id?: string } | null;
 type Directory = { feeds: NewsFeed[]; categories: Category[]; selected: string[] };
+type PublicDirectory = { feeds: { title: string; category: string }[]; categories: { name: string }[] };
 
 export function NewsReader() {
   const { supabase, loading, isAdmin } = useSiteAuth();
@@ -25,6 +26,10 @@ export function NewsReader() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
+  const [publicDirectory, setPublicDirectory] = useState<PublicDirectory | null>(null);
+  const [publicCategory, setPublicCategory] = useState<string | null>(null);
+  const [publicCollapsed, setPublicCollapsed] = useState<string[]>([]);
+  const [publicError, setPublicError] = useState(false);
 
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -67,6 +72,23 @@ export function NewsReader() {
     }, 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [api, loading, isAdmin, loadArticles]);
+
+  useEffect(() => {
+    if (loading || isAdmin) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/news?view=sidebar", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Sidebar unavailable.");
+        const data = await response.json() as PublicDirectory;
+        if (!Array.isArray(data.categories) || !Array.isArray(data.feeds)) throw new Error("Invalid sidebar.");
+        if (!controller.signal.aborted) { setPublicDirectory(data); setPublicError(false); }
+      } catch {
+        if (!controller.signal.aborted) setPublicError(true);
+      }
+    })();
+    return () => controller.abort();
+  }, [loading, isAdmin]);
 
   // FreshRSS requires its default category internally; keep it out of the News
   // sidebar until a feed is actually assigned to it.
@@ -136,16 +158,35 @@ export function NewsReader() {
   }
 
   if (loading) return <div className="news-access">Checking your account…</div>;
-  if (!isAdmin) return <div className="news-layout">
+  if (!isAdmin) {
+    const publicCategories = publicDirectory?.categories.filter(({ name }) =>
+      name !== "Uncategorized" || publicDirectory.feeds.some((feed) => feed.category === name)) ?? [];
+    return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="News sources">
       <div className="news-sidebar-heading"><h2>Categories</h2><button type="button" disabled aria-label="Add category"><Plus size={14} /></button></div>
-      <div className="news-category-row"><button className="news-all active" type="button"><LayoutGrid size={16} /><span>All articles</span></button></div>
+      <div className="news-category-row"><button className={`news-all${publicCategory === null ? " active" : ""}`} type="button" onClick={() => setPublicCategory(null)}><LayoutGrid size={16} /><span>All articles</span></button></div>
+      <div className="news-source-list">
+        {publicCategories.map(({ name }) => <section key={name}>
+          <div className="news-category-row"><button type="button" className={publicCategory === name ? "active" : ""} aria-expanded={!publicCollapsed.includes(name)} onClick={() => {
+            setPublicCategory(name);
+            setPublicCollapsed((previous) => previous.includes(name) ? previous.filter((item) => item !== name) : [...previous, name]);
+          }}>{publicCollapsed.includes(name) ? <Folder size={16} /> : <FolderOpen size={16} />}<span>{name}</span></button>
+            {name !== "Uncategorized" && <span className="news-category-actions"><button type="button" disabled aria-label={`Rename ${name}`}><Pencil size={12} /></button><button type="button" disabled aria-label={`Delete ${name}`}><Trash2 size={12} /></button></span>}
+          </div>
+          {!publicCollapsed.includes(name) && publicDirectory?.feeds.filter((feed) => feed.category === name).map((feed, index) => <div key={`${name}-${index}`} className="news-source-row">
+            <label className="news-source"><input type="checkbox" disabled /><Rss size={14} aria-hidden="true" /><span title={feed.title}>{feed.title}</span></label>
+            <span className="news-feed-actions"><button type="button" disabled aria-label={`Edit ${feed.title}`}><Pencil size={12} /></button><button type="button" disabled aria-label={`Unsubscribe ${feed.title}`}><Trash2 size={12} /></button></span>
+          </div>)}
+        </section>)}
+      </div>
+      {!publicDirectory && <div className="news-source-actions">{publicError ? "Sources are temporarily unavailable." : "Loading sources…"}</div>}
     </aside>
     <section className="news-content" inert>
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>News</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled aria-label="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled><Plus size={15} /> RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{publicCategory ?? "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled aria-label="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled><Plus size={15} /> RSS</button></div></header>
       <p className="news-empty">Articles are private to the administrator.</p>
     </section>
   </div>;
+  }
 
   const editedCategory = dialog?.kind === "category" ? categories.find((cat) => cat.id === dialog.id) : undefined;
   const editedFeed = dialog?.kind === "feed" ? feeds.find((feed) => feed.id === dialog.id) : undefined;

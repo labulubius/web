@@ -6,6 +6,23 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+let sidebarCache: Promise<{ categories: { name: string }[]; feeds: { title: string; category: string }[] }> | null = null;
+let sidebarExpires = 0;
+
+function publicSidebar() {
+  if (!sidebarCache || Date.now() >= sidebarExpires) {
+    sidebarExpires = Date.now() + 30_000;
+    sidebarCache = Promise.all([newsFeeds(), newsCategories()])
+      .then(([feeds, categories]) => ({
+        categories: categories.map(({ name }) => ({ name })),
+        // Titles can fall back to feed URLs internally; do not reveal those URLs.
+        feeds: feeds.map(({ id, title, category }) => ({ title: title === id ? "Untitled source" : title, category })),
+      }))
+      .catch((error: unknown) => { sidebarCache = null; throw error; });
+  }
+  return sidebarCache;
+}
+
 // Vercel hosts the UI. Forward same-origin News requests over the existing
 // Cloudflare Tunnel to the web server; only the web server contacts FreshRSS.
 async function relay(request: Request) {
@@ -33,9 +50,13 @@ function errorResponse() {
 export async function GET(request: Request) {
   try {
     if (process.env.VERCEL) return await relay(request);
+    const url = new URL(request.url);
+    if (url.searchParams.get("view") === "sidebar") {
+      // Public navigation only: never expose feed IDs/URLs, selections or articles.
+      return Response.json(await publicSidebar(), { headers: privateNewsHeaders });
+    }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
-    const url = new URL(request.url);
     const feeds = await newsFeeds();
     const ids = new Set(feeds.map((feed) => feed.id));
     const selected = (await loadNewsSelection(auth.user.id)).filter((id) => ids.has(id));
