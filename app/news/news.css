@@ -3,11 +3,23 @@
 .plasma-desktop[data-sidebar-collapsed="true"] .news-layout { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .news-sidebar { padding: 0; border-color: transparent; }
 .news-sidebar h2 { font-size: 13px; margin: 0; }
+.news-sidebar-heading, .news-category-row, .news-source-row, .news-heading-actions { display: flex; align-items: center; gap: 3px; }
+.news-sidebar-heading { justify-content: space-between; }
+.news-sidebar-heading button, .news-category-row button, .news-source-row button, .news-all { background: transparent; border: 0; border-radius: 4px; color: var(--text); cursor: pointer; padding: 5px; }
+.news-category-row > button:first-child { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; font-weight: 600; }
+.news-category-row button:hover, .news-source-row button:hover, .news-all:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.news-category-row button.active, .news-all.active { background: color-mix(in srgb, var(--accent) 25%, var(--button)); }
+.news-all { text-align: left; font-size: 12px; }
+.news-source-row .news-source { flex: 1; min-width: 0; }
+.news-source-row > button { flex: none; color: var(--text-muted); }
+.news-heading-actions { flex-wrap: wrap; }
+.news-heading-actions button { align-items: center; gap: 4px; white-space: nowrap; }
+.news-empty button { background: var(--button); color: var(--text); border: 1px solid var(--frame); border-radius: 4px; cursor: pointer; padding: 6px 10px; }
 .news-sidebar > p { color: var(--text-muted); font-size: 11px; line-height: 1.45; margin: 0 0 6px; }
 .news-search { align-items: center; background: var(--view); border: 1px solid var(--frame); border-radius: 4px; color: var(--text-muted); display: flex; gap: 6px; padding: 5px 7px; }
 .news-search input { background: none; border: 0; color: var(--text); min-width: 0; outline: none; width: 100%; font-size: 12px; }
 .news-source-list { overflow-y: auto; max-height: min(65vh, 650px); }
-.news-source-list h3 { color: var(--text-muted); font-size: 11px; font-weight: 600; margin: 15px 3px 4px; }
+.news-source-list section { margin-top: 10px; }
 .news-source { align-items: flex-start; border-radius: 4px; cursor: pointer; display: flex; font-size: 12px; gap: 8px; line-height: 1.4; padding: 6px 4px; }
 .news-source:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .news-source input { accent-color: var(--link); margin: 2px 0 0; flex: none; }
