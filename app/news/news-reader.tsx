@@ -67,10 +67,14 @@ export function NewsReader() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [api, loading, isAdmin, loadArticles]);
 
-  const groups = useMemo(() => categories.map((category) => ({
+  // FreshRSS requires its default category internally; keep it out of the News
+  // sidebar until a feed is actually assigned to it.
+  const displayCategories = useMemo(() => categories.filter((category) =>
+    category.name !== "Uncategorized" || feeds.some((feed) => feed.category === category.name)), [categories, feeds]);
+  const groups = useMemo(() => displayCategories.map((category) => ({
     category,
     items: feeds.filter((feed) => feed.category === category.name),
-  })), [feeds, categories]);
+  })), [feeds, displayCategories]);
   const dirty = selected.length !== saved.length || selected.some((id) => !saved.includes(id));
   const activeName = categories.find((category) => category.id === categoryFilter)?.name;
   const visible = activeName ? articles.filter((article) => feeds.some((feed) => feed.id === article.feedId && feed.category === activeName)) : articles;
@@ -150,11 +154,11 @@ export function NewsReader() {
       {ready && <div className="news-source-actions"><span>{selected.length} of {feeds.length} selected</span><button type="button" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save selection"}</button></div>}
     </aside>
     <section className="news-content">
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || dirty} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || dirty} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
       {dirty && <p className="news-hint">Save your source selection to update the articles.</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
-      {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>Add your first RSS feed to start reading.</p><button type="button" onClick={() => setDialog({ kind: "feed" })}>Add RSS</button></div>}
+      {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Add your first RSS feed to start reading." : "Create a category, then add your first RSS feed."}</p><button type="button" onClick={() => setDialog({ kind: displayCategories.length ? "feed" : "category" })}>{displayCategories.length ? "Add RSS" : "Add category"}</button></div>}
       {ready && feeds.length > 0 && !saved.length && <p className="news-empty">Select sources in the sidebar, then save your selection to start reading.</p>}
       {ready && !!saved.length && !visible.length && !busy && !error && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
       <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}>
@@ -171,11 +175,11 @@ export function NewsReader() {
           {dialog.kind === "category" ? <label>Category name<input name="name" defaultValue={editedCategory?.name || ""} maxLength={100} autoFocus required /></label> : <>
             {!dialog.id && <label>RSS URL<input name="url" type="url" placeholder="https://example.com/feed.xml" autoFocus required /></label>}
             <label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} /></label>
-            <label>Category<select name="category" defaultValue={categories.find((cat) => cat.name === editedFeed?.category)?.id || categoryFilter || categories[0]?.id} required>{categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></label>
+            <label>Category<select name="category" defaultValue={displayCategories.find((cat) => cat.name === editedFeed?.category)?.id || categoryFilter || displayCategories[0]?.id} required>{displayCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></label>
           </>}
           {error && <p className="form-error" role="alert">{error}</p>}
-          <footer><button type="button" onClick={() => setDialog(null)} disabled={saving}>Cancel</button><button className="primary" type="submit" disabled={saving || (dialog.kind === "feed" && !categories.length)}>{saving ? "Saving…" : "Save"}</button></footer>
-          {dialog.kind === "feed" && !categories.length && <p>Create a category first.</p>}
+          <footer><button type="button" onClick={() => setDialog(null)} disabled={saving}>Cancel</button><button className="primary" type="submit" disabled={saving || (dialog.kind === "feed" && !displayCategories.length)}>{saving ? "Saving…" : "Save"}</button></footer>
+          {dialog.kind === "feed" && !displayCategories.length && <p>Create a category first.</p>}
         </form>
       </section>
     </div>}
