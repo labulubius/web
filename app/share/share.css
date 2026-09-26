@@ -5,6 +5,11 @@
 .share-header h1 { align-items: center; display: flex; gap: 9px; font-size: 24px; font-weight: 500; margin: 0; }
 .share-header h1 svg { color: var(--link); }
 .share-header h1 + p { color: var(--text-muted); font-size: 12px; margin: 7px 0 0; }
+.share-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-breadcrumbs { align-items: center; display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px; margin-bottom: 16px; }
+.share-breadcrumbs button { background: transparent; border: 0; color: var(--link); cursor: pointer; font: inherit; padding: 3px; }
+.share-breadcrumbs button:disabled { color: var(--text-muted); cursor: default; }
+.share-breadcrumbs span { color: var(--text-muted); overflow-wrap: anywhere; }
 .share-button, .share-toolbar button, .share-card-actions button, .share-card-actions a { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
 .share-button:hover, .share-toolbar button:hover, .share-card-actions button:hover, .share-card-actions a:hover { border-color: var(--accent); }
 .share-button:disabled, .share-toolbar button:disabled, .share-card-actions button:disabled { cursor: default; opacity: .45; }
@@ -21,6 +26,8 @@
 .share-card { background: var(--view); border: 1px solid var(--separator); border-radius: 5px; min-width: 0; overflow: hidden; }
 .share-preview { align-items: center; background: var(--view-alt); color: var(--link); display: flex; height: 150px; justify-content: center; }
 .share-preview img { height: 100%; object-fit: contain; width: 100%; }
+.share-folder-preview { align-items: center; background: var(--view-alt); border: 0; color: var(--link); cursor: pointer; display: flex; height: 150px; justify-content: center; width: 100%; }
+.share-folder-preview:hover { background: var(--window-alt); }
 .share-card-body { padding: 11px; }
 .share-card-body strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-card-body > span { color: var(--text-muted); display: block; font-size: 11px; margin: 6px 0 12px; }
@@ -28,4 +35,16 @@
 .share-card-actions button, .share-card-actions a { font-size: 11px; min-height: 32px; padding: 5px 7px; }
 .share-card-actions .share-remove { margin-left: auto; }
 .share-card-actions .share-remove:hover { border-color: var(--negative); color: var(--negative); }
+.share-public-view { margin: 8vh auto; max-width: 760px; padding: 24px; }
+.share-public-view .share-eyebrow { align-items: center; display: flex; gap: 6px; }
+.share-public-view h1 { align-items: center; display: flex; font-size: 24px; font-weight: 500; gap: 10px; overflow-wrap: anywhere; }
+.share-public-view h1 svg { color: var(--link); flex: none; }
+.share-public-note { color: var(--text-muted); font-size: 12px; }
+.share-public-list { background: var(--view); border: 1px solid var(--separator); border-radius: 5px; list-style: none; margin: 20px 0; padding: 0; }
+.share-public-list li { align-items: center; border-bottom: 1px solid var(--separator); display: flex; gap: 12px; min-width: 0; padding: 13px; }
+.share-public-list li:last-child { border-bottom: 0; }
+.share-public-list svg { color: var(--link); flex: none; }
+.share-public-list a { color: var(--link); flex: 1; min-width: 0; overflow-wrap: anywhere; text-decoration: none; }
+.share-public-list a:hover { text-decoration: underline; }
+.share-public-list span { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 @media (max-width: 650px) { .share-view { padding: 22px 16px; } .share-header { align-items: flex-start; flex-direction: column; gap: 16px; } .share-toolbar { align-items: flex-start; flex-wrap: wrap; } .share-toolbar label { flex-basis: 100%; } .share-toolbar input { max-width: none; } }
