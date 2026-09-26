@@ -125,7 +125,6 @@ export function DriveManager() {
         <button className="drive-refresh" type="button" onClick={() => void reload()} disabled={loadingList || busy} aria-label="Refresh files" title="Refresh files"><RefreshCw size={16} /></button>
       </div>
       {error && <p className="drive-error" role="alert">{error}</p>}
-      <div className="drive-list-heading"><strong>{parts.at(-1) ?? "My files"}</strong><span>{loadingList ? "Loading…" : listFailed ? "Unavailable" : `${entries.length} ${entries.length === 1 ? "item" : "items"}`}</span></div>
       {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : listFailed ? <p className="drive-empty">Could not load files. Check the error above and try Refresh files.</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
         <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
         <ul className="drive-list">{entries.map((entry) => <li key={entry.name}>
