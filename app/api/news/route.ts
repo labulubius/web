@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       return Response.json({
         categories: categories.map(({ name }) => ({ name })),
         // Keep feed IDs/URLs private; checked state reflects the owner's selection.
-        feeds: feeds.map(({ id, title, category }) => ({ title: title === id ? "Untitled source" : title, category, checked: selected.has(id) })),
+        feeds: feeds.map(({ id, title, category }, key) => ({ key, title: title === id ? "Untitled source" : title, category, checked: selected.has(id) })),
       }, { headers: privateNewsHeaders });
     }
     if (url.searchParams.get("view") === "publicArticles") {
@@ -64,10 +64,10 @@ export async function GET(request: Request) {
       if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
       const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
       const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
-      const categoryById = new Map(feeds.map((feed) => [feed.id, feed.category]));
+      const sourceById = new Map(feeds.map((feed, key) => [feed.id, { category: feed.category, key }]));
       const result = await newsArticles(selected, cursor);
       return Response.json({
-        articles: result.articles.map(({ feedId, ...article }) => ({ ...article, category: categoryById.get(feedId) ?? "Uncategorized" })),
+        articles: result.articles.map(({ feedId, ...article }) => ({ ...article, category: sourceById.get(feedId)?.category ?? "Uncategorized", sourceKey: sourceById.get(feedId)?.key ?? -1 })),
         continuation: result.continuation,
       }, { headers: privateNewsHeaders });
     }
@@ -78,9 +78,11 @@ export async function GET(request: Request) {
     const selected = (await loadNewsSelection(auth.user.id)).filter((id) => ids.has(id));
     if (url.searchParams.get("view") === "feeds") return Response.json({ feeds, categories: await newsCategories(), selected }, { headers: privateNewsHeaders });
     if (url.searchParams.get("view") !== "articles") return Response.json({ error: "Invalid view." }, { status: 400, headers: privateNewsHeaders });
+    const feed = url.searchParams.get("feed");
+    if (feed && !ids.has(feed)) return Response.json({ error: "Unknown source." }, { status: 400, headers: privateNewsHeaders });
     const cursor = url.searchParams.get("cursor");
     if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
-    return Response.json(await newsArticles(selected, cursor), { headers: privateNewsHeaders });
+    return Response.json(await newsArticles(feed ? [feed] : selected, cursor), { headers: privateNewsHeaders });
   } catch {
     console.error("News request failed (details withheld).");
     return errorResponse();

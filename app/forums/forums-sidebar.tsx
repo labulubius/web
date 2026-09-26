@@ -8,7 +8,7 @@ import type { ForumDirectory } from "../lib/forums-directory";
 
 type Dialog = { kind: "category" | "source"; id?: string } | null;
 
-export function ForumsSidebar({ directory, activeCategory }: { directory: ForumDirectory; activeCategory: string | null }) {
+export function ForumsSidebar({ directory, activeCategory, activeSource }: { directory: ForumDirectory; activeCategory: string | null; activeSource: string | null }) {
   const router = useRouter();
   const { supabase, isAdmin } = useSiteAuth();
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -57,13 +57,14 @@ export function ForumsSidebar({ directory, activeCategory }: { directory: ForumD
   return <>
     <aside className="forums-sidebar" id="page-sidebar" aria-label="Forum sources">
       <div className="forums-sidebar-heading"><h2>Categories</h2>{isAdmin && <button type="button" disabled={busy} onClick={() => setDialog({ kind: "category" })} title="Add category" aria-label="Add category"><Plus size={14} /></button>}</div>
-      <div className="forums-category-row"><button type="button" className={!activeCategory ? "active" : ""} onClick={() => openCategory(null)}><LayoutGrid size={16} />All discussions</button></div>
+      <div className="forums-category-row"><button type="button" className={!activeCategory && !activeSource ? "active" : ""} onClick={() => openCategory(null)}><LayoutGrid size={16} />All discussions</button></div>
       <div className="forums-source-list">{directory.categories.map((category) => <section key={category.id}>
         <div className="forums-category-row"><button type="button" className={activeCategory === category.id ? "active" : ""} aria-expanded={!collapsed.includes(category.id)} onClick={() => openCategory(category.id)}>{collapsed.includes(category.id) ? <Folder size={16} /> : <FolderOpen size={16} />}<span title={category.name}>{category.name}</span></button>
           {isAdmin && <span className="forums-row-actions"><button type="button" disabled={busy} onClick={() => setDialog({ kind: "category", id: category.id })} aria-label={`Rename ${category.name}`} title={`Rename ${category.name}`}><Pencil size={12} /></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Delete “${category.name}” and all its forum sources?`)) void update({ action: "deleteCategory", id: category.id }); }} aria-label={`Delete ${category.name}`} title={`Delete ${category.name}`}><Trash2 size={12} /></button></span>}
         </div>
         {!collapsed.includes(category.id) && directory.sources.filter((source) => source.categoryId === category.id).map((source) => <div className="forums-source-row" key={source.id}>
-          <label className="forums-source" title={source.name}><input type="checkbox" checked={selected.includes(source.id)} disabled={!isAdmin || busy} onChange={() => { const next = selected.includes(source.id) ? selected.filter((id) => id !== source.id) : [...selected, source.id]; setSelection(next); void update({ action: "selectSources", selected: next }); }} /><span>{source.name}</span></label>
+          <label className="forums-source-check"><input type="checkbox" aria-label={`Include ${source.name} in all discussions`} checked={selected.includes(source.id)} disabled={!isAdmin || busy} onChange={() => { const next = selected.includes(source.id) ? selected.filter((id) => id !== source.id) : [...selected, source.id]; setSelection(next); void update({ action: "selectSources", selected: next }); }} /></label>
+          <button className={`forums-source-name${activeSource === source.id ? " active" : ""}`} type="button" onClick={() => router.push(`/forums?source=${encodeURIComponent(source.id)}`)} title={source.name}>{source.name}</button>
           {isAdmin && <span className="forums-row-actions"><button type="button" disabled={busy} onClick={() => setDialog({ kind: "source", id: source.id })} aria-label={`Edit ${source.name}`} title={`Edit ${source.name}`}><Pencil size={12} /></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Delete “${source.name}”?`)) void update({ action: "deleteSource", id: source.id }); }} aria-label={`Delete ${source.name}`} title={`Delete ${source.name}`}><Trash2 size={12} /></button></span>}
         </div>)}
       </section>)}</div>
