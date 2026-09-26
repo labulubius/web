@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LayoutGrid, MessageCircle, MessagesSquare } from "lucide-react";
+import { MessageCircle, MessagesSquare } from "lucide-react";
 import { SiteShell } from "../site-shell";
 import { forumSources, latestTopics, type ForumTopic, type ForumSource } from "../lib/forums";
 import "./forums.css";
@@ -23,12 +23,12 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
     <div className="forums-layout">
       <aside className="forums-sidebar" aria-label="Forum sources">
         <h2>Sources</h2>
-        <Link className={!sourceId ? "selected" : ""} href="/forums"><LayoutGrid size={16} /><span>All communities</span></Link>
-        {forumSources.map((source) => <Link className={sourceId === source.id ? "selected" : ""} href={`/forums?source=${source.id}`} key={source.id}><MessageCircle size={16} /><span>{source.name}</span></Link>)}
+        <Link className={!sourceId ? "selected" : ""} href="/forums">All communities</Link>
+        {forumSources.map((source) => <Link className={sourceId === source.id ? "selected" : ""} href={`/forums?source=${source.id}`} key={source.id}>{source.name}</Link>)}
         <p>Public conversations. Replies remain on their original sites.</p>
       </aside>
       <section className="forums-content">
-        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>Forums</h1><p>Recent discussions across the web · updated about every 5 minutes</p></div><MessagesSquare size={20} aria-hidden="true" /></header>
+        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>Forums</h1><p>Recent discussions across the web · updated about every 5 minutes</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
         {failed.length > 0 && <p className="forums-warning" role="status">Could not load: {failed.join(", ")}. Try again later.</p>}
         {topics.length === 0 && <p className="forums-empty">No discussions available right now.</p>}
         <div className="forums-topics">

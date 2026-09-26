@@ -1,13 +1,11 @@
-.share-view { margin: 0 auto; max-width: 1080px; padding: 22px; width: 100%; }
+.share-view { margin: 0 auto; max-width: 1080px; padding: 36px 28px; width: 100%; }
 .share-view > p { color: var(--text-muted); font-size: 12px; }
-.share-header { align-items: flex-end; border-bottom: 1px solid var(--separator); display: flex; gap: 18px; justify-content: space-between; margin-bottom: 16px; padding-bottom: 13px; }
+.share-header { align-items: flex-end; display: flex; justify-content: space-between; gap: 20px; padding-bottom: 24px; }
 .share-eyebrow { color: var(--link); font-size: 10px !important; font-weight: 600; letter-spacing: .08em; margin: 0 0 8px; }
-.share-header h1 { align-items: center; display: flex; gap: 8px; font-size: 20px; font-weight: 500; margin: 0; }
+.share-header h1 { align-items: center; display: flex; gap: 9px; font-size: 24px; font-weight: 500; margin: 0; }
 .share-header h1 svg { color: var(--link); }
-.share-header h1 + p { color: var(--text-muted); font-size: 10px; margin: 3px 0 0; }
-.share-button, .share-toolbar button, .share-card-actions button, .share-card-actions a { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; font-size: 11px; gap: 6px; justify-content: center; text-decoration: none; }
-.share-button { height: 32px; padding: 0 9px; }
-.share-toolbar button { height: 32px; padding: 0; width: 32px; }
+.share-header h1 + p { color: var(--text-muted); font-size: 12px; margin: 7px 0 0; }
+.share-button, .share-toolbar button, .share-card-actions button, .share-card-actions a { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; gap: 6px; justify-content: center; padding: 7px 10px; text-decoration: none; }
 .share-button:hover, .share-toolbar button:hover, .share-card-actions button:hover, .share-card-actions a:hover { border-color: var(--accent); }
 .share-button:disabled, .share-toolbar button:disabled, .share-card-actions button:disabled { cursor: default; opacity: .45; }
 .share-toolbar { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; display: flex; gap: 14px; padding: 9px; }
@@ -16,7 +14,7 @@
 .share-toolbar span { color: var(--text-muted); font-size: 11px; }
 .share-notice, .share-error { border: 1px solid var(--accent); border-radius: 4px; color: var(--text); font-size: 12px !important; margin: 12px 0 0; padding: 9px; }
 .share-error { border-color: var(--negative); }
-.share-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 11px; gap: 7px; justify-content: center; min-height: 310px; margin-top: 20px; padding: 42px 16px; text-align: center; }
+.share-empty { align-items: center; border: 1px dashed var(--separator); border-radius: 5px; color: var(--text-muted); display: flex; flex-direction: column; font-size: 12px; gap: 7px; margin-top: 20px; padding: 42px 16px; text-align: center; }
 .share-empty svg { color: var(--link); }
 .share-empty strong { color: var(--text); font-size: 13px; }
 .share-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); list-style: none; margin: 20px 0 0; padding: 0; }
@@ -27,7 +25,7 @@
 .share-card-body strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-card-body > span { color: var(--text-muted); display: block; font-size: 11px; margin: 6px 0 12px; }
 .share-card-actions { display: flex; gap: 5px; }
-.share-card-actions button, .share-card-actions a { min-height: 32px; padding: 5px 7px; }
+.share-card-actions button, .share-card-actions a { font-size: 11px; min-height: 32px; padding: 5px 7px; }
 .share-card-actions .share-remove { margin-left: auto; }
 .share-card-actions .share-remove:hover { border-color: var(--negative); color: var(--negative); }
-@media (max-width: 650px) { .share-view { padding: 15px 11px; } .share-header { align-items: flex-start; flex-direction: column; gap: 10px; } .share-toolbar { align-items: flex-start; flex-wrap: wrap; } .share-toolbar label { flex-basis: 100%; } .share-toolbar input { max-width: none; } }
+@media (max-width: 650px) { .share-view { padding: 22px 16px; } .share-header { align-items: flex-start; flex-direction: column; gap: 16px; } .share-toolbar { align-items: flex-start; flex-wrap: wrap; } .share-toolbar label { flex-basis: 100%; } .share-toolbar input { max-width: none; } }
