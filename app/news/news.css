@@ -23,6 +23,8 @@
 .news-source-list { max-height: min(65vh, 650px); overflow-y: auto; }
 .news-source-list section { margin-top: 8px; }
 .news-source-row { align-items: center; display: flex; min-height: 33px; min-width: 0; padding-left: 10px; position: relative; }
+.news-source-row:has(.news-source-name.active) { background: var(--accent); border-radius: 3px; }
+.news-source-row:has(.news-source-name.active) .news-source-check input { accent-color: white; }
 .news-source-check { align-items: center; display: flex; flex: none; min-height: 33px; padding: 5px 5px 5px 19px; }
 .news-source-check input { accent-color: var(--link); cursor: pointer; margin: 0; }
 .news-source-check input:disabled { cursor: default; }

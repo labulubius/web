@@ -15,6 +15,8 @@
 .forums-source-list { max-height: min(65vh, 650px); overflow-y: auto; }
 .forums-source-list section { margin-top: 8px; }
 .forums-source-row { align-items: center; display: flex; min-width: 0; position: relative; }
+.forums-source-row:has(.forums-source-name.active) { background: var(--accent); border-radius: 3px; }
+.forums-source-row:has(.forums-source-name.active) .forums-source-check input { accent-color: white; }
 .forums-source-check { align-items: center; display: flex; flex: none; min-height: 33px; padding: 5px 5px 5px 19px; }
 .forums-source-check input { accent-color: var(--link); cursor: pointer; margin: 0; }
 .forums-source-check input:disabled { cursor: default; }
