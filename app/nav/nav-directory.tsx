@@ -191,6 +191,7 @@ export function NavDirectory() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const blockSiteOpenUntil = useRef(0);
+  const hasLoadedCategories = useRef(false);
   // Keep taps and scrolling separate from sorting on touch screens.
   const categorySensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 3 } }),
@@ -211,7 +212,20 @@ export function NavDirectory() {
     if (error) {
       setMessage(error.message.includes("navigator_") ? "Navigator database has not been initialized yet." : error.message);
     } else {
-      setCategories((categoryResult.data ?? []) as Category[]);
+      const availableCategories = (categoryResult.data ?? []) as Category[];
+      setCategories(availableCategories);
+      if (!hasLoadedCategories.current) {
+        hasLoadedCategories.current = true;
+        let savedCategory: string | null = null;
+        try {
+          savedCategory = window.localStorage.getItem("site-nav-category");
+        } catch {
+          // Browser storage may be disabled.
+        }
+        setCategoryId(savedCategory && availableCategories.some((category) => category.id === savedCategory) ? savedCategory : "favorites");
+      } else {
+        setCategoryId((current) => current === "favorites" || availableCategories.some((category) => category.id === current) ? current : "favorites");
+      }
       setSites((siteResult.data ?? []).map((site) => ({ ...site, is_favorite: site.is_favorite === true })) as Site[]);
       setMessage("");
     }
@@ -222,6 +236,15 @@ export function NavDirectory() {
     const initialLoad = window.setTimeout(() => void loadDirectory(), 0);
     return () => window.clearTimeout(initialLoad);
   }, [isAdmin, loadDirectory]);
+
+  useEffect(() => {
+    if (!hasLoadedCategories.current) return;
+    try {
+      window.localStorage.setItem("site-nav-category", categoryId);
+    } catch {
+      // Category selection still works when browser storage is unavailable.
+    }
+  }, [categoryId, categories]);
 
   const filteredSites = useMemo(() => {
     const keyword = query.trim().toLowerCase();
