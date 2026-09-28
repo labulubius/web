@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { freshEditToken, freshPost, newsCategories, newsFeeds } from "./news-server";
+import { discoverRssHub } from "./news-discovery";
 
 const labelPrefix = "user/-/label/";
 const blocked = new BlockList();
@@ -135,7 +136,19 @@ export async function manageNews(input: unknown): Promise<void> {
       const url = await publicURL(body.url);
       const dest = await category(body.categoryId ?? body.category);
       const title = optionalText(body.title, "title");
-      await freshPost("reader/api/0/subscription/edit", { s: `feed/${url}`, ac: "subscribe", a: dest.id, ...(title ? { t: title } : {}) });
+      // RSSHub Radar runs on our own container. Only its validated route can
+      // point to the private RSSHub network; user-supplied private URLs stay blocked.
+      let source = url;
+      if (!/\.(?:rss|xml|atom)(?:$|\?)/i.test(new URL(url).pathname)) {
+        try { source = (await discoverRssHub(url)) ?? url; }
+        catch { /* RSSHub unavailable: FreshRSS can still discover native feeds. */ }
+      }
+      try {
+        await freshPost("reader/api/0/subscription/edit", { s: `feed/${source}`, ac: "subscribe", a: dest.id, ...(title ? { t: title } : {}) });
+      } catch {
+        if (source !== url) return invalid("RSSHub could not subscribe to this page. Try its RSS URL directly.");
+        return invalid("No usable RSS feed found at this URL. This site may not be supported by RSSHub.");
+      }
       return;
     }
     case "editFeed": {

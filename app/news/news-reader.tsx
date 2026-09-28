@@ -240,7 +240,7 @@ export function NewsReader() {
       {saving && <div className="news-source-status" role="status">Saving…</div>}
     </aside>
     <section className="news-content">
-      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{feeds.find((feed) => feed.id === feedFilter)?.title || activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add RSS"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
+      <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{feeds.find((feed) => feed.id === feedFilter)?.title || activeName || "News"}</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div><div className="news-heading-actions"><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles" title="Refresh articles"><RefreshCw size={18} /></button><button className="news-add-action" type="button" disabled={!ready || saving || !displayCategories.length} title={!displayCategories.length ? "Create a category first" : "Add a website or RSS feed"} onClick={() => setDialog({ kind: "feed" })}><Plus size={15} /> RSS</button></div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
       {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
       {ready && feeds.length === 0 && <div className="news-empty-state"><Rss size={48} strokeWidth={1.2} /><h2>No subscriptions yet</h2><p>{displayCategories.length ? "Use the RSS button above to add your first subscription." : "Create a category, then use the RSS button above to add a subscription."}</p></div>}
@@ -255,10 +255,10 @@ export function NewsReader() {
     </section>
     {dialog && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setDialog(null); }}>
       <section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="news-dialog-title">
-        <header><h2 id="news-dialog-title">{dialog.kind === "category" ? `${dialog.id ? "Rename" : "Add"} category` : `${dialog.id ? "Edit" : "Add"} RSS subscription`}</h2><button type="button" disabled={saving} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header>
+        <header><h2 id="news-dialog-title">{dialog.kind === "category" ? `${dialog.id ? "Rename" : "Add"} category` : `${dialog.id ? "Edit" : "Add"} news source`}</h2><button type="button" disabled={saving} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header>
         <form onSubmit={(event) => void submit(event)}>
           {dialog.kind === "category" ? <label>Category name<input name="name" defaultValue={editedCategory?.name || ""} maxLength={100} autoFocus required /></label> : <>
-            {!dialog.id && <label>RSS URL<input name="url" type="url" placeholder="https://example.com/feed.xml" autoFocus required /></label>}
+            {!dialog.id && <label>Website or RSS URL<input name="url" type="url" placeholder="https://example.com/news" autoFocus required /></label>}
             <label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} /></label>
             <label>Category<select name="category" defaultValue={displayCategories.find((cat) => cat.name === editedFeed?.category)?.id || categoryFilter || displayCategories[0]?.id} required>{displayCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></label>
           </>}
