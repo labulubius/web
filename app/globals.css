@@ -299,7 +299,7 @@ html[data-theme="dark"] .plasma-desktop {
     border: 0;
     display: block;
     position: fixed;
-    inset: 43px 0 55px;
+    inset: 43px 0 0;
     width: 100%;
     z-index: 20;
   }
@@ -311,7 +311,7 @@ html[data-theme="dark"] .plasma-desktop {
     display: block;
     position: fixed;
     top: 43px;
-    bottom: 55px;
+    bottom: 0;
     left: 0;
     width: min(280px, 85vw);
     overflow-x: hidden;
