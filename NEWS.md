@@ -17,6 +17,16 @@ To replicate this installation on a fresh, **empty** FreshRSS database: verify s
 ## Verification
 
 - Logged out, `/api/news?view=sidebar` shows the owner's checked state and `/api/news?view=publicArticles` shows selected articles. `/api/news?view=feeds` and `?view=articles` still return 401. Admin-only actions are rejected.
-- Signed in as admin: create a category, add an RSS feed to it, check the source, save and reload; rename/move/delete operations reflect in FreshRSS.
+- Signed in as admin: add an RSS feed in Settings → RSS Sources, create tags in Settings → Tags, assign multiple tags to the source, then create a Watchboard requiring all those tags. Confirm its matching source count and articles; existing FreshRSS categories and subscriptions must remain intact.
 - `/news` only fetches News data from `labulubius.com/api/news`; the tunnel host is only contacted server-to-server.
 - Confirm `labulubius-news-retention.timer` is active, and check hourly run status. There should be no automatic article database backup; if backups are added later, their article contents need their own five-day lifecycle policy.
+
+## Watchboards API (MVP)
+
+Admin-only `GET /api/news/watchboards` returns `{tags:[{id,name}],watchboards:[{id,name,tagIds}],sourceTags:{[feedId]:tagIds}}`. Source IDs are available from the existing admin-only `GET /api/news?view=feeds`. Stale source assignments are hidden on read. Existing public `/news` reads are unchanged. Vercel relays this endpoint to web using the same Bearer authentication as the existing News API.
+
+Admin-only `POST /api/news/watchboards` takes a JSON action and returns the updated state: `createTag` (name), `renameTag` (id,name), `deleteTag` (id), `setSourceTags` (feedId,tagIds), `createWatchboard` (name,tagIds), `updateWatchboard` (id,name?,tagIds?), or `deleteWatchboard` (id). Tag and board IDs are server-generated UUIDs. Names are nonempty, max 80 characters, unique case-insensitively per collection; tag IDs and source IDs must exist. Maximum 100 tags and boards each. Empty tag arrays match no sources; a board matches only sources carrying every selected tag (intersection/AND). Deleting a tag removes assignments and board references, but does not unsubscribe feeds.
+
+Admin-only `GET /api/news?view=articles&board=<board-id>` reads retained articles from that board's tagged feeds, using existing cursor pagination. `feed` and `board` cannot be combined. Board filtering never changes the owner's source selection or the existing public News view.
+
+Per-admin metadata is stored only on web at `${NEWS_DATA_DIR:-~/.local/share/labulubius/news}/<user-id>.watchboards.json` with private atomic writes, outside Git and separate from the existing selection files. Preserve this directory on future updates. Writes are serialized per user within the server process.

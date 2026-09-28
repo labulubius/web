@@ -63,3 +63,21 @@
 .news-access h1 { font-size: 25px; font-weight: 400; }
 .news-access p { color: var(--text-muted); font-size: 13px; }
 @media (max-width: 760px) { .news-layout { display: block; } .news-sidebar { border-bottom: 1px solid var(--separator); border-right: 0; padding: 7px; } .news-content { padding: 15px 11px; } .news-heading { align-items: stretch; flex-direction: column; gap: 10px; } .news-heading-actions { flex-wrap: wrap; } .news-source-list { max-height: 180px; } .plasma-desktop[data-sidebar-collapsed="true"] .news-sidebar { display: none; } }
+.news-table-controls { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.news-table-controls label { color: var(--text-muted); display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.news-table-controls input, .news-table-controls select { background: var(--window); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); padding: 6px; min-width: 0; }
+.news-table-scroll { overflow-x: auto; }
+.news-table { border-collapse: collapse; font-size: 12px; width: 100%; min-width: 650px; }
+.news-table th, .news-table td { border-bottom: 1px solid var(--separator); padding: 10px 8px; text-align: left; vertical-align: middle; }
+.news-table th { color: var(--text-muted); font-weight: 500; }
+.news-table button, .news-settings-row button { background: var(--button); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); cursor: pointer; padding: 4px 7px; }
+.news-table button:hover, .news-settings-row button:hover { border-color: var(--accent); }
+.news-table .news-link-button { background: transparent; border: 0; color: var(--link); text-align: left; }
+.news-tag-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.news-tag-choice { display: inline-flex; gap: 3px; align-items: center; border: 1px solid var(--separator); border-radius: 3px; padding: 3px 5px; white-space: nowrap; }
+.news-tag-choice input, .news-tag-fieldset input { accent-color: var(--accent); }
+.news-muted { color: var(--text-muted); font-size: 12px; }
+.news-settings-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--separator); padding: 10px; gap: 10px; font-size: 12px; }
+.news-settings-row small { color: var(--text-muted); }
+.news-tag-fieldset { border: 1px solid var(--separator); display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.news-tag-fieldset label { display: inline-flex; align-items: center; gap: 4px; }

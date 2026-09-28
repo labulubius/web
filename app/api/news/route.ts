@@ -1,6 +1,7 @@
 import { newsAdmin, newsArticles, newsCategories, newsFeeds, privateNewsHeaders } from "../../lib/news-server";
 import { InvalidNewsInput, manageNews } from "../../lib/news-management";
 import { loadNewsSelection, loadPublicNewsSelection, saveNewsSelection } from "../../lib/news-settings";
+import { loadWatchboards } from "../../lib/news-watchboards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,10 +80,19 @@ export async function GET(request: Request) {
     if (url.searchParams.get("view") === "feeds") return Response.json({ feeds, categories: await newsCategories(), selected }, { headers: privateNewsHeaders });
     if (url.searchParams.get("view") !== "articles") return Response.json({ error: "Invalid view." }, { status: 400, headers: privateNewsHeaders });
     const feed = url.searchParams.get("feed");
+    const boardId = url.searchParams.get("board");
+    if (feed && boardId) return Response.json({ error: "Choose a source or watchboard." }, { status: 400, headers: privateNewsHeaders });
     if (feed && !ids.has(feed)) return Response.json({ error: "Unknown source." }, { status: 400, headers: privateNewsHeaders });
     const cursor = url.searchParams.get("cursor");
     if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
-    return Response.json(await newsArticles(feed ? [feed] : selected, cursor), { headers: privateNewsHeaders });
+    let articleFeeds = feed ? [feed] : selected;
+    if (boardId) {
+      const state = await loadWatchboards(auth.user.id);
+      const board = state.watchboards.find((item) => item.id === boardId);
+      if (!board) return Response.json({ error: "Unknown watchboard." }, { status: 400, headers: privateNewsHeaders });
+      articleFeeds = board.tagIds.length ? feeds.filter((source) => board.tagIds.every((tag) => (state.sourceTags[source.id] || []).includes(tag))).map((source) => source.id) : [];
+    }
+    return Response.json(await newsArticles(articleFeeds, cursor), { headers: privateNewsHeaders });
   } catch {
     console.error("News request failed (details withheld).");
     return errorResponse();
