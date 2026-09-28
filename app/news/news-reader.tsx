@@ -144,7 +144,8 @@ export function NewsReader() {
   }
 
   function openDialog(kind: "board" | "feed" | "tag", id?: string) {
-    setDraftTags(kind === "board" ? [...(watchboards.watchboards.find((board) => board.id === id)?.tagIds || [])] : []);
+    setDraftTags(kind === "board" ? [...(watchboards.watchboards.find((board) => board.id === id)?.tagIds || [])]
+      : kind === "feed" && id ? [...(watchboards.sourceTags[id] || [])] : []);
     setDialog({ kind, id });
   }
 
@@ -184,8 +185,39 @@ export function NewsReader() {
     } else if (dialog.kind === "board") {
       await mutateWatchboard({ action: dialog.id ? "updateWatchboard" : "createWatchboard", ...(dialog.id ? { id: dialog.id } : {}), name: String(form.get("name") || "").trim(), tagIds: draftTags });
     } else {
-      await mutate({ action: dialog.id ? "editFeed" : "addFeed", ...(dialog.id ? { feedId: dialog.id } : { url: String(form.get("url") || "").trim() }),
-        ...(String(form.get("title") || "").trim() ? { title: String(form.get("title")).trim() } : {}) });
+      const title = String(form.get("title") || "").trim();
+      const existing = dialog.id ? feeds.find((feed) => feed.id === dialog.id) : undefined;
+      const oldTags = dialog.id ? watchboards.sourceTags[dialog.id] || [] : [];
+      const tagsChanged = draftTags.length !== oldTags.length || draftTags.some((id) => !oldTags.includes(id));
+      setSaving(true); setError("");
+      let added = false;
+      try {
+        let feedId = dialog.id;
+        if (!dialog.id || (title && title !== existing?.title)) {
+          const data = await api("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+            action: dialog.id ? "editFeed" : "addFeed", ...(dialog.id ? { feedId: dialog.id } : { url: String(form.get("url") || "").trim() }),
+            ...(title ? { title } : {}),
+          }) }) as Directory;
+          setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected);
+          if (!dialog.id) {
+            added = true;
+            feedId = data.feeds.find((feed) => !feeds.some((old) => old.id === feed.id))?.id;
+            if (!feedId) throw new Error("Subscription saved, but the new source was not found. Reload before retrying.");
+          }
+        }
+        if (feedId && (tagsChanged || (!dialog.id && draftTags.length))) {
+          const data = await api("/watchboards", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "setSourceTags", feedId, tagIds: draftTags }) }) as WatchboardState;
+          setWatchboards(data);
+        }
+        setDialog(null);
+        if (feedId && !dialog.id) await saveSelection([...selected, feedId]);
+        else if (boardFilter && tagsChanged) await loadArticles();
+      } catch (failure) {
+        if (added) setDialog(null);
+        const message = failure instanceof Error ? failure.message : "Could not save RSS source.";
+        setError(added ? `Source was added, but setup was incomplete: ${message} Edit the source to finish.` : message);
+      } finally { setSaving(false); }
     }
   }
 
@@ -238,7 +270,7 @@ export function NewsReader() {
         {panel === "articles" ? <><button type="button" disabled={busy || !ready || saving} onClick={() => void loadArticles()} aria-label="Refresh articles"><RefreshCw size={18} /></button><button type="button" className="news-add-action" disabled={!ready || saving} onClick={() => openDialog("feed")}><Plus size={15} /> RSS</button></> : panel === "sources" ? <button type="button" className="news-add-action" disabled={!ready || saving} onClick={() => openDialog("feed")}><Plus size={15} /> Add RSS</button> : <button type="button" className="news-add-action" disabled={saving || !watchReady} onClick={() => openDialog("tag")}><Plus size={15} /> Add tag</button>}
       </div></header>
       {error && <p className="news-error" role="alert">{error}</p>}
-      {panel === "sources" ? <><div className="news-table-controls"><label>Search sources <input type="search" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} placeholder="Filter sources…" /></label></div><div className="news-table-scroll"><table className="news-table"><thead><tr><th>Source</th><th>Tags</th><th>In Articles</th><th>Actions</th></tr></thead><tbody>{filteredFeeds.map((feed) => <tr key={feed.id}><td><button type="button" className="news-link-button" onClick={() => { chooseBoard(null); setFeedFilter(feed.id); }}>{feed.title}</button></td><td><div className="news-tag-list">{watchboards.tags.map((tag) => <label key={tag.id} className="news-tag-choice"><input type="checkbox" disabled={saving || !watchReady} checked={(watchboards.sourceTags[feed.id] || []).includes(tag.id)} onChange={() => { const current = watchboards.sourceTags[feed.id] || []; void mutateWatchboard({ action: "setSourceTags", feedId: feed.id, tagIds: current.includes(tag.id) ? current.filter((id) => id !== tag.id) : [...current, tag.id] }); }} />{tag.name}</label>)}{!watchboards.tags.length && <span className="news-muted">Create a tag first</span>}</div></td><td><input type="checkbox" disabled={saving} checked={selected.includes(feed.id)} onChange={() => void toggleSource(feed.id)} aria-label={`Include ${feed.title} in Articles`} /></td><td><button type="button" disabled={saving} onClick={() => openDialog("feed", feed.id)}>Edit</button> <button type="button" disabled={saving} onClick={() => void removeFeed(feed)}>Delete</button></td></tr>)}</tbody></table></div>{!filteredFeeds.length && <p className="news-empty">No matching sources.</p>}</> : panel === "tags" ? <><p className="news-muted">Tags are assigned to RSS sources. A watchboard shows articles from sources matching all of its tags.</p><div className="news-settings-list">{watchboards.tags.map((tag) => <div key={tag.id} className="news-settings-row"><span>{tag.name} <small>({feeds.filter((feed) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).length} sources)</small></span><span><button type="button" disabled={saving} onClick={() => openDialog("tag", tag.id)}>Rename</button> <button type="button" disabled={saving} onClick={() => { if (window.confirm(`Delete tag “${tag.name}” from all sources and watchboards?`)) void mutateWatchboard({ action: "deleteTag", id: tag.id }); }}>Delete</button></span></div>)}{!watchboards.tags.length && <p className="news-empty">No tags yet. Add one to start grouping your sources.</p>}</div></> : <>
+      {panel === "sources" ? <><div className="news-table-controls"><label>Search sources <input type="search" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} placeholder="Filter sources…" /></label></div><div className="news-table-scroll"><table className="news-table"><thead><tr><th>Source</th><th>Tags</th><th>In Articles</th><th>Actions</th></tr></thead><tbody>{filteredFeeds.map((feed) => <tr key={feed.id}><td><button type="button" className="news-link-button" onClick={() => { chooseBoard(null); setFeedFilter(feed.id); }}>{feed.title}</button></td><td><div className="news-tag-list">{watchboards.tags.filter((tag) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).map((tag) => <span key={tag.id} className="news-tag-choice">{tag.name}</span>)}{!(watchboards.sourceTags[feed.id] || []).length && <span className="news-muted">No tags</span>}</div></td><td><input type="checkbox" disabled={saving} checked={selected.includes(feed.id)} onChange={() => void toggleSource(feed.id)} aria-label={`Include ${feed.title} in Articles`} /></td><td><button type="button" disabled={saving} onClick={() => openDialog("feed", feed.id)}>Edit</button> <button type="button" disabled={saving} onClick={() => void removeFeed(feed)}>Delete</button></td></tr>)}</tbody></table></div>{!filteredFeeds.length && <p className="news-empty">No matching sources.</p>}</> : panel === "tags" ? <><p className="news-muted">Tags are assigned to RSS sources. A watchboard shows articles from sources matching all of its tags.</p><div className="news-settings-list">{watchboards.tags.map((tag) => <div key={tag.id} className="news-settings-row"><span>{tag.name} <small>({feeds.filter((feed) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).length} sources)</small></span><span><button type="button" disabled={saving} onClick={() => openDialog("tag", tag.id)}>Rename</button> <button type="button" disabled={saving} onClick={() => { if (window.confirm(`Delete tag “${tag.name}” from all sources and watchboards?`)) void mutateWatchboard({ action: "deleteTag", id: tag.id }); }}>Delete</button></span></div>)}{!watchboards.tags.length && <p className="news-empty">No tags yet. Add one to start grouping your sources.</p>}</div></> : <>
         {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
         {ready && activeBoard && !matches(activeBoard) && <p className="news-empty">No sources match this watchboard. Assign its tags to sources under Settings → RSS Sources.</p>}
         {ready && !activeBoard && !feedFilter && !saved.length && <p className="news-empty">Select sources under Settings → RSS Sources to start reading.</p>}
@@ -249,8 +281,9 @@ export function NewsReader() {
     </section>
     {dialog && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setDialog(null); }}><section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="news-dialog-title"><header><h2 id="news-dialog-title">{dialog.id ? "Edit" : "Add"} {dialog.kind === "feed" ? "RSS source" : dialog.kind === "board" ? "watchboard" : dialog.kind}</h2><button type="button" disabled={saving} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header><form onSubmit={(event) => void submit(event)}>
       {dialog.kind === "feed" ? <>{!dialog.id && <label>Website or RSS URL<input name="url" type="url" placeholder="https://example.com/news" autoFocus required /></label>}<label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} /></label></> : <label>{dialog.kind === "tag" ? "Tag" : "Watchboard"} name<input name="name" defaultValue={editedTag?.name || editedBoard?.name || ""} maxLength={80} autoFocus required /></label>}
+      {dialog.kind === "feed" && <fieldset className="news-tag-fieldset"><legend>Source tags</legend>{watchboards.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!watchboards.tags.length && <p>Create tags under Settings → Tags first.</p>}</fieldset>}
       {dialog.kind === "board" && <fieldset className="news-tag-fieldset"><legend>Matching tags (all)</legend>{watchboards.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!watchboards.tags.length && <p>Create tags under Settings → Tags first.</p>}</fieldset>}
-      {error && <p className="form-error" role="alert">{error}</p>}<footer><button type="button" disabled={saving} onClick={() => setDialog(null)}>Cancel</button><button type="submit" className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
+      {error && <p className="form-error" role="alert">{error}</p>}<footer><button type="button" disabled={saving} onClick={() => setDialog(null)}>Cancel</button><button type="submit" className="primary" disabled={saving || (dialog.kind === "feed" && !watchReady)}>{saving ? "Saving…" : "Save"}</button></footer>
     </form></section></div>}
   </div>;
 }
