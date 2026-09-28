@@ -5,7 +5,8 @@ import {
   DndContext,
   type DragEndEvent,
   type Modifier,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -190,11 +191,14 @@ export function NavDirectory() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const blockSiteOpenUntil = useRef(0);
+  // Keep taps and scrolling separate from sorting on touch screens.
   const categorySensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
   );
   const siteSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 7 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
   );
 
   const loadDirectory = useCallback(async () => {
