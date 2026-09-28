@@ -96,11 +96,11 @@ export async function newsCategories(): Promise<{ id: string; name: string }[]> 
 
 export async function newsFeeds(): Promise<NewsFeed[]> {
   const data = await freshGet("reader/api/0/subscription/list") as {
-    subscriptions?: { id?: string; title?: string; categories?: { label?: string }[] }[];
+    subscriptions?: { id?: string; title?: string; url?: string; categories?: { label?: string }[] }[];
   };
   if (!Array.isArray(data.subscriptions)) throw new Error("Invalid FreshRSS subscriptions response.");
   return data.subscriptions.filter((feed) => typeof feed.id === "string").map((feed) => ({
-    id: feed.id!, title: feed.title || feed.id!, category: feed.categories?.[0]?.label || "Uncategorized",
+    id: feed.id!, title: feed.title || feed.id!, category: feed.categories?.[0]?.label || "Uncategorized", url: feed.url || "",
   })).sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
 }
 

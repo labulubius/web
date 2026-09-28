@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, Pencil, Plus, Rss, Tags, Trash2, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, Pencil, Plus, Rss, Tags, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
@@ -250,6 +250,8 @@ export function NewsReader() {
   const editedBoard = dialog?.kind === "board" ? watchboards.watchboards.find((board) => board.id === dialog.id) : undefined;
   const activeBoard = watchboards.watchboards.find((board) => board.id === boardFilter);
   const matches = (board: WatchboardState["watchboards"][number]) => board.tagIds.length ? feeds.filter((feed) => board.tagIds.every((id) => (watchboards.sourceTags[feed.id] || []).includes(id))).length : 0;
+  const popularTags = watchboards.tags.map((tag, index) => ({ tag, index, count: feeds.filter((feed) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).length }))
+    .sort((a, b) => b.count - a.count || a.index - b.index);
   const filteredFeeds = feeds.filter((feed) => feed.title.toLocaleLowerCase().includes(sourceQuery.toLocaleLowerCase()))
     .sort((a, b) => a.title.localeCompare(b.title));
   return <div className="news-layout">
@@ -280,8 +282,8 @@ export function NewsReader() {
       </>}
     </section>
     {dialog && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setDialog(null); }}><section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="news-dialog-title"><header><h2 id="news-dialog-title">{dialog.id ? "Edit" : "Add"} {dialog.kind === "feed" ? "RSS source" : dialog.kind === "board" ? "watchboard" : dialog.kind}</h2><button type="button" disabled={saving} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header><form onSubmit={(event) => void submit(event)}>
-      {dialog.kind === "feed" ? <>{!dialog.id && <label>Website or RSS URL<input name="url" type="url" placeholder="https://example.com/news" autoFocus required /></label>}<label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} /></label></> : <label>{dialog.kind === "tag" ? "Tag" : "Watchboard"} name<input name="name" defaultValue={editedTag?.name || editedBoard?.name || ""} maxLength={80} autoFocus required /></label>}
-      {dialog.kind === "feed" && <fieldset className="news-tag-fieldset"><legend>Source tags</legend>{watchboards.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!watchboards.tags.length && <p>Create tags under Settings → Tags first.</p>}</fieldset>}
+      {dialog.kind === "feed" ? <><label>Website or RSS URL{dialog.id ? <input type="url" defaultValue={editedFeed?.url || ""} readOnly /> : <input name="url" type="url" placeholder="https://example.com/news" autoFocus required />}</label><label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} autoFocus={!!dialog.id} /></label></> : <label>{dialog.kind === "tag" ? "Tag" : "Watchboard"} name<input name="name" defaultValue={editedTag?.name || editedBoard?.name || ""} maxLength={80} autoFocus required /></label>}
+      {dialog.kind === "feed" && <details className="news-source-tags"><summary>Source tags{draftTags.length > 0 && <span>({draftTags.length} selected)</span>}<ChevronDown size={15} aria-hidden="true" /></summary><div className="news-source-tags-options">{popularTags.map(({ tag }) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!popularTags.length && <p>Create tags under Settings → Tags first.</p>}</div></details>}
       {dialog.kind === "board" && <fieldset className="news-tag-fieldset"><legend>Matching tags (all)</legend>{watchboards.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!watchboards.tags.length && <p>Create tags under Settings → Tags first.</p>}</fieldset>}
       {error && <p className="form-error" role="alert">{error}</p>}<footer><button type="button" disabled={saving} onClick={() => setDialog(null)}>Cancel</button><button type="submit" className="primary" disabled={saving || (dialog.kind === "feed" && !watchReady)}>{saving ? "Saving…" : "Save"}</button></footer>
     </form></section></div>}
