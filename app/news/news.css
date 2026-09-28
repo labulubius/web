@@ -81,3 +81,9 @@
 .news-settings-row small { color: var(--text-muted); }
 .news-tag-fieldset { border: 1px solid var(--separator); display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
 .news-tag-fieldset label { display: inline-flex; align-items: center; gap: 4px; }
+
+.news-inline-actions { align-items: center; display: inline-flex; gap: 0; }
+.news-table .news-inline-actions button, .news-settings-row .news-inline-actions button { align-items: center; background: color-mix(in srgb, var(--window) 78%, transparent); border: 0; border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
+.news-inline-actions button:hover { color: var(--text); }
+.news-inline-actions button:last-child:hover { color: var(--negative); }
+.news-inline-actions button:disabled { cursor: default; opacity: .5; }
