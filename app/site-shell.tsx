@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, HardDrive, Home, Info, Menu, MessagesSquare, Monitor, Moon, Newspaper, Share2, StickyNote, Sun } from "lucide-react";
+import { Bot, Compass, HardDrive, Home, Info, Menu, MessagesSquare, Monitor, Moon, Newspaper, Share2, StickyNote, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -26,6 +26,7 @@ const navigation = [
   { href: "/drive", label: "Drive", icon: HardDrive },
   { href: "/share", label: "Share", icon: Share2 },
   { href: "/note", label: "Note", icon: StickyNote },
+  { href: "/agent", label: "Agent", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];
 

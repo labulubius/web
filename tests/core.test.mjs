@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
@@ -22,8 +23,19 @@ test("global headers include baseline browser protections", async () => {
   const rules = await nextConfig.headers();
   const headers = new Map(rules[0].headers.map(({ key, value }) => [key.toLowerCase(), value]));
   assert.match(headers.get("content-security-policy"), /frame-ancestors 'none'/);
+  assert.match(headers.get("content-security-policy"), /frame-src https:\/\/agent\.labulubius\.com/);
+  assert.match(headers.get("content-security-policy"), /connect-src[^;]*https:\/\/agent\.labulubius\.com/);
   assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.equal(headers.get("x-frame-options"), "DENY");
   assert.ok(headers.has("referrer-policy"));
   assert.ok(headers.has("permissions-policy"));
+});
+
+test("agent page exchanges the Supabase bearer token without putting it in the iframe URL", async () => {
+  const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
+  assert.match(source, /\/api\/owner-auth/);
+  assert.match(source, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(source, /credentials: "include"/);
+  assert.match(source, /src=\{AGENT_ORIGIN\}/);
+  assert.doesNotMatch(source, /src=.*access_token/);
 });
