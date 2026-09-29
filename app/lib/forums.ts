@@ -54,8 +54,9 @@ async function pinnedText(url: string): Promise<string> {
 async function curlText(url: string): Promise<string> {
   const key = `curl:${url}`; const cached = responseCache.get(key); if (cached && cached.expires > Date.now()) return cached.value;
   const target = new URL(url); if (target.protocol !== "https:" || target.port || target.username || target.password) throw new Error("Invalid community URL.");
-  await publicForumAddress(target.hostname);
-  const value = runFile("curl", ["--silent", "--show-error", "--fail", "--max-time", "12", "--max-filesize", "2000000", "--user-agent", "Labulubius-Communities/1.0 (+https://labulubius.com/forums)", target.href], { maxBuffer: 2_000_000 }).then(({ stdout }) => stdout);
+  const address = await publicForumAddress(target.hostname);
+  const pinned = address.includes(":") ? `[${address}]` : address;
+  const value = runFile("curl", ["--disable", "--silent", "--show-error", "--fail", "--max-time", "12", "--max-filesize", "2000000", "--noproxy", "*", "--resolve", `${target.hostname}:443:${pinned}`, "--user-agent", "Labulubius-Communities/1.0 (+https://labulubius.com/forums)", target.href], { maxBuffer: 2_000_000 }).then(({ stdout }) => stdout);
   responseCache.set(key, { expires: Date.now() + ttl, value }); value.catch(() => { if (responseCache.get(key)?.value === value) responseCache.delete(key); }); return value;
 }
 

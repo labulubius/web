@@ -485,7 +485,7 @@ export function NavDirectory() {
         </nav>
       </aside>
 
-      <section className="directory-content" inert={!isAdmin}>
+      <section className="directory-content">
         <header className="directory-header">
           <div><h1>{categoryId === "favorites" ? "Favorites" : categories.find((item) => item.id === categoryId)?.name}</h1><p>{filteredSites.length} items</p></div>
           <div className="directory-tools">

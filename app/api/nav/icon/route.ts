@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { randomUUID } from "node:crypto";
+import http from "node:http";
+import https from "node:https";
+import { Readable } from "node:stream";
+import { publicAddress } from "../../../lib/public-network";
 
 export const runtime = "nodejs";
 
@@ -53,37 +55,6 @@ async function getAdminClient(request: Request) {
   return supabase;
 }
 
-function isPrivateIpv4(address: string) {
-  const parts = address.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
-  const [a, b] = parts;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 224
-  );
-}
-
-function isPrivateAddress(address: string) {
-  if (isIP(address) === 4) return isPrivateIpv4(address);
-
-  const normalized = address.toLowerCase().split("%")[0];
-  if (normalized.startsWith("::ffff:")) return isPrivateIpv4(normalized.slice(7));
-  return (
-    normalized === "::" ||
-    normalized === "::1" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    /^fe[89ab]/.test(normalized) ||
-    normalized.startsWith("ff")
-  );
-}
-
 async function assertPublicUrl(value: string) {
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
@@ -93,37 +64,45 @@ async function assertPublicUrl(value: string) {
     throw new Error("Only standard HTTP and HTTPS ports are allowed.");
   }
 
-  if (isIP(url.hostname)) {
-    if (isPrivateAddress(url.hostname)) throw new Error("Private network addresses are not allowed.");
-  } else {
-    const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-    if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) {
-      throw new Error("The hostname does not resolve to a public address.");
-    }
-  }
-  return url;
+  const address = await publicAddress(url.hostname);
+  return { url, address };
+}
+
+function pinnedRequest(url: URL, address: string, accept: string): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const transport = url.protocol === "https:" ? https : http;
+    const request = transport.get(url, {
+      headers: { Accept: accept, "User-Agent": "Labulubius-Navigator-Icon/1.0" },
+      timeout: FETCH_TIMEOUT_MS,
+      lookup: (_hostname, options, callback) => {
+        const family = address.includes(":") ? 6 : 4;
+        if (typeof options !== "number" && options.all) callback(null, [{ address, family }]);
+        else callback(null, address, family);
+      },
+    }, (incoming) => {
+      const headers = new Headers();
+      for (let index = 0; index < incoming.rawHeaders.length; index += 2) headers.append(incoming.rawHeaders[index], incoming.rawHeaders[index + 1]);
+      resolve(new Response(Readable.toWeb(incoming) as ReadableStream<Uint8Array>, { status: incoming.statusCode || 500, headers }));
+    });
+    request.on("timeout", () => request.destroy(new Error("Remote request timed out.")));
+    request.on("error", reject);
+  });
 }
 
 async function fetchPublicUrl(value: string, accept: string) {
   let current = value;
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-    const url = await assertPublicUrl(current);
-    const response = await fetch(url, {
-      headers: {
-        Accept: accept,
-        "User-Agent": "Labulubius-Navigator-Icon/1.0",
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    const { url, address } = await assertPublicUrl(current);
+    const response = await pinnedRequest(url, address, accept);
 
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
+      await response.body?.cancel();
       if (!location) throw new Error("Redirect response has no location.");
       current = new URL(location, url).href;
       continue;
     }
-    if (!response.ok) throw new Error(`Remote server returned ${response.status}.`);
+    if (!response.ok) { await response.body?.cancel(); throw new Error(`Remote server returned ${response.status}.`); }
     return { response, finalUrl: url.href };
   }
   throw new Error("Too many redirects.");

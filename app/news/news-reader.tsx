@@ -232,7 +232,7 @@ export function NewsReader() {
         <div className="news-category-row"><button type="button" disabled><Rss size={16} /><span>RSS Sources</span></button></div>
         <div className="news-category-row"><button type="button" disabled><Tags size={16} /><span>Tags</span></button></div>
       </aside>
-      <section className="news-content" inert>
+      <section className="news-content">
         <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>News</h1><p>Your selected RSS sources, powered by FreshRSS.</p></div></header>
         {publicArticlesError && <p className="news-error" role="alert">Articles are temporarily unavailable.</p>}
         {publicArticlesBusy && <p className="news-empty">Loading articles…</p>}

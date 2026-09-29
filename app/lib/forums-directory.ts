@@ -4,8 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { publicAddress } from "./public-network";
 
 export type ForumCategory = { id: string; name: string };
 export type ForumKind = "discourse" | "v2ex" | "hackernews" | "stackexchange" | "reddit" | "rss";
@@ -38,21 +37,8 @@ function validName(value: unknown, length: number): string {
 
 // DNS is checked both at save time and again when connecting (with the checked IP pinned).
 export async function publicForumAddress(hostname: string): Promise<string> {
-  if (isIP(hostname) || !/^(?=.{1,253}$)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(hostname) || hostname.toLowerCase().endsWith(".local")) {
-    throw new InvalidForumInput("Use a public DNS hostname, not an IP address.");
-  }
-  const addresses = await lookup(hostname, { all: true });
-  const safe = addresses.filter(({ address, family }) => {
-    if (family === 4) {
-      const [a, b, c] = address.split(".").map(Number);
-      return a !== 0 && a !== 10 && a !== 127 && a !== 169 && a < 224 && !(a === 100 && b >= 64 && b <= 127) && !(a === 172 && b >= 16 && b <= 31) &&
-        !(a === 192 && (b === 168 || (b === 0 && (c === 0 || c === 2)))) && !(a === 198 && b === 51 && c === 100) && !(a === 203 && b === 0 && c === 113);
-    }
-    const ip = address.toLowerCase();
-    return family === 6 && !/^(::|::1|::ffff:|fc|fd|fe[89ab]|ff|64:ff9b:)/.test(ip) && !ip.startsWith("2001:db8:");
-  });
-  if (!addresses.length || safe.length !== addresses.length) throw new InvalidForumInput("Forum hostname must resolve only to public addresses.");
-  return safe[0].address;
+  try { return await publicAddress(hostname); }
+  catch { throw new InvalidForumInput("Forum hostname must resolve only to public addresses."); }
 }
 
 export async function forumOrigin(value: unknown): Promise<string> {

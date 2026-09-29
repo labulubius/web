@@ -17,6 +17,8 @@ export function NoteEditor() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const writing = useRef(false);
   const blocked = useRef(false);
+  const mounted = useRef(true);
+  const flushRequested = useRef(false);
   const generation = useRef(0);
   const saveRef = useRef<() => Promise<void>>(async () => {});
 
@@ -38,31 +40,42 @@ export function NoteEditor() {
       const { data, error } = await supabase.from("private_note")
         .update({ content: value }).eq("id", 1).eq("revision", expected)
         .select("revision").maybeSingle();
-      if (version !== generation.current) return;
+      const active = mounted.current && version === generation.current;
+      const flushingAfterUnmount = !mounted.current && flushRequested.current;
+      if (!active && !flushingAfterUnmount) return;
       if (error) throw error;
       if (!data) {
         blocked.current = true;
-        setState("conflict");
-        setMessage("This note was changed elsewhere. Copy your unsaved text before reloading.");
+        if (active) {
+          setState("conflict");
+          setMessage("This note was changed elsewhere. Copy your unsaved text before reloading.");
+        }
         return;
       }
       revision.current = data.revision;
       saved.current = value;
-      if (current.current === value) setState("saved");
-      else { setState("pending"); schedule(); }
+      if (active) {
+        if (current.current === value) setState("saved");
+        else { setState("pending"); schedule(); }
+      }
     } catch {
-      if (version === generation.current) {
+      if (mounted.current && version === generation.current) {
         setState("error");
         setMessage("Could not save. Your text is still here; retry when connected.");
       }
     } finally {
       writing.current = false;
+      if (!mounted.current && flushRequested.current) {
+        flushRequested.current = false;
+        if (!blocked.current && revision.current !== null && current.current !== saved.current) void saveRef.current();
+      }
     }
   }, [supabase, schedule]);
   useEffect(() => { saveRef.current = save; }, [save]);
 
   useEffect(() => {
     const version = ++generation.current;
+    flushRequested.current = false;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     current.current = "";
@@ -90,8 +103,20 @@ export function NoteEditor() {
       setText(data.content);
       setState("saved");
     })();
-    return () => { generation.current++; if (timer.current) clearTimeout(timer.current); };
+    return () => { if (generation.current === version) generation.current = version + 1; if (timer.current) clearTimeout(timer.current); timer.current = null; };
   }, [supabase, isAdmin, loading]);
+
+  useEffect(() => {
+    mounted.current = true;
+    flushRequested.current = false;
+    return () => {
+      mounted.current = false;
+      flushRequested.current = true;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      if (revision.current !== null && current.current !== saved.current) void saveRef.current();
+    };
+  }, []);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {

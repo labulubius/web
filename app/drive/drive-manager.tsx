@@ -12,13 +12,17 @@ export function DriveManager() {
   const { supabase, isAdmin, loading } = useSiteAuth();
   const [parts, setParts] = useState<string[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [listedPath, setListedPath] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [listFailed, setListFailed] = useState(false);
   const [progress, setProgress] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const listRequest = useRef<{ id: number; controller: AbortController } | null>(null);
   const path = parts.join("/");
+  const pathRef = useRef(path);
+  useEffect(() => { pathRef.current = path; }, [path]);
 
   const api = useCallback(async (url: string, options: RequestInit = {}) => {
     const { data } = await supabase.auth.getSession();
@@ -37,23 +41,34 @@ export function DriveManager() {
     return response;
   }, [supabase]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (targetPath = pathRef.current) => {
     if (!isAdmin) return;
+    listRequest.current?.controller.abort();
+    const request = { id: (listRequest.current?.id ?? 0) + 1, controller: new AbortController() };
+    listRequest.current = request;
+    const requestedPath = targetPath;
     setLoadingList(true);
     setListFailed(false);
     try {
-      const response = await api(`/api/drive?path=${encodeURIComponent(path)}`);
+      const response = await api(`/api/drive?path=${encodeURIComponent(requestedPath)}`, { signal: request.controller.signal });
       const data = await response.json() as { entries: Entry[] };
+      if (listRequest.current?.id !== request.id || request.controller.signal.aborted) return;
       setEntries(data.entries);
+      setListedPath(requestedPath);
       setError("");
     } catch (failure) {
+      if (listRequest.current?.id !== request.id || request.controller.signal.aborted) return;
       setEntries([]);
+      setListedPath(requestedPath);
       setListFailed(true);
       setError(failure instanceof Error ? failure.message : "Could not load files.");
-    } finally { setLoadingList(false); }
-  }, [api, isAdmin, path]);
+    } finally {
+      if (listRequest.current?.id === request.id) setLoadingList(false);
+    }
+  }, [api, isAdmin]);
 
-  useEffect(() => { const timer = window.setTimeout(() => void reload(), 0); return () => window.clearTimeout(timer); }, [reload]);
+  useEffect(() => { const timer = window.setTimeout(() => void reload(path), 0); return () => window.clearTimeout(timer); }, [path, reload]);
+  useEffect(() => () => listRequest.current?.controller.abort(), []);
 
   async function run(task: () => Promise<void>) {
     setBusy(true);
@@ -85,8 +100,9 @@ export function DriveManager() {
 
   function remove(entry: Entry) {
     if (!window.confirm(`Delete ${entry.type === "folder" ? "folder and everything inside" : "file"} “${entry.name}”? This cannot be undone.`)) return;
+    const targetPath = [listedPath, entry.name].filter(Boolean).join("/");
     void run(async () => {
-      await api("/api/drive", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: [...parts, entry.name].join("/") }) });
+      await api("/api/drive", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: targetPath }) });
     });
   }
 
@@ -96,7 +112,8 @@ export function DriveManager() {
       const picker = (window as Window & { showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{ createWritable: () => Promise<WritableStream<Uint8Array>> }> }).showSaveFilePicker;
       const target = picker ? await picker.call(window, { suggestedName: entry.name }) : null;
       if (!target && entry.size > 64 * 1024 ** 2) throw new Error("Large downloads require a browser with streaming file save support (Chrome or Edge).");
-      const response = await api(`/api/drive/download?path=${encodeURIComponent([...parts, entry.name].join("/"))}`);
+      const targetPath = [listedPath, entry.name].filter(Boolean).join("/");
+      const response = await api(`/api/drive/download?path=${encodeURIComponent(targetPath)}`);
       if (target) {
         if (!response.body) throw new Error("Download stream unavailable.");
         await response.body.pipeTo(await target.createWritable());

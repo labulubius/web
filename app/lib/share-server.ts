@@ -187,11 +187,22 @@ export async function removeFolder(id: string) {
   for (let index = 0; index <= folders.length; index++) {
     for (const folder of folders) if (folder.parentId && ids.has(folder.parentId)) ids.add(folder.id);
   }
-  // Revoke the folder and its descendants first; public file downloads also
-  // check the whole ancestor chain, so a partial cleanup cannot keep links live.
-  await unlink(folderPath(id));
-  for (const folder of folders) if (folder.id !== id && ids.has(folder.id)) await unlink(folderPath(folder.id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+  // Keep the root metadata until every descendant has been removed. If cleanup
+  // fails, the folder remains reachable and the administrator can safely retry.
   for (const file of files) if (file.folderId && ids.has(file.folderId)) await remove(file.id);
+  const depth = (folder: ShareFolder) => {
+    let value = 0;
+    let parentId = folder.parentId;
+    const seen = new Set<string>();
+    while (parentId && ids.has(parentId) && !seen.has(parentId)) {
+      seen.add(parentId); value += 1;
+      parentId = folders.find((item) => item.id === parentId)?.parentId ?? null;
+    }
+    return value;
+  };
+  const descendants = folders.filter((folder) => folder.id !== id && ids.has(folder.id)).sort((a, b) => depth(b) - depth(a));
+  for (const folder of descendants) await unlink(folderPath(folder.id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+  await unlink(folderPath(id));
   return true;
 }
 
