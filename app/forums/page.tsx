@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { MessageCircle, MessagesSquare, TrendingUp } from "lucide-react";
 import { SiteShell } from "../site-shell";
 import { ForumsSidebar } from "./forums-sidebar";
@@ -50,7 +49,7 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
         <div className="forums-topics">
           {topics.map(({ topic, source }) => <article className="forums-topic" key={`${source.id}-${topic.id}`}>
             <div className="forums-topic-meta"><span>{source.name}</span><small>{providerNames[source.kind]}</small>{topic.author && <small>by {topic.author}</small>}<time dateTime={topic.bumpedAt}>{new Date(topic.bumpedAt).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" })}</time></div>
-            <h2><Link href={`/forums/${encodeURIComponent(source.id)}/${encodeURIComponent(topic.id)}`}>{topic.title}</Link></h2>
+            <h2><a href={topic.url} target="_blank" rel="noopener noreferrer">{topic.title}</a></h2>
             {topic.summary && <p className="forums-topic-summary">{topic.summary}</p>}
             <div className="forums-topic-foot"><span><MessageCircle size={14} aria-hidden="true" /> {topic.replyCount} {topic.replyCount === 1 ? "reply" : "replies"}</span>{typeof topic.score === "number" && <span><TrendingUp size={14} aria-hidden="true" /> {topic.score}</span>}<a href={topic.url} target="_blank" rel="noopener noreferrer">Original discussion ↗</a></div>
           </article>)}
