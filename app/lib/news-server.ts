@@ -149,6 +149,6 @@ export async function newsArticles(selected: string[], cursor: string | null) {
       source: item.origin?.title || "Unknown source", published: Number(item.published) || 0,
       summary: plainText(item.summary?.content || item.content?.content || ""),
     };
-  });
+  }).sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
   return { articles, continuation: data.continuation && /^\d{1,24}$/.test(data.continuation) ? data.continuation : null };
 }

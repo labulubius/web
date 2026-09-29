@@ -55,7 +55,8 @@ export function NewsReader() {
     try {
       const data = await api(`?view=articles${boardFilter ? `&board=${encodeURIComponent(boardFilter)}` : feedFilter ? `&feed=${encodeURIComponent(feedFilter)}` : ""}${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`) as { articles: NewsArticle[]; continuation: string | null };
       if (currentRequest !== requestId.current) return;
-      setArticles((previous) => nextCursor ? [...previous, ...data.articles] : data.articles);
+      setArticles((previous) => (nextCursor ? [...previous, ...data.articles] : [...data.articles])
+        .sort((a, b) => b.published - a.published || a.id.localeCompare(b.id)));
       setCursor(data.continuation);
     } catch (failure) {
       if (currentRequest === requestId.current) setError(failure instanceof Error ? failure.message : "Could not load articles.");
