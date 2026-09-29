@@ -48,7 +48,7 @@
 .news-article > a { color: inherit; display: block; text-decoration: none; }
 .news-article-content { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) auto; padding: 18px 0; }
 .news-article > a:hover h2 { color: var(--link); text-decoration: underline; }
-.news-article h2 { font-size: 17px; font-weight: 500; line-height: 1.4; margin: 0 0 7px; }
+.news-article h2 { color: var(--link); font-size: 17px; font-weight: 500; line-height: 1.4; margin: 0 0 7px; }
 .news-article p { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
 .news-article time { color: var(--text-muted); font-size: 11px; padding-top: 4px; white-space: nowrap; }
 .news-empty, .news-error { border: 1px solid var(--separator); border-radius: 4px; color: var(--text-muted); font-size: 11px; padding: 10px; }
