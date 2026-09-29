@@ -107,7 +107,7 @@ async function readLimited(response: Response) {
   return body;
 }
 
-async function fetchRemote(value: string) {
+export async function fetchPinnedNewsResource(value: string) {
   let current = value;
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
     const { url, address } = await target(current);
@@ -127,7 +127,7 @@ function xmlFeed(body: Uint8Array) {
 }
 
 export async function discoverPinnedNewsFeed(value: string) {
-  const first = await fetchRemote(value);
+  const first = await fetchPinnedNewsResource(value);
   if (!first.response.ok) { await first.response.body?.cancel(); throw new Error("Website unavailable."); }
   const body = await readLimited(first.response);
   if (xmlFeed(body)) return first.finalUrl;
@@ -139,7 +139,7 @@ export async function discoverPinnedNewsFeed(value: string) {
     const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]?.replace(/&amp;/gi, "&");
     if (!href || !/(?:^|\s)alternate(?:\s|$)/i.test(rel) || !/(?:rss|atom|xml)/i.test(type)) continue;
     const candidate = new URL(href, first.finalUrl).href;
-    const checked = await fetchRemote(candidate);
+    const checked = await fetchPinnedNewsResource(candidate);
     if (!checked.response.ok) { await checked.response.body?.cancel(); continue; }
     const feed = await readLimited(checked.response);
     if (xmlFeed(feed)) return checked.finalUrl;
@@ -154,7 +154,7 @@ export async function proxyNewsFeed(token: string) {
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return new Response("Not found", { status: 404 });
   let current: string;
   try { current = Buffer.from(encoded, "base64url").toString("utf8"); new URL(current); } catch { return new Response("Not found", { status: 404 }); }
-  const result = await fetchRemote(current);
+  const result = await fetchPinnedNewsResource(current);
   if (!result.response.ok) { await result.response.body?.cancel(); return new Response("Feed unavailable", { status: 502 }); }
   const body = await readLimited(result.response);
   if (!xmlFeed(body)) return new Response("Invalid feed", { status: 502 });

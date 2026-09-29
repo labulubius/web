@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { execFile } from "node:child_process";
+import { articleSummary } from "./news-article-summary";
 import type { NewsArticle, NewsFeed } from "./news-server-types";
 import { originalNewsFeedUrl } from "./news-feed-proxy";
 
@@ -158,14 +159,15 @@ LIMIT 51;`;
   const rows = output.trim() ? output.trim().split("\n").map((line) => JSON.parse(line) as DatabaseArticle) : [];
   const hasMore = rows.length > 50;
   const page = rows.slice(0, 50);
-  const articles = page.map((item) => {
+  const articles = await Promise.all(page.map(async (item) => {
     let url = "";
     try { if (["http:", "https:"].includes(new URL(item.url).protocol)) url = item.url; } catch { /* no unsafe links */ }
+    const summary = await articleSummary(url, plainText(item.summary || ""));
     return {
       id: item.id, title: plainText(item.title || "Untitled"), url,
-      published: Number(item.published) || 0, summary: plainText(item.summary || ""),
+      published: Number(item.published) || 0, summary,
     };
-  });
+  }));
   const last = articles.at(-1);
   return { articles, continuation: hasMore && last ? `${last.published}:${last.id}` : null };
 }
