@@ -11,6 +11,12 @@ type WatchboardState = { tags: { id: string; name: string }[]; watchboards: { id
 type Directory = { feeds: NewsFeed[]; selected: string[] };
 type PublicArticle = Omit<NewsArticle, "feedId"> & { category: string; sourceKey: number };
 
+function mergeArticles<T extends { id: string; published: number }>(previous: T[], incoming: T[]) {
+  const merged = new Map(previous.map((article) => [article.id, article]));
+  for (const article of incoming) merged.set(article.id, article);
+  return [...merged.values()].sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
+}
+
 export function NewsReader() {
   const { supabase, loading, isAdmin } = useSiteAuth();
   const [feeds, setFeeds] = useState<NewsFeed[]>([]);
@@ -19,6 +25,7 @@ export function NewsReader() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const requestId = useRef(0);
+  const publicRequestId = useRef(0);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,6 +39,7 @@ export function NewsReader() {
   const [draftTags, setDraftTags] = useState<string[]>([]);
   const [sourceQuery, setSourceQuery] = useState("");
   const [publicArticles, setPublicArticles] = useState<PublicArticle[]>([]);
+  const [publicCursor, setPublicCursor] = useState<string | null>(null);
   const [publicArticlesBusy, setPublicArticlesBusy] = useState(true);
   const [publicArticlesError, setPublicArticlesError] = useState(false);
 
@@ -55,8 +63,7 @@ export function NewsReader() {
     try {
       const data = await api(`?view=articles${boardFilter ? `&board=${encodeURIComponent(boardFilter)}` : feedFilter ? `&feed=${encodeURIComponent(feedFilter)}` : ""}${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`) as { articles: NewsArticle[]; continuation: string | null };
       if (currentRequest !== requestId.current) return;
-      setArticles((previous) => (nextCursor ? [...previous, ...data.articles] : [...data.articles])
-        .sort((a, b) => b.published - a.published || a.id.localeCompare(b.id)));
+      setArticles((previous) => mergeArticles(nextCursor ? previous : [], data.articles));
       setCursor(data.continuation);
     } catch (failure) {
       if (currentRequest === requestId.current) setError(failure instanceof Error ? failure.message : "Could not load articles.");
@@ -89,26 +96,29 @@ export function NewsReader() {
     return () => window.clearTimeout(timer);
   }, [ready, isAdmin, loadArticles]);
 
+  const invalidatePublicRequests = useCallback(() => { publicRequestId.current++; }, []);
+
+  const loadPublicArticles = useCallback(async (nextCursor: string | null = null) => {
+    const currentRequest = ++publicRequestId.current;
+    setPublicArticlesBusy(true); setPublicArticlesError(false);
+    if (!nextCursor) { setPublicArticles([]); setPublicCursor(null); }
+    try {
+      const response = await fetch(`/api/news?view=publicArticles${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Articles unavailable.");
+      const data = await response.json() as { articles: PublicArticle[]; continuation: string | null };
+      if (!Array.isArray(data.articles)) throw new Error("Invalid articles.");
+      if (currentRequest !== publicRequestId.current) return;
+      setPublicArticles((previous) => mergeArticles(nextCursor ? previous : [], data.articles));
+      setPublicCursor(data.continuation === nextCursor ? null : data.continuation);
+    } catch { if (currentRequest === publicRequestId.current) setPublicArticlesError(true); }
+    finally { if (currentRequest === publicRequestId.current) setPublicArticlesBusy(false); }
+  }, []);
+
   useEffect(() => {
-    if (loading || isAdmin) return;
-    const controller = new AbortController();
-    void (async () => {
-      setPublicArticlesBusy(true);
-      const articles = await Promise.allSettled([
-        fetch("/api/news?view=publicArticles", { cache: "no-store", signal: controller.signal }).then(async (response) => {
-          if (!response.ok) throw new Error("Articles unavailable.");
-          const data = await response.json() as { articles: PublicArticle[] };
-          if (!Array.isArray(data.articles)) throw new Error("Invalid articles.");
-          return data.articles;
-        }),
-      ]);
-      if (controller.signal.aborted) return;
-      if (articles[0].status === "fulfilled") { setPublicArticles(articles[0].value); setPublicArticlesError(false); }
-      else setPublicArticlesError(true);
-      setPublicArticlesBusy(false);
-    })();
-    return () => controller.abort();
-  }, [loading, isAdmin]);
+    if (loading || isAdmin) { invalidatePublicRequests(); return; }
+    const timer = window.setTimeout(() => { void loadPublicArticles(); }, 0);
+    return () => { window.clearTimeout(timer); invalidatePublicRequests(); };
+  }, [loading, isAdmin, loadPublicArticles, invalidatePublicRequests]);
 
   const visible = articles;
 
@@ -242,6 +252,7 @@ export function NewsReader() {
           <h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>
           {article.summary && <p>{article.summary}</p>}
         </article>)}</div>
+        {(publicCursor || (publicArticlesBusy && publicArticles.length > 0)) && <button className="news-more" type="button" disabled={publicArticlesBusy} onClick={() => void loadPublicArticles(publicCursor)}>{publicArticlesBusy ? "Loading…" : "Load more"}</button>}
       </section>
     </div>;
   }

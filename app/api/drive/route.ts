@@ -1,6 +1,7 @@
 import { readdir, lstat, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../lib/drive-server";
+import { locked } from "../../lib/upload-sessions";
 
 export const runtime = "nodejs";
 
@@ -47,9 +48,12 @@ export async function DELETE(request: Request) {
     const body = await request.json() as { path?: unknown };
     const parts = segments(body.path);
     if (!parts.length) throw new Error("Cannot delete the drive root.");
-    const target = await resolveDrivePath(parts);
-    // rm does not follow symlinks inside a directory, but reject symlinks at the target.
-    await rm(target, { recursive: true });
+    const root = await driveRoot();
+    await locked(root, async () => {
+      const target = await resolveDrivePath(parts);
+      // rm does not follow symlinks inside a directory, but reject symlinks at the target.
+      await rm(target, { recursive: true });
+    });
     return Response.json({ ok: true }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
   });

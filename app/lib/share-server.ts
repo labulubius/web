@@ -14,6 +14,16 @@ const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 export type ShareEntry = { id: string; name: string; size: number; type: "image" | "file"; created: string; folderId?: string | null };
 export type ShareFolder = { id: string; name: string; parentId: string | null; created: string };
 
+type Catalog<T> = { expires: number; value: Promise<T[]> };
+let entryCatalog: Catalog<ShareEntry> | null = null;
+let folderCatalog: Catalog<ShareFolder> | null = null;
+const catalogTtl = 5_000;
+
+function invalidateCatalogs(entries = true, folders = true) {
+  if (entries) entryCatalog = null;
+  if (folders) folderCatalog = null;
+}
+
 export function shareHost(request: Request) {
   const host = new URL(request.url).hostname;
   return host === "share.labulubius.com" || host === "localhost" || host === "127.0.0.1";
@@ -86,13 +96,26 @@ async function load(id: string): Promise<ShareEntry | null> {
   }
 }
 
-export async function list() {
+async function scanEntries() {
   const base = await directories();
   const names = await readdir(path.join(base, "meta"));
   const entries = (await Promise.all(names.filter((name) => ID.test(name.replace(/\.json$/, "")) && name.endsWith(".json"))
     .map((name) => load(name.slice(0, -5))))).filter((item): item is ShareEntry => item !== null);
   entries.sort((a, b) => b.created.localeCompare(a.created));
   return entries;
+}
+
+export async function list() {
+  if (!entryCatalog || entryCatalog.expires <= Date.now()) {
+    const value = scanEntries();
+    entryCatalog = { expires: Date.now() + catalogTtl, value };
+    value.catch(() => { if (entryCatalog?.value === value) entryCatalog = null; });
+  }
+  return [...await entryCatalog.value];
+}
+
+export async function shareUsed() {
+  return (await scanEntries()).reduce((sum, entry) => sum + entry.size, 0);
 }
 
 function folderPath(id: string) {
@@ -128,11 +151,20 @@ async function activeFolder(id: string): Promise<ShareFolder | null> {
   return result;
 }
 
-async function allFolders(): Promise<ShareFolder[]> {
+async function scanFolders(): Promise<ShareFolder[]> {
   const base = await directories();
   const names = await readdir(path.join(base, "folders"));
   return (await Promise.all(names.filter((name) => name.endsWith(".json") && ID.test(name.slice(0, -5)))
     .map((name) => loadFolder(name.slice(0, -5))))).filter((folder): folder is ShareFolder => folder !== null);
+}
+
+async function allFolders(): Promise<ShareFolder[]> {
+  if (!folderCatalog || folderCatalog.expires <= Date.now()) {
+    const value = scanFolders();
+    folderCatalog = { expires: Date.now() + catalogTtl, value };
+    value.catch(() => { if (folderCatalog?.value === value) folderCatalog = null; });
+  }
+  return [...await folderCatalog.value];
 }
 
 export async function folderContents(folderId: string | null) {
@@ -176,6 +208,7 @@ export async function createFolder(value: unknown, parentValue: unknown): Promis
     await handle.close();
     if (parentId && !await activeFolder(parentId)) throw new Error("Parent folder no longer exists.");
     await rename(temporary, folderPath(folder.id));
+    invalidateCatalogs(false, true);
     return folder;
   } finally { await handle.close().catch(() => {}); await unlink(temporary).catch(() => {}); }
 }
@@ -183,27 +216,30 @@ export async function createFolder(value: unknown, parentValue: unknown): Promis
 export async function removeFolder(id: string) {
   if (!ID.test(id) || !await activeFolder(id)) return false;
   const [folders, files] = await Promise.all([allFolders(), list()]);
-  const ids = new Set([id]);
-  for (let index = 0; index <= folders.length; index++) {
-    for (const folder of folders) if (folder.parentId && ids.has(folder.parentId)) ids.add(folder.id);
-  }
-  // Keep the root metadata until every descendant has been removed. If cleanup
-  // fails, the folder remains reachable and the administrator can safely retry.
-  for (const file of files) if (file.folderId && ids.has(file.folderId)) await remove(file.id);
-  const depth = (folder: ShareFolder) => {
-    let value = 0;
-    let parentId = folder.parentId;
-    const seen = new Set<string>();
-    while (parentId && ids.has(parentId) && !seen.has(parentId)) {
-      seen.add(parentId); value += 1;
-      parentId = folders.find((item) => item.id === parentId)?.parentId ?? null;
+  invalidateCatalogs(true, true);
+  try {
+    const ids = new Set([id]);
+    for (let index = 0; index <= folders.length; index++) {
+      for (const folder of folders) if (folder.parentId && ids.has(folder.parentId)) ids.add(folder.id);
     }
-    return value;
-  };
-  const descendants = folders.filter((folder) => folder.id !== id && ids.has(folder.id)).sort((a, b) => depth(b) - depth(a));
-  for (const folder of descendants) await unlink(folderPath(folder.id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
-  await unlink(folderPath(id));
-  return true;
+    // Keep the root metadata until every descendant has been removed. If cleanup
+    // fails, the folder remains reachable and the administrator can safely retry.
+    for (const file of files) if (file.folderId && ids.has(file.folderId)) await remove(file.id);
+    const depth = (folder: ShareFolder) => {
+      let value = 0;
+      let parentId = folder.parentId;
+      const seen = new Set<string>();
+      while (parentId && ids.has(parentId) && !seen.has(parentId)) {
+        seen.add(parentId); value += 1;
+        parentId = folders.find((item) => item.id === parentId)?.parentId ?? null;
+      }
+      return value;
+    };
+    const descendants = folders.filter((folder) => folder.id !== id && ids.has(folder.id)).sort((a, b) => depth(b) - depth(a));
+    for (const folder of descendants) await unlink(folderPath(folder.id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+    await unlink(folderPath(id));
+    return true;
+  } finally { invalidateCatalogs(true, true); }
 }
 
 export async function shareRoot() { return directories(); }
@@ -218,7 +254,7 @@ export async function finishShareUpload(session: Session): Promise<ShareEntry> {
   const folderId = session.context || null;
   await validateShareTarget(name, folderId);
   const base = await directories();
-  const used = (await list()).reduce((sum, item) => sum + item.size, 0);
+  const used = await shareUsed();
   if (used + session.size > TOTAL_BYTES) throw new Error("Share storage limit reached (5 GB total).");
   const id = session.id;
   const target = location(id);
@@ -245,6 +281,7 @@ export async function finishShareUpload(session: Session): Promise<ShareEntry> {
     const metadata = await open(/* turbopackIgnore: true */ tempMeta, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     try { await metadata.writeFile(JSON.stringify(entry)); } finally { await metadata.close(); }
     try { await rename(tempMeta, target.meta); } finally { await unlink(tempMeta).catch(() => {}); }
+    invalidateCatalogs(true, false);
     committed = true;
     return entry;
   } finally {
@@ -258,6 +295,7 @@ export async function remove(id: string) {
   const paths = location(id);
   // Revoke at origin first. Remaining files can be cleaned after a partial failure.
   await unlink(paths.meta);
+  invalidateCatalogs(true, false);
   await Promise.all([paths.blob, paths.thumb].map((file) => unlink(file).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") console.error("Share file cleanup failed:", error.code);
   })));

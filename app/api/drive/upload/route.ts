@@ -1,7 +1,7 @@
 import { link, lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
-import { appendChunk, createSession, discard, loadSession, locked, offset, smallJson, tempPath, TOTAL_BYTES } from "../../../lib/upload-sessions";
+import { appendChunk, createSession, discard, loadSession, locked, offset, smallJson, tempPath } from "../../../lib/upload-sessions";
 
 export const runtime = "nodejs";
 export function OPTIONS(request: Request) { return drivePreflight(request); }
@@ -57,7 +57,9 @@ export function POST(request: Request) {
         const parts = segments(session.context);
         const parent = parts.length ? await resolveDrivePath(parts) : root;
         if (!(await lstat(parent)).isDirectory()) throw new Error("Invalid drive path.");
-        if (await driveUsed(root) + session.size > TOTAL_BYTES) throw new Error("Storage limit reached (5 GB total).");
+        // createSession reserves every pending upload under this same root lock.
+        // Finishing converts reserved bytes to committed bytes one-for-one, so a
+        // second recursive quota scan is redundant and would double scan large drives.
         // Hard link fails atomically if a file with this name appeared during upload.
         await link(tempPath(root, session.id), path.join(parent, session.name));
         await discard(root, session.id);

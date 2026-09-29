@@ -1,4 +1,4 @@
-import { admin, cors, failure, finishShareUpload, list, shareHost, shareRoot, validateShareTarget } from "../../../lib/share-server";
+import { admin, cors, failure, finishShareUpload, shareHost, shareRoot, shareUsed, validateShareTarget } from "../../../lib/share-server";
 import { appendChunk, createSession, discard, loadSession, locked, offset, smallJson } from "../../../lib/upload-sessions";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export function POST(request: Request) {
     const data = await smallJson(request);
     if (data.action === "start") {
       await validateShareTarget(data.name, data.folderId ?? null);
-      const session = await locked(root, async () => createSession(root, (await list()).reduce((sum, item) => sum + item.size, 0), data.name as string, data.size as number, (data.folderId as string | null) ?? ""));
+      const session = await locked(root, async () => createSession(root, await shareUsed(), data.name as string, data.size as number, (data.folderId as string | null) ?? ""));
       return Response.json({ id: session.id, offset: 0 }, { headers: { "Cache-Control": "no-store" } });
     }
     if (data.action === "finish") {

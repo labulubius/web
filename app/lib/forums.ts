@@ -1,32 +1,38 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import https from "node:https";
 import { promisify } from "node:util";
 import { XMLParser } from "fast-xml-parser";
-import { publicForumAddress, type ForumSource } from "./forums-directory";
+import { loadForumDirectory, publicForumAddress, type ForumKind, type ForumSource } from "./forums-directory";
 export type { ForumSource } from "./forums-directory";
 
 export type ForumTopic = {
   id: string; title: string; url: string; author: string; replyCount: number; createdAt: string; bumpedAt: string;
   score?: number; summary?: string;
 };
-export type ForumPost = { id: string; username: string; createdAt: string; text: string; number: number; depth?: number; score?: number };
-export type ForumThread = { title: string; url: string; posts: ForumPost[]; totalPosts: number; truncated?: boolean };
+export type ForumListedTopic = { topic: ForumTopic; source: { id: string; name: string; kind: ForumKind } };
+export type ForumTopicPage = { topics: ForumListedTopic[]; failed: string[]; continuation: string | null };
 
+type ForumSnapshot = { key: string; expires: number; value: Promise<{ topics: ForumListedTopic[]; failed: string[] }> };
 const responseCache = new Map<string, { expires: number; value: Promise<string> }>();
+const aggregateCache = new Map<string, { expires: number; snapshot: string; value: Promise<{ topics: ForumListedTopic[]; failed: string[] }> }>();
+const snapshotCache = new Map<string, ForumSnapshot>();
 const ttl = 5 * 60_000;
+const forumPageSize = 50;
 const runFile = promisify(execFile);
 
+function cacheText(key: string, value: Promise<string>) {
+  if (responseCache.size >= 250) responseCache.delete(responseCache.keys().next().value!);
+  responseCache.set(key, { expires: Date.now() + ttl, value });
+  value.catch(() => { if (responseCache.get(key)?.value === value) responseCache.delete(key); });
+  return value;
+}
 function requestText(url: string): Promise<string> {
   const cached = responseCache.get(url);
   if (cached && cached.expires > Date.now()) return cached.value;
-  if (responseCache.size >= 250) responseCache.delete(responseCache.keys().next().value!);
-  const value = pinnedText(url);
-  responseCache.set(url, { expires: Date.now() + ttl, value });
-  value.catch(() => { if (responseCache.get(url)?.value === value) responseCache.delete(url); });
-  return value;
+  return cacheText(url, pinnedText(url));
 }
 
 async function pinnedText(url: string): Promise<string> {
@@ -57,7 +63,7 @@ async function curlText(url: string): Promise<string> {
   const address = await publicForumAddress(target.hostname);
   const pinned = address.includes(":") ? `[${address}]` : address;
   const value = runFile("curl", ["--disable", "--silent", "--show-error", "--fail", "--max-time", "12", "--max-filesize", "2000000", "--noproxy", "*", "--resolve", `${target.hostname}:443:${pinned}`, "--user-agent", "Labulubius-Communities/1.0 (+https://labulubius.com/forums)", target.href], { maxBuffer: 2_000_000 }).then(({ stdout }) => stdout);
-  responseCache.set(key, { expires: Date.now() + ttl, value }); value.catch(() => { if (responseCache.get(key)?.value === value) responseCache.delete(key); }); return value;
+  return cacheText(key, value);
 }
 
 async function json<T>(url: string): Promise<T> { return JSON.parse(await requestText(url)) as T; }
@@ -176,67 +182,60 @@ export async function latestTopics(source: ForumSource): Promise<ForumTopic[]> {
   return rssTopics(source);
 }
 
-async function discourseThread(source: ForumSource, id: string, page: number): Promise<ForumThread> {
-  if (!/^\d{1,16}$/.test(id)) throw new Error("Invalid topic.");
-  try {
-    const thread = await json<Record<string, unknown>>(`${source.origin}/t/${id}.json`); const stream = thread.post_stream as { posts?: Array<Record<string, unknown>>; stream?: number[] } | undefined;
-    const ids = Array.isArray(stream?.stream) ? stream.stream : []; const wanted = ids.slice((page - 1) * 20, page * 20);
-    let posts = (stream?.posts || []).filter((post) => wanted.includes(Number(post.id)));
-    if (posts.length < wanted.length && wanted.length) { const query = new URLSearchParams(); wanted.forEach((postId) => query.append("post_ids[]", String(postId))); posts = (await json<{ post_stream?: { posts?: Array<Record<string, unknown>> } }>(`${source.origin}/t/${id}/posts.json?${query}`)).post_stream?.posts || []; }
-    posts.sort((a, b) => Number(a.post_number) - Number(b.post_number));
-    return { title: postText(String(thread.title || "Discussion")), url: `${source.origin}/t/${id}`, totalPosts: ids.length, posts: posts.map((post) => ({ id: String(post.id), username: String(post.username || ""), createdAt: safeDate(post.created_at), text: postText(String(post.cooked || "")), number: Number(post.post_number) || 1 })) };
-  } catch {
-    const parsed = xml.parse(await curlText(`${source.origin}/t/topic/${id}.rss`)) as { rss?: { channel?: Record<string, unknown> } };
-    const channel = parsed.rss?.channel; const items = list(channel?.item as Record<string, unknown> | Record<string, unknown>[] | undefined).reverse();
-    const posts = items.map((item, index) => ({ id: `${id}-${index + 1}`, username: postText(xmlText(item["dc:creator"] || item.author)), createdAt: safeDate(xmlText(item.pubDate)), text: postText(xmlText(item.description || item["content:encoded"])), number: index + 1 }));
-    return { title: postText(xmlText(channel?.title) || "Discussion"), url: `${source.origin}/t/topic/${id}`, totalPosts: posts.length, posts };
-  }
+export function invalidateForumCaches() {
+  responseCache.clear();
+  aggregateCache.clear();
+  snapshotCache.clear();
 }
 
-async function v2exThread(id: string): Promise<ForumThread> {
-  if (!/^\d{1,16}$/.test(id)) throw new Error("Invalid topic.");
-  const [topics, replies] = await Promise.all([json<Array<Record<string, unknown>>>(`https://www.v2ex.com/api/topics/show.json?id=${id}`), json<Array<Record<string, unknown>>>(`https://www.v2ex.com/api/replies/show.json?topic_id=${id}`)]); const topic = topics[0]; if (!topic) throw new Error("Topic not found.");
-  const member = topic.member as Record<string, unknown> | undefined; const original: ForumPost = { id: `topic-${id}`, username: String(member?.username || ""), createdAt: safeDate(topic.created, true), text: postText(String(topic.content_rendered || topic.content || "")), number: 1 };
-  return { title: postText(String(topic.title || "Discussion")), url: safeUrl(topic.url, `https://www.v2ex.com/t/${id}`), totalPosts: replies.length + 1, posts: [original, ...replies.map((reply, index) => { const author = reply.member as Record<string, unknown> | undefined; return { id: String(reply.id), username: String(author?.username || ""), createdAt: safeDate(reply.created, true), text: postText(String(reply.content_rendered || reply.content || "")), number: index + 2 }; })] };
+async function aggregateTopics(sourceId: string | null, categoryId: string | null, requestedSnapshot: string | null) {
+  const directory = await loadForumDirectory();
+  const sources = directory.sources.filter((source) => sourceId ? source.id === sourceId : source.selected && (!categoryId || source.categoryId === categoryId));
+  const cacheKey = JSON.stringify({ sourceId, categoryId, sources });
+  const oldSnapshot = requestedSnapshot ? snapshotCache.get(requestedSnapshot) : null;
+  if (oldSnapshot && oldSnapshot.key === cacheKey && oldSnapshot.expires > Date.now()) return { snapshot: requestedSnapshot!, value: oldSnapshot.value };
+  if (requestedSnapshot) throw new Error("Discussion page expired. Refresh to continue.");
+  const cached = aggregateCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return { snapshot: cached.snapshot, value: cached.value };
+  const value = (async () => {
+    const results = new Array<PromiseSettledResult<{ source: ForumSource; topics: ForumTopic[] }>>(sources.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(5, sources.length) }, async () => {
+      while (next < sources.length) {
+        const index = next++;
+        try { results[index] = { status: "fulfilled", value: { source: sources[index], topics: await latestTopics(sources[index]) } }; }
+        catch (reason) { results[index] = { status: "rejected", reason }; }
+      }
+    }));
+    const topics = results.flatMap((result) => result.status === "fulfilled" ? result.value.topics.map((topic) => ({ topic, source: { id: result.value.source.id, name: result.value.source.name, kind: result.value.source.kind } })) : []);
+    topics.sort((a, b) => Date.parse(b.topic.bumpedAt) - Date.parse(a.topic.bumpedAt) || `${a.source.id}:${a.topic.id}`.localeCompare(`${b.source.id}:${b.topic.id}`));
+    return { topics, failed: results.flatMap((result, index) => result.status === "rejected" ? [sources[index].name] : []) };
+  })();
+  const snapshot = randomUUID();
+  aggregateCache.set(cacheKey, { expires: Date.now() + ttl, snapshot, value });
+  snapshotCache.set(snapshot, { key: cacheKey, expires: Date.now() + 30 * 60_000, value });
+  while (snapshotCache.size > 100) snapshotCache.delete(snapshotCache.keys().next().value!);
+  value.catch(() => {
+    if (aggregateCache.get(cacheKey)?.value === value) aggregateCache.delete(cacheKey);
+    if (snapshotCache.get(snapshot)?.value === value) snapshotCache.delete(snapshot);
+  });
+  return { snapshot, value };
 }
 
-async function hnThread(id: string): Promise<ForumThread> {
-  if (!/^\d{1,16}$/.test(id)) throw new Error("Invalid item."); const root = await json<Record<string, unknown> | null>(`https://hacker-news.firebaseio.com/v0/item/${id}.json`); if (!root) throw new Error("Item not found.");
-  const kidIds = Array.isArray(root.kids) ? (root.kids as number[]).slice(0, 40) : []; const comments = await mapLimit(kidIds, 8, (kid) => json<Record<string, unknown> | null>(`https://hacker-news.firebaseio.com/v0/item/${kid}.json`));
-  const posts: ForumPost[] = [{ id, username: String(root.by || ""), createdAt: safeDate(root.time, true), text: postText(String(root.text || "Open the linked article to read the full story.")), number: 1, score: Number(root.score) || 0 }];
-  comments.filter((item): item is Record<string, unknown> => !!item && item.deleted !== true && item.dead !== true).forEach((item, index) => posts.push({ id: String(item.id), username: String(item.by || ""), createdAt: safeDate(item.time, true), text: postText(String(item.text || "")), number: index + 2 }));
-  return { title: postText(String(root.title || "Hacker News discussion")), url: `https://news.ycombinator.com/item?id=${id}`, posts, totalPosts: (Number(root.descendants) || kidIds.length) + 1, truncated: kidIds.length < (Number(root.descendants) || 0) };
-}
-
-async function stackThread(source: ForumSource, id: string): Promise<ForumThread> {
-  if (!/^\d{1,16}$/.test(id)) throw new Error("Invalid question."); const common = `site=${encodeURIComponent(source.site || "stackoverflow")}&filter=withbody`;
-  const [questions, answers] = await Promise.all([json<{ items?: Array<Record<string, unknown>> }>(`https://api.stackexchange.com/2.3/questions/${id}?${common}`), json<{ items?: Array<Record<string, unknown>> }>(`https://api.stackexchange.com/2.3/questions/${id}/answers?${common}&sort=creation&order=asc&pagesize=30`)]); const question = questions.items?.[0]; if (!question) throw new Error("Question not found.");
-  const all = [question, ...(answers.items || [])]; return { title: postText(String(question.title || "Question")), url: safeUrl(question.link, `https://${source.site}.com/questions/${id}`), totalPosts: 1 + Number(question.answer_count || 0), posts: all.map((item, index) => { const owner = item.owner as Record<string, unknown> | undefined; return { id: String(item.answer_id || item.question_id), username: postText(String(owner?.display_name || "")), createdAt: safeDate(item.creation_date, true), text: postText(String(item.body || "")), number: index + 1, score: Number(item.score) || 0 }; }), truncated: Number(question.answer_count || 0) > (answers.items?.length || 0) };
-}
-
-async function redditThread(source: ForumSource, id: string): Promise<ForumThread> {
-  if (!/^[a-z0-9]{3,12}$/i.test(id)) throw new Error("Invalid post."); const result = await json<Array<{ data?: { children?: Array<{ kind?: string; data?: Record<string, unknown> }> } }>>(`https://www.reddit.com/r/${encodeURIComponent(source.subreddit || "programming")}/comments/${id}.json?raw_json=1&limit=40`); const root = result[0]?.data?.children?.[0]?.data; if (!root || root.over_18) throw new Error("Post not found."); const replies = result[1]?.data?.children || [];
-  const posts: ForumPost[] = [{ id, username: String(root.author || ""), createdAt: safeDate(root.created_utc, true), text: postText(String(root.selftext || "Open the original post to view its content.")), number: 1, score: Number(root.score) || 0 }];
-  replies.forEach((reply, index) => { const item = reply.data; if (reply.kind === "t1" && item && typeof item.id === "string") posts.push({ id: item.id, username: String(item.author || ""), createdAt: safeDate(item.created_utc, true), text: postText(String(item.body || "")), number: index + 2, score: Number(item.score) || 0 }); });
-  return { title: postText(String(root.title || "Reddit discussion")), url: `https://www.reddit.com${String(root.permalink || `/comments/${id}`)}`, posts, totalPosts: 1 + Number(root.num_comments || 0), truncated: replies.length < Number(root.num_comments || 0) };
-}
-
-async function rssThread(source: ForumSource, id: string): Promise<ForumThread> {
-  const topic = (await rssTopics(source)).find((item) => item.id === id); if (!topic) throw new Error("Feed item not found.");
-  return { title: topic.title, url: topic.url, totalPosts: 1, posts: [{ id, username: topic.author, createdAt: topic.createdAt, text: topic.summary || "Open the original item to continue reading.", number: 1 }] };
-}
-
-export async function forumThread(source: ForumSource, id: string, page = 1): Promise<ForumThread> {
+export async function forumTopicPage(sourceId: string | null, categoryId: string | null, cursor: string | null = null): Promise<ForumTopicPage> {
   if (process.env.VERCEL) {
-    const query = new URLSearchParams({ view: "thread", source: source.id, id, page: String(page) });
+    const query = new URLSearchParams({ view: "aggregate" });
+    if (cursor) query.set("cursor", cursor);
+    if (sourceId) query.set("source", sourceId);
+    if (categoryId) query.set("category", categoryId);
     const response = await fetch(`https://drive.labulubius.com/api/forums?${query}`, { cache: "no-store", signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error("Discussion unavailable.");
-    return response.json() as Promise<ForumThread>;
+    if (!response.ok) throw new Error("Communities unavailable.");
+    return response.json() as Promise<ForumTopicPage>;
   }
-  if (source.kind === "discourse") return discourseThread(source, id, page);
-  if (source.kind === "v2ex") return v2exThread(id);
-  if (source.kind === "hackernews") return hnThread(id);
-  if (source.kind === "stackexchange") return stackThread(source, id);
-  if (source.kind === "reddit") return redditThread(source, id);
-  return rssThread(source, id);
+  const match = cursor?.match(/^([0-9a-f-]{36})\.(\d{1,6})$/) ?? null;
+  const offset = match ? Number(match[2]) : 0;
+  const result = await aggregateTopics(sourceId, categoryId, match?.[1] ?? null);
+  const aggregate = await result.value;
+  const end = Math.min(aggregate.topics.length, offset + forumPageSize);
+  return { topics: aggregate.topics.slice(offset, end), failed: aggregate.failed, continuation: end < aggregate.topics.length ? `${result.snapshot}.${end}` : null };
 }

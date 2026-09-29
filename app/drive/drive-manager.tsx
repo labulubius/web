@@ -156,7 +156,7 @@ export function DriveManager() {
         <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
         <ul className="drive-list">{entries.map((entry) => <li key={entry.name}>
           <span className="drive-file-icon">{entry.type === "folder" ? <Folder size={21} /> : <File size={21} />}</span>
-          {entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => setParts([...parts, entry.name])}>{entry.name}</button> : <span className="drive-name">{entry.name}</span>}
+          {entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => setParts([...(listedPath ? listedPath.split("/") : []), entry.name])}>{entry.name}</button> : <span className="drive-name">{entry.name}</span>}
           <span className="drive-detail">{entry.type === "file" ? `${(entry.size / 1024).toFixed(1)} KB` : "Folder"}</span>
           <span className="drive-detail">{new Date(entry.modified).toLocaleDateString()}</span>
           <span className="drive-row-actions">{entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>}

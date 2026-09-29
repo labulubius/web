@@ -15,6 +15,8 @@ async function loadSidebarData() {
 let sidebarCache: ReturnType<typeof loadSidebarData> | null = null;
 let sidebarExpires = 0;
 
+function invalidateSidebarData() { sidebarCache = null; sidebarExpires = 0; }
+
 function sidebarData() {
   if (!sidebarCache || Date.now() >= sidebarExpires) {
     sidebarExpires = Date.now() + 30_000;
@@ -113,6 +115,7 @@ export async function POST(request: Request) {
     try {
       await manageNews(body);
     } finally {
+      invalidateSidebarData();
       // Also reconcile after a partially completed category deletion.
       if (deleting) {
         const ids = new Set((await newsFeeds()).map((feed) => feed.id));

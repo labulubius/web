@@ -129,18 +129,31 @@ function unexpiredIds(items: { id?: string }[]): Promise<Set<string>> {
   });
 }
 
+type FreshArticle = { id?: string; title?: string; origin?: { streamId?: string; title?: string }; published?: number;
+  canonical?: { href?: string }[]; alternate?: { href?: string }[]; summary?: { content?: string }; content?: { content?: string } };
+
 export async function newsArticles(selected: string[], cursor: string | null) {
   if (!selected.length) return { articles: [] as NewsArticle[], continuation: null as string | null };
-  // Filter on the server: never trust the browser to provide a private feed URL or a cached selection.
+  // FreshRSS paginates the global reading list. Consume a few complete upstream pages
+  // so sparse source selections do not produce a false empty page.
   const allowed = new Set(selected);
-  const data = await freshGet("reader/api/0/stream/contents/reading-list", { n: "100", ...(cursor ? { c: cursor } : {}) }) as {
-    items?: { id?: string; title?: string; origin?: { streamId?: string; title?: string }; published?: number;
-      canonical?: { href?: string }[]; alternate?: { href?: string }[]; summary?: { content?: string }; content?: { content?: string } }[];
-    continuation?: string;
-  };
-  if (!Array.isArray(data.items)) throw new Error("Invalid FreshRSS articles response.");
-  const current = await unexpiredIds(data.items);
-  const articles = data.items.filter((item) => item.origin?.streamId && allowed.has(item.origin.streamId) &&
+  const items: FreshArticle[] = [];
+  const seenContinuations = new Set<string>();
+  if (cursor) seenContinuations.add(cursor);
+  let nextCursor = cursor;
+  let continuation: string | null = null;
+  for (let page = 0; page < 3; page++) {
+    const data = await freshGet("reader/api/0/stream/contents/reading-list", { n: "100", ...(nextCursor ? { c: nextCursor } : {}) }) as { items?: FreshArticle[]; continuation?: string };
+    if (!Array.isArray(data.items)) throw new Error("Invalid FreshRSS articles response.");
+    items.push(...data.items);
+    const next = data.continuation && /^\d{1,24}$/.test(data.continuation) && !seenContinuations.has(data.continuation) ? data.continuation : null;
+    continuation = next;
+    if (!next || items.filter((item) => item.origin?.streamId && allowed.has(item.origin.streamId)).length >= 50) break;
+    seenContinuations.add(next);
+    nextCursor = next;
+  }
+  const current = await unexpiredIds(items);
+  const articles = items.filter((item) => item.origin?.streamId && allowed.has(item.origin.streamId) &&
     current.has(BigInt(`0x${item.id?.match(/\/item\/([0-9a-f]{1,16})$/i)?.[1] || "0"}`).toString())).map((item) => {
     const href = item.canonical?.[0]?.href || item.alternate?.[0]?.href || "";
     let url = "";
@@ -150,6 +163,7 @@ export async function newsArticles(selected: string[], cursor: string | null) {
       source: item.origin?.title || "Unknown source", published: Number(item.published) || 0,
       summary: plainText(item.summary?.content || item.content?.content || ""),
     };
-  }).sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
-  return { articles, continuation: data.continuation && /^\d{1,24}$/.test(data.continuation) ? data.continuation : null };
+  }).filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index)
+    .sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
+  return { articles, continuation };
 }
