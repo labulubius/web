@@ -10,10 +10,10 @@ import "./forums.css";
 export const metadata: Metadata = { title: "Communities" };
 export const dynamic = "force-dynamic";
 
-export default async function ForumsPage({ searchParams }: PageProps<"/forums">) {
+export default async function CommunitiesPage({ searchParams }: PageProps<"/communities">) {
   let directory;
   try { directory = await loadForumDirectory(); }
-  catch { return <SiteShell active="/forums" title="Communities"><p className="forums-warning">Community sources are temporarily unavailable.</p></SiteShell>; }
+  catch { return <SiteShell active="/communities" title="Communities"><p className="forums-warning">Community sources are temporarily unavailable.</p></SiteShell>; }
   const { category: requested, source: requestedSource } = await searchParams;
   const sourceId = typeof requestedSource === "string" && directory.sources.some((source) => source.id === requestedSource) ? requestedSource : null;
   const categoryId = !sourceId && typeof requested === "string" && directory.categories.some((category) => category.id === requested) ? requested : null;
@@ -23,11 +23,11 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
   try { page = await forumTopicPage(sourceId, categoryId); }
   catch { page = { topics: [], failed: sources.map((source) => source.name), continuation: null }; }
 
-  return <SiteShell active="/forums" title="Communities">
+  return <SiteShell active="/communities" title="Communities">
     <div className="forums-layout">
       <ForumsSidebar directory={directory} activeCategory={categoryId} activeSource={sourceId} />
       <section className="forums-content">
-        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>{heading}</h1><p>Discussions from forums and communities, ordered by posting date</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
+        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>{heading}</h1><p>Discussions from communities, ordered by posting date</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
         <ForumsTopicList key={`${sourceId ?? "all"}:${categoryId ?? "all"}`} initial={page} sourceId={sourceId} categoryId={categoryId} hasSources={sources.length > 0} />
       </section>
     </div>

@@ -59,6 +59,6 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof InvalidForumInput) return Response.json({ error: error.message }, { status: 400, headers: privateNewsHeaders });
     console.error("Forum management failed (details withheld).", error);
-    return Response.json({ error: "Could not update forums." }, { status: 503, headers: privateNewsHeaders });
+    return Response.json({ error: "Could not update communities." }, { status: 503, headers: privateNewsHeaders });
   }
 }
