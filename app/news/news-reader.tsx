@@ -10,8 +10,6 @@ import "./news.css";
 type Dialog = { kind: "feed" | "tag" | "board"; id?: string } | null;
 type WatchboardState = { tags: { id: string; name: string }[]; watchboards: { id: string; name: string; tagIds: string[] }[]; sourceTags: Record<string, string[]> };
 type Directory = { feeds: NewsFeed[]; selected: string[] };
-type PublicArticle = Omit<NewsArticle, "feedId"> & { category: string; sourceKey: number };
-
 function mergeArticles<T extends { id: string; published: number }>(previous: T[], incoming: T[]) {
   const merged = new Map(previous.map((article) => [article.id, article]));
   for (const article of incoming) merged.set(article.id, article);
@@ -33,6 +31,20 @@ function saveSidebarLocation(location: string) {
   } catch {
     // Sidebar selection still works when browser storage is unavailable.
   }
+}
+
+function NewsArticleItem({ article }: { article: NewsArticle }) {
+  const content = <div className="news-article-content">
+    <div className="news-article-copy">
+      <h2>{article.title}</h2>
+      {article.summary && <p>{article.summary}</p>}
+    </div>
+    {article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}
+  </div>;
+
+  return <article className="news-article">
+    {article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{content}</a> : content}
+  </article>;
 }
 
 export function NewsReader() {
@@ -61,7 +73,7 @@ export function NewsReader() {
   const [watchReady, setWatchReady] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>([]);
   const [sourceQuery, setSourceQuery] = useState("");
-  const [publicArticles, setPublicArticles] = useState<PublicArticle[]>([]);
+  const [publicArticles, setPublicArticles] = useState<NewsArticle[]>([]);
   const [publicCursor, setPublicCursor] = useState<string | null>(null);
   const [publicArticlesBusy, setPublicArticlesBusy] = useState(true);
   const [publicArticlesError, setPublicArticlesError] = useState(false);
@@ -147,7 +159,7 @@ export function NewsReader() {
     try {
       const response = await fetch(`/api/news?view=publicArticles${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Articles unavailable.");
-      const data = await response.json() as { articles: PublicArticle[]; continuation: string | null };
+      const data = await response.json() as { articles: NewsArticle[]; continuation: string | null };
       if (!Array.isArray(data.articles)) throw new Error("Invalid articles.");
       if (currentRequest !== publicRequestId.current) return;
       setPublicArticles((previous) => mergeArticles(nextCursor ? previous : [], data.articles));
@@ -311,11 +323,7 @@ export function NewsReader() {
         {publicArticlesError && <p className="news-error" role="alert">Articles are temporarily unavailable.</p>}
         {publicArticlesBusy && <p className="news-empty">Loading articles…</p>}
         {!publicArticlesBusy && !publicArticlesError && !publicArticles.length && <p className="news-empty">No articles here yet.</p>}
-        <div className="news-articles">{publicArticles.map((article) => <article className="news-article" key={article.id}>
-          <div className="news-meta"><span>{article.source}</span>{article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}</div>
-          <h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>
-          {article.summary && <p>{article.summary}</p>}
-        </article>)}</div>
+        <div className="news-articles">{publicArticles.map((article) => <NewsArticleItem article={article} key={article.id} />)}</div>
         {(publicCursor || (publicArticlesBusy && publicArticles.length > 0)) && <div className="news-auto-loader" ref={publicArticleLoaderRef} role="status">{publicArticlesBusy ? "Loading…" : ""}</div>}
       </section>
     </div>;
@@ -353,7 +361,7 @@ export function NewsReader() {
         {ready && activeBoard && !matches(activeBoard) && <p className="news-empty">No sources match this watchboard. Assign its tags to sources under Settings → RSS Sources.</p>}
         {ready && !activeBoard && !feedFilter && !saved.length && <p className="news-empty">Select sources under Settings → RSS Sources to start reading.</p>}
         {ready && !visible.length && !busy && !error && (activeBoard ? matches(activeBoard) > 0 : saved.length > 0 || !!feedFilter) && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
-        <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}><div className="news-meta"><span>{article.source}</span>{article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}</div><h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>{article.summary && <p>{article.summary}</p>}</article>)}</div>
+        <div className="news-articles">{visible.map((article) => <NewsArticleItem article={article} key={article.id} />)}</div>
         {ready && (activeBoard ? matches(activeBoard) > 0 : saved.length > 0 || !!feedFilter) && (cursor || busy) && <div className="news-auto-loader" ref={articleLoaderRef} role="status">{busy ? "Loading…" : ""}</div>}
       </>}
     </section>

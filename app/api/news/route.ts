@@ -67,12 +67,7 @@ export async function GET(request: Request) {
       if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
       const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
       const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
-      const sourceById = new Map(feeds.map((feed, key) => [feed.id, { category: feed.category, key }]));
-      const result = await newsArticles(selected, cursor);
-      return Response.json({
-        articles: result.articles.map(({ feedId, ...article }) => ({ ...article, category: sourceById.get(feedId)?.category ?? "Uncategorized", sourceKey: sourceById.get(feedId)?.key ?? -1 })),
-        continuation: result.continuation,
-      }, { headers: privateNewsHeaders });
+      return Response.json(await newsArticles(selected, cursor), { headers: privateNewsHeaders });
     }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });

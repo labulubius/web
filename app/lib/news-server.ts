@@ -116,7 +116,7 @@ export function validNewsCursor(cursor: string) {
 }
 
 type DatabaseArticle = {
-  id: string; feedId: string; title: string; url: string; source: string; published: number; summary: string;
+  id: string; title: string; url: string; published: number; summary: string;
 };
 
 function queryFreshDatabase(sql: string): Promise<string> {
@@ -143,15 +143,12 @@ export async function newsArticles(selected: string[], cursor: string | null) {
   const sql = `
 SELECT json_build_object(
   'id', e.id::text,
-  'feedId', 'feed/' || e.id_feed::text,
   'title', e.title,
   'url', e.link,
-  'source', f.name,
   'published', e.date,
   'summary', left(regexp_replace(regexp_replace(coalesce(e.content, ''), '<[^>]*>', ' ', 'g'), '\\s+', ' ', 'g'), 1000)
 )::text
 FROM public.freshrss_labulubius_entry e
-JOIN public.freshrss_labulubius_feed f ON f.id = e.id_feed
 WHERE e.id_feed IN (${feedIds.join(",")})
   AND e.date > extract(epoch FROM clock_timestamp() - interval '5 days')::bigint
   ${cursor ? `AND (e.date, e.id) < (${cursorDate}, ${cursorId})` : ""}
@@ -165,9 +162,8 @@ LIMIT 51;`;
     let url = "";
     try { if (["http:", "https:"].includes(new URL(item.url).protocol)) url = item.url; } catch { /* no unsafe links */ }
     return {
-      id: item.id, feedId: item.feedId, title: plainText(item.title || "Untitled"), url,
-      source: plainText(item.source || "Unknown source"), published: Number(item.published) || 0,
-      summary: plainText(item.summary || ""),
+      id: item.id, title: plainText(item.title || "Untitled"), url,
+      published: Number(item.published) || 0, summary: plainText(item.summary || ""),
     };
   });
   const last = articles.at(-1);
