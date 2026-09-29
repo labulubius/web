@@ -1,6 +1,6 @@
 -- Run hourly with psql -X -v ON_ERROR_STOP=1 -f this-file.
 -- All expired articles (including unread/starred) and their entry tags are
--- deleted atomically with the anti-reimport hashes. No publication dates used.
+-- deleted atomically with the anti-reimport hashes, based on publication time.
 BEGIN;
 SET LOCAL search_path = public, pg_catalog;
 DO $cleanup$
@@ -14,12 +14,10 @@ BEGIN
   INSERT INTO public.news_entry_tombstone (id_feed, guid_hash)
     SELECT DISTINCT e.id_feed, decode(md5(e.guid), 'hex')
     FROM public.freshrss_labulubius_entry e
-    JOIN public.news_entry_receipt r ON r.entry_id = e.id
-    WHERE r.received_at <= cutoff
+    WHERE e.date <= extract(epoch FROM cutoff)::bigint
     ON CONFLICT (id_feed, guid_hash) DO NOTHING;
   DELETE FROM public.freshrss_labulubius_entry e
-    USING public.news_entry_receipt r
-    WHERE r.entry_id = e.id AND r.received_at <= cutoff;
+    WHERE e.date <= extract(epoch FROM cutoff)::bigint;
   -- FK cascades remove entrytag and receipt; feed deletion cascades tombstones.
 END $cleanup$;
 COMMIT;

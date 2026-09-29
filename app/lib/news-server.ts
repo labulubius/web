@@ -111,59 +111,65 @@ function plainText(html: string) {
     .replace(/\s+/g, " ").trim().slice(0, 360);
 }
 
-function unexpiredIds(items: { id?: string }[]): Promise<Set<string>> {
-  const ids = items.flatMap((item) => {
-    const hex = item.id?.match(/\/item\/([0-9a-f]{1,16})$/i)?.[1];
-    return hex ? [BigInt(`0x${hex}`).toString()] : [];
-  });
-  if (!ids.length) return Promise.resolve(new Set());
-  // FreshRSS is local to the web server. Query only numeric GReader IDs; fail closed
-  // if the retention database cannot be checked rather than exposing expired data.
+export function validNewsCursor(cursor: string) {
+  return /^\d{1,12}:\d{1,20}$/.test(cursor);
+}
+
+type DatabaseArticle = {
+  id: string; feedId: string; title: string; url: string; source: string; published: number; summary: string;
+};
+
+function queryFreshDatabase(sql: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const sql = `SELECT entry_id FROM public.news_entry_receipt WHERE received_at > NOW() - INTERVAL '5 days' AND entry_id IN (${ids.join(",")});`;
     const child = execFile("docker", ["exec", "-i", "freshrss-postgres", "sh", "-c",
       'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'],
-      { timeout: 8000, maxBuffer: 65536 }, (error, stdout) => error ? reject(new Error("Article expiration check failed.")) : resolve(new Set(stdout.trim().split("\n"))));
+      { timeout: 8000, maxBuffer: 1024 * 1024 }, (error, stdout) => error ? reject(new Error("Article query failed.")) : resolve(stdout));
     child.stdin?.on("error", () => { /* process exit is handled by the callback */ });
     child.stdin?.end(sql + "\n");
   });
 }
 
-type FreshArticle = { id?: string; title?: string; origin?: { streamId?: string; title?: string }; published?: number;
-  canonical?: { href?: string }[]; alternate?: { href?: string }[]; summary?: { content?: string }; content?: { content?: string } };
-
 export async function newsArticles(selected: string[], cursor: string | null) {
-  if (!selected.length) return { articles: [] as NewsArticle[], continuation: null as string | null };
-  // FreshRSS paginates the global reading list. Consume a few complete upstream pages
-  // so sparse source selections do not produce a false empty page.
-  const allowed = new Set(selected);
-  const items: FreshArticle[] = [];
-  const seenContinuations = new Set<string>();
-  if (cursor) seenContinuations.add(cursor);
-  let nextCursor = cursor;
-  let continuation: string | null = null;
-  for (let page = 0; page < 3; page++) {
-    const data = await freshGet("reader/api/0/stream/contents/reading-list", { n: "100", ...(nextCursor ? { c: nextCursor } : {}) }) as { items?: FreshArticle[]; continuation?: string };
-    if (!Array.isArray(data.items)) throw new Error("Invalid FreshRSS articles response.");
-    items.push(...data.items);
-    const next = data.continuation && /^\d{1,24}$/.test(data.continuation) && !seenContinuations.has(data.continuation) ? data.continuation : null;
-    continuation = next;
-    if (!next || items.filter((item) => item.origin?.streamId && allowed.has(item.origin.streamId)).length >= 50) break;
-    seenContinuations.add(next);
-    nextCursor = next;
-  }
-  const current = await unexpiredIds(items);
-  const articles = items.filter((item) => item.origin?.streamId && allowed.has(item.origin.streamId) &&
-    current.has(BigInt(`0x${item.id?.match(/\/item\/([0-9a-f]{1,16})$/i)?.[1] || "0"}`).toString())).map((item) => {
-    const href = item.canonical?.[0]?.href || item.alternate?.[0]?.href || "";
+  const feedIds = [...new Set(selected.flatMap((id) => {
+    const match = id.match(/^feed\/(\d{1,10})$/);
+    return match ? [Number(match[1])] : [];
+  }))].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 500);
+  if (!feedIds.length) return { articles: [] as NewsArticle[], continuation: null as string | null };
+  if (cursor && !validNewsCursor(cursor)) throw new Error("Invalid article cursor.");
+  const [cursorDate, cursorId] = cursor ? cursor.split(":") : [];
+  // Query by publication time rather than FreshRSS insertion ID. A newly added
+  // source can import years of history with new IDs, which must not jump ahead
+  // of genuinely recent articles from existing sources.
+  const sql = `
+SELECT json_build_object(
+  'id', e.id::text,
+  'feedId', 'feed/' || e.id_feed::text,
+  'title', e.title,
+  'url', e.link,
+  'source', f.name,
+  'published', e.date,
+  'summary', left(regexp_replace(regexp_replace(coalesce(e.content, ''), '<[^>]*>', ' ', 'g'), '\\s+', ' ', 'g'), 1000)
+)::text
+FROM public.freshrss_labulubius_entry e
+JOIN public.freshrss_labulubius_feed f ON f.id = e.id_feed
+WHERE e.id_feed IN (${feedIds.join(",")})
+  AND e.date > extract(epoch FROM clock_timestamp() - interval '5 days')::bigint
+  ${cursor ? `AND (e.date, e.id) < (${cursorDate}, ${cursorId})` : ""}
+ORDER BY e.date DESC, e.id DESC
+LIMIT 51;`;
+  const output = await queryFreshDatabase(sql);
+  const rows = output.trim() ? output.trim().split("\n").map((line) => JSON.parse(line) as DatabaseArticle) : [];
+  const hasMore = rows.length > 50;
+  const page = rows.slice(0, 50);
+  const articles = page.map((item) => {
     let url = "";
-    try { if (["http:", "https:"].includes(new URL(href).protocol)) url = href; } catch { /* no unsafe links */ }
+    try { if (["http:", "https:"].includes(new URL(item.url).protocol)) url = item.url; } catch { /* no unsafe links */ }
     return {
-      id: item.id || href, feedId: item.origin?.streamId || "", title: plainText(item.title || "Untitled"), url,
-      source: item.origin?.title || "Unknown source", published: Number(item.published) || 0,
-      summary: plainText(item.summary?.content || item.content?.content || ""),
+      id: item.id, feedId: item.feedId, title: plainText(item.title || "Untitled"), url,
+      source: plainText(item.source || "Unknown source"), published: Number(item.published) || 0,
+      summary: plainText(item.summary || ""),
     };
-  }).filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index)
-    .sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
-  return { articles, continuation };
+  });
+  const last = articles.at(-1);
+  return { articles, continuation: hasMore && last ? `${last.published}:${last.id}` : null };
 }

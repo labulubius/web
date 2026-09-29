@@ -1,4 +1,4 @@
-import { newsAdmin, newsArticles, newsCategories, newsFeeds, privateNewsHeaders } from "../../lib/news-server";
+import { newsAdmin, newsArticles, newsCategories, newsFeeds, privateNewsHeaders, validNewsCursor } from "../../lib/news-server";
 import { InvalidNewsInput, manageNews } from "../../lib/news-management";
 import { loadNewsSelection, loadPublicNewsSelection, saveNewsSelection } from "../../lib/news-settings";
 import { loadWatchboards } from "../../lib/news-watchboards";
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     }
     if (url.searchParams.get("view") === "publicArticles") {
       const cursor = url.searchParams.get("cursor");
-      if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
+      if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
       const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
       const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
       const sourceById = new Map(feeds.map((feed, key) => [feed.id, { category: feed.category, key }]));
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
     if (feed && boardId) return Response.json({ error: "Choose a source or watchboard." }, { status: 400, headers: privateNewsHeaders });
     if (feed && !ids.has(feed)) return Response.json({ error: "Unknown source." }, { status: 400, headers: privateNewsHeaders });
     const cursor = url.searchParams.get("cursor");
-    if (cursor && !/^\d{1,24}$/.test(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
+    if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
     let articleFeeds = feed ? [feed] : selected;
     if (boardId) {
       const state = await loadWatchboards(auth.user.id);
