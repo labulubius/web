@@ -18,6 +18,23 @@ function mergeArticles<T extends { id: string; published: number }>(previous: T[
   return [...merged.values()].sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
 }
 
+function readSidebarLocation() {
+  if (typeof window === "undefined") return "articles";
+  try {
+    return window.localStorage.getItem("site-news-location") || "articles";
+  } catch {
+    return "articles";
+  }
+}
+
+function saveSidebarLocation(location: string) {
+  try {
+    window.localStorage.setItem("site-news-location", location);
+  } catch {
+    // Sidebar selection still works when browser storage is unavailable.
+  }
+}
+
 export function NewsReader() {
   const { supabase, loading, isAdmin, authError, retryAuth } = useSiteAuth();
   const [feeds, setFeeds] = useState<NewsFeed[]>([]);
@@ -33,8 +50,13 @@ export function NewsReader() {
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [feedFilter, setFeedFilter] = useState<string | null>(null);
-  const [boardFilter, setBoardFilter] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"articles" | "sources" | "tags">("articles");
+  const [initialSidebarLocation] = useState(readSidebarLocation);
+  const [boardFilter, setBoardFilter] = useState<string | null>(() =>
+    initialSidebarLocation.startsWith("board:") ? initialSidebarLocation.slice("board:".length) : null
+  );
+  const [panel, setPanel] = useState<"articles" | "sources" | "tags">(() =>
+    initialSidebarLocation === "sources" || initialSidebarLocation === "tags" ? initialSidebarLocation : "articles"
+  );
   const [watchboards, setWatchboards] = useState<WatchboardState>({ tags: [], watchboards: [], sourceTags: {} });
   const [watchReady, setWatchReady] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>([]);
@@ -79,10 +101,15 @@ export function NewsReader() {
         try {
           const data = await api("?view=feeds") as Directory;
           if (cancelled) return;
-          setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected); setReady(true);
           const boards = await api("/watchboards") as WatchboardState;
           if (cancelled) return;
+          setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected); setReady(true);
           setWatchboards(boards); setWatchReady(true);
+          setBoardFilter((savedBoard) => {
+            if (!savedBoard || boards.watchboards.some((board) => board.id === savedBoard)) return savedBoard;
+            saveSidebarLocation("articles");
+            return null;
+          });
         } catch (failure) {
           if (!cancelled) setError(failure instanceof Error ? failure.message : "Could not load sources.");
         }
@@ -147,7 +174,10 @@ export function NewsReader() {
     try {
       const data = await api("/watchboards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) }) as WatchboardState;
       setWatchboards(data);
-      if (boardFilter && !data.watchboards.some((board) => board.id === boardFilter)) setBoardFilter(null);
+      if (boardFilter && !data.watchboards.some((board) => board.id === boardFilter)) {
+        setBoardFilter(null);
+        saveSidebarLocation("articles");
+      }
       setDialog(null);
       if (action.action === "setSourceTags" && boardFilter) await loadArticles();
       if ((action.action === "updateWatchboard" && boardFilter === action.id) || (action.action === "deleteTag" && boardFilter)) await loadArticles();
@@ -163,6 +193,12 @@ export function NewsReader() {
 
   function chooseBoard(id: string | null) {
     setBoardFilter(id); setFeedFilter(null); setPanel("articles");
+    saveSidebarLocation(id ? `board:${id}` : "articles");
+  }
+
+  function choosePanel(nextPanel: "sources" | "tags") {
+    setPanel(nextPanel);
+    saveSidebarLocation(nextPanel);
   }
 
   async function mutate(action: Record<string, string>) {
@@ -277,8 +313,8 @@ export function NewsReader() {
         <span className="news-category-actions"><button type="button" disabled={saving} title={`Edit ${board.name}`} aria-label={`Edit ${board.name}`} onClick={() => openDialog("board", board.id)}><Pencil size={12} /></button><button type="button" disabled={saving} title={`Delete ${board.name}`} aria-label={`Delete ${board.name}`} onClick={() => { if (window.confirm(`Delete watchboard “${board.name}”?`)) void mutateWatchboard({ action: "deleteWatchboard", id: board.id }); }}><Trash2 size={12} /></button></span>
       </div>)}
       <div className="news-sidebar-heading"><h2>Settings</h2></div>
-      <div className="news-category-row"><button type="button" className={panel === "sources" ? "active" : ""} onClick={() => setPanel("sources")}><Rss size={16} /><span>RSS Sources</span></button></div>
-      <div className="news-category-row"><button type="button" className={panel === "tags" ? "active" : ""} onClick={() => setPanel("tags")}><Tags size={16} /><span>Tags</span></button></div>
+      <div className="news-category-row"><button type="button" className={panel === "sources" ? "active" : ""} onClick={() => choosePanel("sources")}><Rss size={16} /><span>RSS Sources</span></button></div>
+      <div className="news-category-row"><button type="button" className={panel === "tags" ? "active" : ""} onClick={() => choosePanel("tags")}><Tags size={16} /><span>Tags</span></button></div>
       {saving && <div className="news-source-status" role="status">Saving…</div>}
     </aside>
     <section className="news-content">

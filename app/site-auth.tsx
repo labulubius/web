@@ -1,7 +1,7 @@
 "use client";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { LogIn, LogOut, RefreshCw, User as UserIcon, X } from "lucide-react";
+import { LogIn, LogOut, User as UserIcon, X } from "lucide-react";
 import { createContext, FormEvent, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibleDialog } from "./accessible-dialog";
 import { getSupabaseBrowserClient } from "./lib/supabase";
@@ -51,6 +51,7 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
     setLoading(true); setAuthError("");
     void supabase.auth.getUser().then(({ data, error }) => {
       if (request !== generation.current) return;
+      if (error?.name === "AuthSessionMissingError") return syncUser(null, request);
       if (error) throw error;
       return syncUser(data.user, request);
     }).catch(() => {
@@ -82,7 +83,7 @@ export function useSiteAuth() {
 }
 
 export function AccountControl() {
-  const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
+  const { supabase, user, isAdmin, loading, authError } = useSiteAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -107,7 +108,7 @@ export function AccountControl() {
   }
 
   return <>
-    {authError ? <button className="account-control" type="button" disabled={loading} onClick={retryAuth} title={authError}><RefreshCw size={15} /><span>{loading ? "Checking…" : "Retry account"}</span></button>
+    {authError ? <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }} title={authError}><LogIn size={15} /><span>{loading ? "Account" : "Sign in"}</span></button>
       : user ? <button className="account-control" type="button" disabled={loading || saving} onClick={() => void signOut()} title={`Sign out ${user.email ?? ""}`}><UserIcon size={15} /><span>{loading ? "Checking…" : isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} /></button>
       : <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }}><LogIn size={15} /><span>{loading ? "Account" : "Sign in"}</span></button>}
     {error && !dialogOpen && <span className="account-error" role="alert">{error}</span>}
