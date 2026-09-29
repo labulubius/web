@@ -1,3 +1,4 @@
+import { forumThread, latestTopics } from "../../lib/forums";
 import { InvalidForumInput, loadForumDirectory, manageForums } from "../../lib/forums-directory";
 import { newsAdmin, privateNewsHeaders } from "../../lib/news-server";
 
@@ -5,7 +6,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function relay(request: Request) {
-  const response = await fetch("https://drive.labulubius.com/api/forums", {
+  const incoming = new URL(request.url);
+  const response = await fetch(`https://drive.labulubius.com/api/forums${incoming.search}`, {
     method: request.method,
     headers: {
       ...(request.headers.get("authorization") ? { Authorization: request.headers.get("authorization")! } : {}),
@@ -19,9 +21,23 @@ async function relay(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    return process.env.VERCEL ? await relay(request) : Response.json(await loadForumDirectory(), { headers: privateNewsHeaders });
+    if (process.env.VERCEL) return await relay(request);
+    const url = new URL(request.url);
+    const directory = await loadForumDirectory();
+    const view = url.searchParams.get("view");
+    if (!view) return Response.json(directory, { headers: privateNewsHeaders });
+    const source = directory.sources.find((item) => item.id === url.searchParams.get("source"));
+    if (!source) return Response.json({ error: "Unknown community source." }, { status: 404, headers: privateNewsHeaders });
+    if (view === "topics") return Response.json(await latestTopics(source), { headers: privateNewsHeaders });
+    if (view === "thread") {
+      const id = url.searchParams.get("id") || "";
+      const rawPage = url.searchParams.get("page") || "1";
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(id) || !/^[1-9]\d{0,3}$/.test(rawPage)) return Response.json({ error: "Invalid discussion." }, { status: 400, headers: privateNewsHeaders });
+      return Response.json(await forumThread(source, id, Number(rawPage)), { headers: privateNewsHeaders });
+    }
+    return Response.json({ error: "Invalid view." }, { status: 400, headers: privateNewsHeaders });
   } catch {
-    return Response.json({ error: "Forum sources unavailable." }, { status: 503, headers: privateNewsHeaders });
+    return Response.json({ error: "Community source unavailable." }, { status: 503, headers: privateNewsHeaders });
   }
 }
 
