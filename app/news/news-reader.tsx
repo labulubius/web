@@ -65,6 +65,8 @@ export function NewsReader() {
   const [publicCursor, setPublicCursor] = useState<string | null>(null);
   const [publicArticlesBusy, setPublicArticlesBusy] = useState(true);
   const [publicArticlesError, setPublicArticlesError] = useState(false);
+  const articleLoaderRef = useRef<HTMLDivElement>(null);
+  const publicArticleLoaderRef = useRef<HTMLDivElement>(null);
 
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -124,6 +126,18 @@ export function NewsReader() {
     return () => window.clearTimeout(timer);
   }, [ready, isAdmin, loadArticles]);
 
+  useEffect(() => {
+    const target = articleLoaderRef.current;
+    if (!target || !cursor || busy || saving || panel !== "articles") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      void loadArticles(cursor);
+    }, { rootMargin: "400px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [cursor, busy, saving, panel, loadArticles]);
+
   const invalidatePublicRequests = useCallback(() => { publicRequestId.current++; }, []);
 
   const loadPublicArticles = useCallback(async (nextCursor: string | null = null) => {
@@ -147,6 +161,18 @@ export function NewsReader() {
     const timer = window.setTimeout(() => { void loadPublicArticles(); }, 0);
     return () => { window.clearTimeout(timer); invalidatePublicRequests(); };
   }, [loading, isAdmin, loadPublicArticles, invalidatePublicRequests]);
+
+  useEffect(() => {
+    const target = publicArticleLoaderRef.current;
+    if (!target || !publicCursor || publicArticlesBusy || isAdmin) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      void loadPublicArticles(publicCursor);
+    }, { rootMargin: "400px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [publicCursor, publicArticlesBusy, isAdmin, loadPublicArticles]);
 
   const visible = articles;
 
@@ -290,7 +316,7 @@ export function NewsReader() {
           <h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>
           {article.summary && <p>{article.summary}</p>}
         </article>)}</div>
-        {(publicCursor || (publicArticlesBusy && publicArticles.length > 0)) && <button className="news-more" type="button" disabled={publicArticlesBusy} onClick={() => void loadPublicArticles(publicCursor)}>{publicArticlesBusy ? "Loading…" : "Load more"}</button>}
+        {(publicCursor || (publicArticlesBusy && publicArticles.length > 0)) && <div className="news-auto-loader" ref={publicArticleLoaderRef} role="status">{publicArticlesBusy ? "Loading…" : ""}</div>}
       </section>
     </div>;
   }
@@ -328,7 +354,7 @@ export function NewsReader() {
         {ready && !activeBoard && !feedFilter && !saved.length && <p className="news-empty">Select sources under Settings → RSS Sources to start reading.</p>}
         {ready && !visible.length && !busy && !error && (activeBoard ? matches(activeBoard) > 0 : saved.length > 0 || !!feedFilter) && <p className="news-empty">No articles here yet. Try loading more or choose other sources.</p>}
         <div className="news-articles">{visible.map((article) => <article className="news-article" key={article.id}><div className="news-meta"><span>{article.source}</span>{article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}</div><h2>{article.url ? <a href={article.url} target="_blank" rel="noopener noreferrer">{article.title}</a> : article.title}</h2>{article.summary && <p>{article.summary}</p>}</article>)}</div>
-        {ready && (activeBoard ? matches(activeBoard) > 0 : saved.length > 0 || !!feedFilter) && (cursor || busy) && <button className="news-more" type="button" disabled={busy || saving} onClick={() => void loadArticles(cursor)}>{busy ? "Loading…" : "Load more"}</button>}
+        {ready && (activeBoard ? matches(activeBoard) > 0 : saved.length > 0 || !!feedFilter) && (cursor || busy) && <div className="news-auto-loader" ref={articleLoaderRef} role="status">{busy ? "Loading…" : ""}</div>}
       </>}
     </section>
     {dialog && <AccessibleDialog labelledBy="news-dialog-title" busy={saving} onClose={() => setDialog(null)}><header><h2 id="news-dialog-title">{dialog.id ? "Edit" : "Add"} {dialog.kind === "feed" ? "RSS source" : dialog.kind === "board" ? "watchboard" : dialog.kind}</h2><button type="button" disabled={saving} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header><form onSubmit={(event) => void submit(event)}>
