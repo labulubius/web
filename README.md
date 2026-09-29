@@ -25,7 +25,7 @@ A personal web workspace with a KDE Breeze-inspired interface. The public pages 
 
 ## Local development
 
-Requirements: Node.js 20.9+ and npm, plus a Supabase project configured as described in [supabase/README.md](supabase/README.md).
+Requirements: Node.js 24 and npm, plus a Supabase project configured as described in [supabase/README.md](supabase/README.md).
 
 ```bash
 git clone git@github.com:labulubius/web.git
@@ -47,8 +47,10 @@ Run `npm run dev` and open <http://localhost:3000>. `nav.localhost:3000` exercis
 
 ```bash
 npm run dev    # Development server
-npm run lint   # ESLint
-npm run build  # Production build
+npm run lint       # ESLint
+npm run typecheck  # TypeScript without emitting files
+npm test           # Focused regression tests
+npm run build      # Production build
 npm run start  # Run the production build
 ```
 
@@ -58,7 +60,7 @@ Apply the SQL migrations and set up the administrator account using [supabase/RE
 
 Build and run the Next.js service on `web` behind a reverse proxy, preserving the original `Host` header for host-specific behavior. Configure the Cloudflare Tunnel and DNS for the Drive and Share hostnames, then deploy the main UI on Vercel. News and Forums API relays require a working `drive.labulubius.com` endpoint. Back up the server-side file directories, News preferences, Forums directory and FreshRSS data separately from Git and Supabase. The installed five-day News retention job and its operational checks are described in [NEWS.md](NEWS.md).
 
-More details: [DRIVE.md](DRIVE.md), [SHARE.md](SHARE.md), [NEWS.md](NEWS.md), [FORUMS.md](FORUMS.md), [supabase/README.md](supabase/README.md).
+More details: [DRIVE.md](DRIVE.md), [SHARE.md](SHARE.md), [NEWS.md](NEWS.md), [FORUMS.md](FORUMS.md), [operations and restore verification](OPERATIONS.md), [supabase/README.md](supabase/README.md).
 
 ## Repository map
 

@@ -17,11 +17,6 @@ export default function AboutPage() {
           </div>
         </header>
 
-        <div className="about-tabs" role="tablist" aria-label="About sections">
-          <button className="active" type="button" role="tab" aria-selected="true">About</button>
-          <button type="button" role="tab" aria-selected="false">Details</button>
-        </div>
-
         <div className="about-body">
           <section>
             <h2>About this space</h2>

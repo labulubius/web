@@ -9,7 +9,7 @@ import "./drive.css";
 type Entry = { name: string; type: "file" | "folder"; size: number; modified: string };
 
 export function DriveManager() {
-  const { supabase, isAdmin, loading } = useSiteAuth();
+  const { supabase, isAdmin, loading, authError, retryAuth } = useSiteAuth();
   const [parts, setParts] = useState<string[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [listedPath, setListedPath] = useState("");
@@ -131,6 +131,7 @@ export function DriveManager() {
   }
 
   if (loading) return <section className="drive-view"><p>Checking account…</p></section>;
+  if (authError) return <section className="drive-view"><p className="drive-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
   if (!isAdmin) return <section className="drive-view" inert>
     <header className="drive-header">
       <div><p className="drive-eyebrow">PERSONAL WORKSPACE / ADMINISTRATOR</p><h1><HardDrive size={22} /> Private Drive</h1><p>Private files on this server · 5 GB total</p></div>

@@ -2,8 +2,9 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { link, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
-import { Session, tempPath, TOTAL_BYTES } from "./upload-sessions";
+import { link, lstat, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
+import { pendingBytes, Session, tempPath, TOTAL_BYTES } from "./upload-sessions";
+import { fitsStorageQuota } from "./storage-quota";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
@@ -11,7 +12,7 @@ import sharp from "sharp";
 const ORIGIN = "https://labulubius.com";
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export type ShareEntry = { id: string; name: string; size: number; type: "image" | "file"; created: string; folderId?: string | null };
+export type ShareEntry = { id: string; name: string; size: number; storedSize?: number; type: "image" | "file"; created: string; folderId?: string | null };
 export type ShareFolder = { id: string; name: string; parentId: string | null; created: string };
 
 type Catalog<T> = { expires: number; value: Promise<T[]> };
@@ -96,13 +97,23 @@ async function load(id: string): Promise<ShareEntry | null> {
   }
 }
 
+async function measuredEntry(entry: ShareEntry): Promise<ShareEntry> {
+  const files = location(entry.id);
+  const blob = await lstat(files.blob).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+  const thumb = entry.type === "image" ? await lstat(files.thumb).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; }) : null;
+  if (blob?.isSymbolicLink() || thumb?.isSymbolicLink()) throw new Error("Invalid Share storage entry.");
+  const size = blob?.isFile() ? blob.size : entry.size;
+  return { ...entry, size, storedSize: (blob?.isFile() ? blob.size : entry.storedSize ?? entry.size) + (thumb?.isFile() ? thumb.size : 0) };
+}
+
 async function scanEntries() {
   const base = await directories();
   const names = await readdir(path.join(base, "meta"));
   const entries = (await Promise.all(names.filter((name) => ID.test(name.replace(/\.json$/, "")) && name.endsWith(".json"))
     .map((name) => load(name.slice(0, -5))))).filter((item): item is ShareEntry => item !== null);
-  entries.sort((a, b) => b.created.localeCompare(a.created));
-  return entries;
+  const measured = await Promise.all(entries.map(measuredEntry));
+  measured.sort((a, b) => b.created.localeCompare(a.created));
+  return measured;
 }
 
 export async function list() {
@@ -115,7 +126,7 @@ export async function list() {
 }
 
 export async function shareUsed() {
-  return (await scanEntries()).reduce((sum, entry) => sum + entry.size, 0);
+  return (await scanEntries()).reduce((sum, entry) => sum + (entry.storedSize ?? entry.size), 0);
 }
 
 function folderPath(id: string) {
@@ -180,7 +191,7 @@ export async function folderContents(folderId: string | null) {
   return {
     entries: entries.filter((entry) => (entry.folderId ?? null) === folderId),
     folders: folders.filter((folder) => folder.parentId === folderId).sort((a, b) => a.name.localeCompare(b.name)),
-    breadcrumbs, used: entries.reduce((sum, entry) => sum + entry.size, 0),
+    breadcrumbs, used: entries.reduce((sum, entry) => sum + (entry.storedSize ?? entry.size), 0),
   };
 }
 
@@ -254,8 +265,6 @@ export async function finishShareUpload(session: Session): Promise<ShareEntry> {
   const folderId = session.context || null;
   await validateShareTarget(name, folderId);
   const base = await directories();
-  const used = await shareUsed();
-  if (used + session.size > TOTAL_BYTES) throw new Error("Share storage limit reached (5 GB total).");
   const id = session.id;
   const target = location(id);
   const temp = tempPath(base, id);
@@ -275,7 +284,13 @@ export async function finishShareUpload(session: Session): Promise<ShareEntry> {
       await link(temp, target.blob);
     }
     if (folderId && !await activeFolder(folderId)) throw new Error("Folder no longer exists.");
-    const entry: ShareEntry = { id, name, size: session.size, type, created: new Date().toISOString(), folderId };
+    const blobStat = await lstat(target.blob);
+    const thumbStat = type === "image" ? await lstat(target.thumb) : null;
+    if (!blobStat.isFile() || blobStat.isSymbolicLink() || (thumbStat && (!thumbStat.isFile() || thumbStat.isSymbolicLink()))) throw new Error("Invalid Share output.");
+    const storedSize = blobStat.size + (thumbStat?.size ?? 0);
+    const [committedBytes, pending] = await Promise.all([shareUsed(), pendingBytes(base, id)]);
+    if (!fitsStorageQuota(committedBytes, pending, storedSize, TOTAL_BYTES)) throw new Error("Share storage limit reached (5 GB total).");
+    const entry: ShareEntry = { id, name, size: blobStat.size, storedSize, type, created: new Date().toISOString(), folderId };
     // Metadata appears last: a partially uploaded file never gets a public link.
     const tempMeta = path.join(base, "tmp", `${id}.json`);
     const metadata = await open(/* turbopackIgnore: true */ tempMeta, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);

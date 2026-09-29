@@ -6,7 +6,7 @@ import { useSiteAuth } from "../site-auth";
 type SaveState = "loading" | "saved" | "pending" | "saving" | "error" | "conflict";
 
 export function NoteEditor() {
-  const { supabase, isAdmin, loading } = useSiteAuth();
+  const { supabase, isAdmin, loading, authError, retryAuth } = useSiteAuth();
   const [text, setText] = useState("");
   const [state, setState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("");
@@ -138,6 +138,7 @@ export function NoteEditor() {
   }
 
   if (loading) return <section className="note-view"><p>Checking account…</p></section>;
+  if (authError) return <section className="note-view"><p className="note-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
   if (!isAdmin) return <section className="note-view" inert>
     <header className="note-header"><div><h1>Private Note</h1><p>Plain text · Private to Owner · Autosaved</p></div></header>
     <textarea className="note-text" aria-label="Private note (administrator only)" disabled value="" placeholder="Private to the administrator" readOnly />

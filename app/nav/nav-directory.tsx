@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibleDialog } from "../accessible-dialog";
 import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
@@ -542,11 +543,10 @@ export function NavDirectory() {
       </section>
 
       {dialog && (
-        <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
-          <section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+        <AccessibleDialog labelledBy="dialog-title" busy={saving} onClose={closeDialog}>
             <header>
               <h2 id="dialog-title">{dialog === "site" ? `${editingSite ? "Edit" : "Add"} website` : `${editingCategory ? "Edit" : "Add"} group`}</h2>
-              <button type="button" onClick={closeDialog} aria-label="Close"><X size={17} /></button>
+              <button type="button" disabled={saving} onClick={closeDialog} aria-label="Close"><X size={17} /></button>
             </header>
 
             {dialog === "category" && (
@@ -554,7 +554,7 @@ export function NavDirectory() {
                 <label>Group name<input name="name" defaultValue={editingCategory?.name ?? ""} maxLength={60} autoFocus required /></label>
                 {supportsCategoryVisibility && <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingCategory?.is_published ?? true} /> Visible to guests</label>}
                 {message && <p className="form-error" role="alert">{message}</p>}
-                <footer><button type="button" onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
+                <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
               </form>
             )}
 
@@ -569,11 +569,10 @@ export function NavDirectory() {
                 <label>Custom icon URL <small>(optional)</small><input name="icon_url" type="url" placeholder="Automatically uses the website favicon" defaultValue={editingSite?.icon_url ?? ""} /></label>
                 <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingSite?.is_published ?? true} /> Visible to guests</label>
                 {message && <p className="form-error" role="alert">{message}</p>}
-                <footer><button type="button" onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save website"}</button></footer>
+                <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save website"}</button></footer>
               </form>
             )}
-          </section>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

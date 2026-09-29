@@ -3,6 +3,7 @@
 import { Folder, FolderOpen, LayoutGrid, Pencil, Plus, Radio, Trash2, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AccessibleDialog } from "../accessible-dialog";
 import { useSiteAuth } from "../site-auth";
 import type { ForumDirectory, ForumKind } from "../lib/forums-directory";
 
@@ -66,8 +67,7 @@ export function ForumsSidebar({ directory, activeCategory, activeSource }: { dir
       {isAdmin && <><div className="forums-sidebar-heading forums-settings-heading"><h2>Settings</h2></div><button className="forums-add-source" type="button" disabled={busy || !directory.categories.length} onClick={() => openSource()}><Radio size={14} /> Community Sources <Plus size={12} /></button></>}
       {error && <p className="forums-sidebar-error" role="alert">{error}</p>}
     </aside>
-    {dialog && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setDialog(null); }}>
-      <section className="breeze-dialog" role="dialog" aria-modal="true" aria-labelledby="forums-dialog-title">
+    {dialog && <AccessibleDialog labelledBy="forums-dialog-title" busy={busy} onClose={() => setDialog(null)}>
         <header><h2 id="forums-dialog-title">{dialog.kind === "category" ? `${dialog.id ? "Rename" : "Add"} category` : `${dialog.id ? "Edit" : "Add"} community source`}</h2><button type="button" disabled={busy} onClick={() => setDialog(null)} aria-label="Close"><X size={17} /></button></header>
         <form key={`${dialog.kind}-${dialog.id ?? "new"}`} onSubmit={(event) => void submit(event)}>
           <label>Name<input name="name" maxLength={dialog.kind === "category" ? 60 : 100} defaultValue={editedCategory?.name ?? editedSource?.name ?? ""} autoFocus required /></label>
@@ -84,7 +84,6 @@ export function ForumsSidebar({ directory, activeCategory, activeSource }: { dir
           {error && <p className="form-error" role="alert">{error}</p>}
           <footer><button type="button" disabled={busy} onClick={() => setDialog(null)}>Cancel</button><button className="primary" disabled={busy} type="submit">{busy ? "Saving…" : "Save"}</button></footer>
         </form>
-      </section>
-    </div>}
+    </AccessibleDialog>}
   </>;
 }

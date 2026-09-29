@@ -12,7 +12,7 @@ type Directory = { entries: Entry[]; folders: ShareFolder[]; breadcrumbs: ShareF
 const endpoint = "https://share.labulubius.com";
 
 export function ShareManager() {
-  const { supabase, isAdmin, loading } = useSiteAuth();
+  const { supabase, isAdmin, loading, authError, retryAuth } = useSiteAuth();
   const [folderId, setFolderId] = useState<string | null>(null);
   const [directory, setDirectory] = useState<Directory>({ entries: [], folders: [], breadcrumbs: [], used: 0 });
   const [busy, setBusy] = useState(false);
@@ -100,6 +100,7 @@ export function ShareManager() {
 
   const { folders, entries } = directory;
   if (loading) return <section className="share-view"><p>Checking account…</p></section>;
+  if (authError) return <section className="share-view"><p className="share-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
   if (!isAdmin) return <section className="share-view" inert>
     <header className="share-header"><div><p className="share-eyebrow">PERSONAL WORKSPACE / PUBLIC FILES</p><h1><Share2 size={22} /> Public Share</h1><p>Files here are public to anyone with a link · 5 GB total</p></div><div className="share-header-actions"><button type="button" className="share-button" disabled><FolderPlus size={16} /> New folder</button><button type="button" className="share-button" disabled><Upload size={16} /> Upload files</button></div></header>
     <div className="share-location"><button className="share-back" type="button" disabled aria-label="Parent folder"><ArrowLeft size={17} /></button><nav className="share-breadcrumbs" aria-label="Share path"><button type="button" disabled>Share</button></nav><button className="share-refresh" type="button" disabled aria-label="Refresh files"><RefreshCw size={16} /></button></div>

@@ -125,7 +125,7 @@ export function SiteShell({
           </button>
           <nav aria-label="Main navigation">
             {navigation.map(({ href, label, icon: Icon }) => (
-              <Link key={href} className={active === href ? "active" : ""} href={`https://labulubius.com${href}`} aria-current={active === href ? "page" : undefined} title={label}>
+              <Link key={href} className={active === href ? "active" : ""} href={href} aria-current={active === href ? "page" : undefined} title={label}>
                 <Icon size={18} /><span>{label}</span>
               </Link>
             ))}

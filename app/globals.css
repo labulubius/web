@@ -3,12 +3,20 @@
 :root {
   --background: #dceaf3;
   --foreground: #232629;
+  --view: #ffffff;
+  --text-muted: #707d8a;
+  --link: #2980b9;
+  --separator: rgba(35, 38, 41, .14);
   color-scheme: light;
 }
 
 html[data-theme="dark"] {
   --background: #141618;
   --foreground: #fcfcfc;
+  --view: #141618;
+  --text-muted: #a1a9b1;
+  --link: #1d99f3;
+  --separator: rgba(252, 252, 252, .12);
   color-scheme: dark;
 }
 
@@ -16,6 +24,10 @@ html[data-theme="dark"] {
   html[data-theme="system"] {
     --background: #141618;
     --foreground: #fcfcfc;
+    --view: #141618;
+    --text-muted: #a1a9b1;
+    --link: #1d99f3;
+    --separator: rgba(252, 252, 252, .12);
     color-scheme: dark;
   }
 }

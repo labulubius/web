@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir, open, readdir, statfs, unlink } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, statfs, unlink } from "node:fs/promises";
 import path from "node:path";
 
 export const TOTAL_BYTES = 5 * 1024 ** 3;
@@ -32,14 +32,14 @@ function paths(root: string, id: string) {
 export async function loadSession(root: string, id: string): Promise<Session> {
   const { meta } = paths(root, id);
   let text: string;
-  try { text = await (await import("node:fs/promises")).readFile(meta, "utf8"); }
+  try { text = await readFile(/* turbopackIgnore: true */ meta, "utf8"); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("Upload session expired. Select the file again."); throw error; }
   const data: Session = JSON.parse(text);
   if (data.id !== id || !Number.isSafeInteger(data.size) || data.size <= 0 || !data.name || typeof data.context !== "string") throw new Error("Invalid upload session.");
   return data;
 }
 export async function offset(root: string, id: string) {
-  const handle = await open(paths(root, id).temp, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(/* turbopackIgnore: true */ paths(root, id).temp, constants.O_RDONLY | constants.O_NOFOLLOW);
   try { return (await handle.stat()).size; } finally { await handle.close(); }
 }
 async function activeSessions(root: string) {
@@ -55,6 +55,9 @@ async function activeSessions(root: string) {
   }
   return sessions;
 }
+export async function pendingBytes(root: string, excludingId?: string) {
+  return (await activeSessions(root)).reduce((sum, session) => sum + (session.id === excludingId ? 0 : session.size), 0);
+}
 export async function createSession(root: string, used: number, name: string, size: number, context: string) {
   if (!Number.isSafeInteger(size) || size <= 0 || size > TOTAL_BYTES) throw new Error("Upload exceeds available space.");
   const pending = (await activeSessions(root)).reduce((sum, item) => sum + item.size, 0);
@@ -63,9 +66,9 @@ export async function createSession(root: string, used: number, name: string, si
   if (Number(disk.bavail) * Number(disk.bsize) < size + RESERVE_BYTES) throw new Error("Not enough free disk space for upload.");
   const session: Session = { id: randomUUID(), name, size, context, created: Date.now() };
   const { meta, temp } = paths(root, session.id);
-  const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  const handle = await open(/* turbopackIgnore: true */ temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   await handle.close();
-  try { const metadata = await open(meta, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  try { const metadata = await open(/* turbopackIgnore: true */ meta, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     try { await metadata.writeFile(JSON.stringify(session)); } finally { await metadata.close(); }
   } catch (error) { await unlink(temp).catch(() => {}); throw error; }
   return session;
@@ -73,7 +76,7 @@ export async function createSession(root: string, used: number, name: string, si
 export async function appendChunk(root: string, session: Session, expected: number, request: Request) {
   if (!Number.isSafeInteger(expected) || expected < 0) throw new Error("Invalid upload offset.");
   const { temp } = paths(root, session.id);
-  const handle = await open(temp, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW);
+  const handle = await open(/* turbopackIgnore: true */ temp, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW);
   try {
     const current = (await handle.stat()).size;
     if (expected !== current) throw new Error(`Upload offset mismatch; current offset is ${current}.`);
