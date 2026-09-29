@@ -41,7 +41,7 @@ async function pinnedText(url: string): Promise<string> {
   const address = await publicForumAddress(target.hostname);
   return new Promise<string>((resolve, reject) => {
     const request = https.get(target, {
-      headers: { Accept: "application/json, application/atom+xml, application/rss+xml, text/xml;q=0.9", "User-Agent": "Labulubius-Communities/1.0 (+https://labulubius.com/communities)" },
+      headers: { Accept: "application/json, application/atom+xml, application/rss+xml, text/xml;q=0.9", "User-Agent": "Labulubius-Communities/1.0 (+https://labulubius.com/forums)" },
       timeout: 12000,
       lookup: (_hostname, options, callback) => {
         const family = address.includes(":") ? 6 : 4;
@@ -62,7 +62,7 @@ async function curlText(url: string): Promise<string> {
   const target = new URL(url); if (target.protocol !== "https:" || target.port || target.username || target.password) throw new Error("Invalid community URL.");
   const address = await publicForumAddress(target.hostname);
   const pinned = address.includes(":") ? `[${address}]` : address;
-  const value = runFile("curl", ["--disable", "--silent", "--show-error", "--fail", "--max-time", "12", "--max-filesize", "2000000", "--noproxy", "*", "--resolve", `${target.hostname}:443:${pinned}`, "--user-agent", "Labulubius-Communities/1.0 (+https://labulubius.com/communities)", target.href], { maxBuffer: 2_000_000 }).then(({ stdout }) => stdout);
+  const value = runFile("curl", ["--disable", "--silent", "--show-error", "--fail", "--max-time", "12", "--max-filesize", "2000000", "--noproxy", "*", "--resolve", `${target.hostname}:443:${pinned}`, "--user-agent", "Labulubius-Communities/1.0 (+https://labulubius.com/forums)", target.href], { maxBuffer: 2_000_000 }).then(({ stdout }) => stdout);
   return cacheText(key, value);
 }
 

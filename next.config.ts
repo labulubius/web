@@ -26,7 +26,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   async headers() { return [{ source: "/:path*", headers: securityHeaders }]; },
-  async redirects() { return [{ source: "/forums", destination: "/communities", permanent: true }]; },
+  async redirects() { return [{ source: "/communities", destination: "/forums", permanent: true }]; },
 };
 
 export default nextConfig;

@@ -17,7 +17,7 @@ export function PlacesSidebar({ active }: { active: string }) {
           <Compass size={16} /> Navigator
         </Link>
         <Link href="/news"><Newspaper size={16} /> News</Link>
-        <Link href="/communities"><MessagesSquare size={16} /> Communities</Link>
+        <Link href="/forums"><MessagesSquare size={16} /> Forums</Link>
         {isAdmin && <Link href="/drive"><HardDrive size={16} /> Drive</Link>}
         {isAdmin && <Link href="/share"><Share2 size={16} /> Share</Link>}
         <Link href="/note"><StickyNote size={16} /> Note</Link>

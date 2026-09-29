@@ -22,7 +22,7 @@ const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
   { href: "/news", label: "News", icon: Newspaper },
-  { href: "/communities", label: "Communities", icon: MessagesSquare },
+  { href: "/forums", label: "Forums", icon: MessagesSquare },
   { href: "/drive", label: "Drive", icon: HardDrive },
   { href: "/share", label: "Share", icon: Share2 },
   { href: "/note", label: "Note", icon: StickyNote },

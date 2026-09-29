@@ -39,7 +39,7 @@ export function ForumsSidebar({ directory, activeCategory, activeSource }: { dir
 
   function openCategory(id: string | null) {
     if (id) setCollapsed((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id]);
-    router.push(id ? `/communities?category=${encodeURIComponent(id)}` : "/communities");
+    router.push(id ? `/forums?category=${encodeURIComponent(id)}` : "/forums");
   }
   function openSource(id?: string) { setSourceKind(directory.sources.find((source) => source.id === id)?.kind || "discourse"); setDialog({ kind: "source", id }); }
 
@@ -60,7 +60,7 @@ export function ForumsSidebar({ directory, activeCategory, activeSource }: { dir
         </div>
         {!collapsed.includes(category.id) && directory.sources.filter((source) => source.categoryId === category.id).map((source) => <div className="forums-source-row" key={source.id}>
           <label className="forums-source-check"><input type="checkbox" aria-label={`Include ${source.name} in all discussions`} checked={selected.includes(source.id)} disabled={!isAdmin || busy} onChange={() => { const next = selected.includes(source.id) ? selected.filter((id) => id !== source.id) : [...selected, source.id]; setSelection(next); void update({ action: "selectSources", selected: next }); }} /></label>
-          <button className={`forums-source-name${activeSource === source.id ? " active" : ""}`} type="button" onClick={() => router.push(`/communities?source=${encodeURIComponent(source.id)}`)} title={`${source.name} · ${kindNames[source.kind]}`}>{source.name}</button>
+          <button className={`forums-source-name${activeSource === source.id ? " active" : ""}`} type="button" onClick={() => router.push(`/forums?source=${encodeURIComponent(source.id)}`)} title={`${source.name} · ${kindNames[source.kind]}`}>{source.name}</button>
           {isAdmin && <span className="forums-row-actions"><button type="button" disabled={busy} onClick={() => openSource(source.id)} aria-label={`Edit ${source.name}`} title={`Edit ${source.name}`}><Pencil size={12} /></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Delete “${source.name}”?`)) void update({ action: "deleteSource", id: source.id }); }} aria-label={`Delete ${source.name}`} title={`Delete ${source.name}`}><Trash2 size={12} /></button></span>}
         </div>)}
       </section>)}</div>
