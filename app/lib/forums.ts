@@ -208,7 +208,7 @@ async function aggregateTopics(sourceId: string | null, categoryId: string | nul
       }
     }));
     const topics = results.flatMap((result) => result.status === "fulfilled" ? result.value.topics.map((topic) => ({ topic, source: { id: result.value.source.id, name: result.value.source.name, kind: result.value.source.kind } })) : []);
-    topics.sort((a, b) => Date.parse(b.topic.bumpedAt) - Date.parse(a.topic.bumpedAt) || `${a.source.id}:${a.topic.id}`.localeCompare(`${b.source.id}:${b.topic.id}`));
+    topics.sort((a, b) => Date.parse(b.topic.createdAt) - Date.parse(a.topic.createdAt) || `${a.source.id}:${a.topic.id}`.localeCompare(`${b.source.id}:${b.topic.id}`));
     return { topics, failed: results.flatMap((result, index) => result.status === "rejected" ? [sources[index].name] : []) };
   })();
   const snapshot = randomUUID();

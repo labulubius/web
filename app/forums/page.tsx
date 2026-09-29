@@ -27,7 +27,7 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
     <div className="forums-layout">
       <ForumsSidebar directory={directory} activeCategory={categoryId} activeSource={sourceId} />
       <section className="forums-content">
-        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>{heading}</h1><p>Discussions from forums and communities, ordered by recent activity</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
+        <header className="forums-heading"><div><p className="section-label">COMMUNITIES</p><h1>{heading}</h1><p>Discussions from forums and communities, ordered by posting date</p></div><MessagesSquare size={25} aria-hidden="true" /></header>
         <ForumsTopicList key={`${sourceId ?? "all"}:${categoryId ?? "all"}`} initial={page} sourceId={sourceId} categoryId={categoryId} hasSources={sources.length > 0} />
       </section>
     </div>
