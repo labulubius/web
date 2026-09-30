@@ -6,6 +6,10 @@
 
 Run `scripts/health-check.sh` to check the main, Drive, and Share hostnames. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `SHARE_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
 
+## CAU notice synchronization
+
+`labulubius-cau-news-refresh.timer` refreshes the authenticated school-notice feed every 30 minutes. Check it with `systemctl status labulubius-cau-news-refresh.timer` and `journalctl -u labulubius-cau-news-refresh.service`. Login failures do not log credentials or response bodies. Rotate the encrypted credentials with `systemd-creds encrypt --name=cau-username` and `--name=cau-password`, then restart `labulubius-web.service`.
+
 ## Security headers
 
 Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive/Share origins. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on all three hostnames after changes to Vercel, Cloudflare, or a reverse proxy.

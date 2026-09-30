@@ -3,8 +3,34 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
+import { cauLoginCipher } from "../app/lib/cau-login-encryption.ts";
+import { CAU_RETENTION_MS, normalizeCauNotices, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
+
+test("CAU login encryption matches the university CAS implementation", () => {
+  assert.equal(cauLoginCipher("abc"), "39644174795FB4D0");
+  assert.equal(cauLoginCipher("12345678"), "C1BB5938DF9F2190B89172CB54C8C33A");
+  assert.equal(cauLoginCipher("测试PassLT-123-tpass"), "964BAFACCEE9D0F8BBE41E1C36D7E4325B6830E26368DDFC568AB252F27C6846FD6A959843DC7E15");
+});
+
+test("CAU notices are sanitized, deduplicated, and retained for five days", () => {
+  const now = Date.UTC(2026, 8, 30, 12);
+  const records = [
+    { RESOURCE_ID: "123", PIM_TITLE: "通知 &amp; 安排", PIM_CONTENT: "<p>第一句话。</p><script>bad()</script><p>第二句话！第三句话。</p>", BELONG_UNIT_NAME: "教务处", CREATE_TIME: now - 1000 },
+    { RESOURCE_ID: "123", PIM_TITLE: "更新后的通知", PIM_CONTENT: "更新内容。", BELONG_UNIT_NAME: "教务处", CREATE_TIME: now - 500 },
+    { RESOURCE_ID: "456", PIM_TITLE: "已过期", PIM_CONTENT: "不应保留。", CREATE_TIME: now - CAU_RETENTION_MS - 1 },
+  ];
+  const notices = normalizeCauNotices(records, now);
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].title, "更新后的通知");
+  assert.equal(notices[0].summary, "更新内容。");
+  assert.equal(retainCauNotices(notices, now + CAU_RETENTION_MS + 1).length, 0);
+  const rss = renderCauRss(normalizeCauNotices(records.slice(0, 1), now), now);
+  assert.match(rss, /通知 &amp; 安排/);
+  assert.match(rss, /第一句话。第二句话！/);
+  assert.doesNotMatch(rss, /bad\(\)|第三句话/);
+});
 
 test("news summaries contain no more than two short sentences", () => {
   assert.equal(conciseSummary("第一句话。第二句话！第三句话不应显示。"), "第一句话。第二句话！");
