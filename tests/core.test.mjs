@@ -61,3 +61,15 @@ test("agent sign-out clears both the hint and remote owner session", async () =>
   assert.match(source, /rememberAgentSession\(false\)/);
   assert.match(source, /method: "DELETE"/);
 });
+
+test("agent iframe stays mounted across workspace route changes", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  const keeper = await readFile(new URL("../app/persistent-agent.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/agent/page.tsx", import.meta.url), "utf8");
+
+  assert.match(layout, /<PersistentAgent>\{children\}<\/PersistentAgent>/);
+  assert.match(keeper, /const shouldMountAgent = agentMounted \|\| isAgentRoute/);
+  assert.match(keeper, /hidden=\{!isAgentRoute\}/);
+  assert.match(keeper, /<AgentFrame \/>/);
+  assert.doesNotMatch(page, /<AgentFrame \/>/);
+});

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AgentFrame } from "./agent-frame";
 
 export const metadata: Metadata = {
   title: "Pi Agent",
@@ -7,5 +6,5 @@ export const metadata: Metadata = {
 };
 
 export default function AgentPage() {
-  return <AgentFrame />;
+  return null;
 }
