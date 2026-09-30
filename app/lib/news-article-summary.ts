@@ -1,5 +1,6 @@
 import "server-only";
 
+import { conciseSummary } from "./concise-summary";
 import { fetchPinnedNewsResource } from "./news-feed-proxy";
 
 const MAX_BYTES = 256 * 1024;
@@ -77,7 +78,8 @@ function socialStatus(url: URL) {
 }
 
 async function fetchSummary(value: string) {
-  const url = new URL(value);
+  let url: URL;
+  try { url = new URL(value); } catch { return ""; }
   const status = socialStatus(url);
   if (status) {
     const result = await fetchPinnedNewsResource(`https://api.fxtwitter.com/status/${status}`);
@@ -94,12 +96,13 @@ async function fetchSummary(value: string) {
 }
 
 export async function articleSummary(url: string, summary: string) {
-  if (!isFeedMetadata(summary)) return summary;
+  if (!isFeedMetadata(summary)) return conciseSummary(summary);
   const cached = cache.get(url);
   if (cached && cached.expires > Date.now()) return cached.value;
   const existing = pending.get(url);
   if (existing) return existing;
   const request = fetchSummary(url).catch(() => "").then((value) => {
+    value = conciseSummary(value);
     cache.set(url, { value, expires: Date.now() + (value ? SUCCESS_TTL : FAILURE_TTL) });
     pending.delete(url);
     return value;

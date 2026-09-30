@@ -2,8 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
+import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
+
+test("news summaries contain no more than two short sentences", () => {
+  assert.equal(conciseSummary("第一句话。第二句话！第三句话不应显示。"), "第一句话。第二句话！");
+  assert.equal(conciseSummary("A short description of the article."), "A short description of the article.");
+  const longChinese = conciseSummary(`这是一个没有句号的超长摘要${"内容".repeat(120)}`);
+  assert.ok(longChinese.length <= 220);
+  assert.match(longChinese, /…$/);
+});
 
 test("storage quota includes pending and converted output bytes", () => {
   assert.equal(fitsStorageQuota(80, 10, 10, 100), true);
