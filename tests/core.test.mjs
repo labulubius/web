@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
-import { cauLoginCipher } from "../app/lib/cau-login-encryption.ts";
-import { CAU_RETENTION_MS, normalizeCauNotices, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
+import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
+import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
 
@@ -12,6 +12,16 @@ test("CAU login encryption matches the university CAS implementation", () => {
   assert.equal(cauLoginCipher("abc"), "39644174795FB4D0");
   assert.equal(cauLoginCipher("12345678"), "C1BB5938DF9F2190B89172CB54C8C33A");
   assert.equal(cauLoginCipher("测试PassLT-123-tpass"), "964BAFACCEE9D0F8BBE41E1C36D7E4325B6830E26368DDFC568AB252F27C6846FD6A959843DC7E15");
+});
+
+test("CAU login and API changes fail closed", () => {
+  const form = '<form id="loginForm" action="/tpass/login?service=x&amp;y=z"><input id="lt" value="LT-1234567890-tpass"></form>';
+  assert.deepEqual(parseCauLoginForm(form), { action: "/tpass/login?service=x&y=z", lt: "LT-1234567890-tpass" });
+  assert.throws(() => parseCauLoginForm('<form id="loginForm"></form>'), /login form changed/);
+  assert.equal(cauLoginSucceeded("https://one.cau.edu.cn/tp_up/view", "<main>workspace</main>"), true);
+  assert.equal(cauLoginSucceeded("https://onecas.cau.edu.cn/tpass/login", form), false);
+  assert.deepEqual(parseCauNoticePage({ list: [], hasNextPage: false }), { list: [], hasNextPage: false });
+  assert.throws(() => parseCauNoticePage({ items: [] }), /invalid notice page/);
 });
 
 test("CAU notices are sanitized, deduplicated, and retained for five days", () => {

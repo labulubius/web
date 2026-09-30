@@ -11,6 +11,13 @@ export type CauNotice = {
   url: string;
 };
 
+export function parseCauNoticePage(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("CAU returned an invalid notice page.");
+  const page = value as { list?: unknown; hasNextPage?: unknown };
+  if (!Array.isArray(page.list) || typeof page.hasNextPage !== "boolean") throw new Error("CAU returned an invalid notice page.");
+  return { list: page.list, hasNextPage: page.hasNextPage };
+}
+
 function decodeEntities(value: string) {
   const named: Record<string, string> = { amp: "&", apos: "'", gt: ">", lt: "<", nbsp: " ", quot: '"' };
   return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, key: string) => {

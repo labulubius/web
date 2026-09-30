@@ -42,6 +42,28 @@ function encryptBlock(block: Buffer, key: string) {
   return Buffer.concat([cipher.update(block), cipher.final()]);
 }
 
+function decodeAttribute(value: string) {
+  return value.replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+}
+
+export function parseCauLoginForm(page: string) {
+  const form = page.match(/<form\b[^>]*\bid=["']loginForm["'][^>]*>/i)?.[0] || "";
+  const ltTag = page.match(/<input\b[^>]*\bid=["']lt["'][^>]*>/i)?.[0] || "";
+  const actionMatch = form.match(/\baction\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+  const valueMatch = ltTag.match(/\bvalue\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+  const action = decodeAttribute(actionMatch?.[1] ?? actionMatch?.[2] ?? "");
+  const lt = decodeAttribute(valueMatch?.[1] ?? valueMatch?.[2] ?? "");
+  if (!action || !/^LT-[\w-]{10,200}$/.test(lt)) throw new Error("CAU login form changed.");
+  return { action, lt };
+}
+
+export function cauLoginSucceeded(responseUrl: string, page: string) {
+  try {
+    const url = new URL(responseUrl);
+    return url.protocol === "https:" && url.hostname === "one.cau.edu.cn" && url.pathname.startsWith("/tp_up/") && !/\bid=["']loginForm["']/i.test(page);
+  } catch { return false; }
+}
+
 export function cauLoginCipher(value: string) {
   const encrypted: Buffer[] = [];
   for (let offset = 0; offset < value.length; offset += 4) {

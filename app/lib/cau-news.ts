@@ -4,8 +4,8 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { cauLoginCipher } from "./cau-login-encryption";
-import { type CauNotice, normalizeCauNotices, renderCauRss, retainCauNotices } from "./cau-news-feed";
+import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "./cau-login-encryption";
+import { type CauNotice, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "./cau-news-feed";
 
 const LOGIN_URL = "https://onecas.cau.edu.cn/tpass/login?service=https%3A%2F%2Fone.cau.edu.cn%2Ftp_up%2F";
 const APP_ROOT = "https://one.cau.edu.cn/tp_up/";
@@ -117,21 +117,11 @@ function credential(name: string) {
   });
 }
 
-function decodeAttribute(value: string) {
-  return value.replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
-}
-
 async function login() {
   const jar = new CookieJar();
   const response = await request(jar, LOGIN_URL);
   const loginPage = await response.text();
-  const form = loginPage.match(/<form\b[^>]*\bid=["']loginForm["'][^>]*>/i)?.[0] || "";
-  const ltTag = loginPage.match(/<input\b[^>]*\bid=["']lt["'][^>]*>/i)?.[0] || "";
-  const actionMatch = form.match(/\baction\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
-  const valueMatch = ltTag.match(/\bvalue\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
-  const action = decodeAttribute(actionMatch?.[1] ?? actionMatch?.[2] ?? "");
-  const lt = decodeAttribute(valueMatch?.[1] ?? valueMatch?.[2] ?? "");
-  if (!action || !/^LT-[\w-]{10,200}$/.test(lt)) throw new Error("CAU login form changed.");
+  const { action, lt } = parseCauLoginForm(loginPage);
   const [username, password] = await Promise.all([credential("cau-username"), credential("cau-password")]);
   const body = new URLSearchParams({
     rsa: cauLoginCipher(username + password + lt), ul: String(username.length), pl: String(password.length), sl: "0",
@@ -141,10 +131,7 @@ async function login() {
     method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: "https://onecas.cau.edu.cn", Referer: response.url },
   });
   const page = await result.text();
-  const finalUrl = allowedUrl(result.url);
-  if (finalUrl.hostname !== "one.cau.edu.cn" || !finalUrl.pathname.startsWith("/tp_up/") || /\bid=["']loginForm["']/i.test(page)) {
-    throw new Error("CAU login was rejected.");
-  }
+  if (!cauLoginSucceeded(result.url, page)) throw new Error("CAU login was rejected.");
   return jar;
 }
 
@@ -176,8 +163,7 @@ async function fetchNotices(now: number) {
   const records: unknown[] = [];
   const cutoff = now - 5 * 24 * 60 * 60 * 1000;
   for (let pageNum = 1; pageNum <= 20; pageNum++) {
-    const data = await postJson("up/pim/allpim/getAllPimList", { two: "yes", pageNum, pageSize: 500 }) as { list?: unknown[]; hasNextPage?: boolean };
-    if (!Array.isArray(data.list)) throw new Error("CAU returned an invalid notice list.");
+    const data = parseCauNoticePage(await postJson("up/pim/allpim/getAllPimList", { two: "yes", pageNum, pageSize: 500 }));
     records.push(...data.list);
     const times = data.list.flatMap((item) => item && typeof item === "object" && !Array.isArray(item) ? [Number((item as Record<string, unknown>).CREATE_TIME)] : []);
     if (!data.hasNextPage || (times.length > 0 && times.every((time) => Number.isFinite(time) && time < cutoff))) break;
