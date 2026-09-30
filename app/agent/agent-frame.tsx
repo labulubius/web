@@ -6,14 +6,37 @@ import "./agent.css";
 
 const AGENT_ORIGIN = "https://agent.labulubius.com";
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+const AGENT_SESSION_HINT_KEY = "pi-agent-session-established";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
 
+function hasAgentSessionHint(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(AGENT_SESSION_HINT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function rememberAgentSession(established: boolean): void {
+  try {
+    if (established) window.localStorage.setItem(AGENT_SESSION_HINT_KEY, "true");
+    else window.localStorage.removeItem(AGENT_SESSION_HINT_KEY);
+  } catch {
+    // The signed HttpOnly cookie remains authoritative when storage is blocked.
+  }
+}
+
 export function AgentFrame() {
   const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
-  const [connection, setConnection] = useState<ConnectionState>("idle");
+  const [connection, setConnection] = useState<ConnectionState>(() => (
+    hasAgentSessionHint() ? "ready" : "idle"
+  ));
   const [error, setError] = useState("");
+  const [frameGeneration, setFrameGeneration] = useState(0);
   const generation = useRef(0);
+  const frameReloadPending = useRef(false);
 
   const connect = useCallback(async () => {
     const request = ++generation.current;
@@ -39,13 +62,37 @@ export function AgentFrame() {
         throw new Error(typeof body?.error === "string" ? body.error : `Agent authentication failed (${response.status}).`);
       }
       if (request !== generation.current) return;
+      const reloadFrame = frameReloadPending.current;
+      frameReloadPending.current = false;
+      rememberAgentSession(true);
       setConnection("ready");
+      if (reloadFrame) setFrameGeneration((current) => current + 1);
     } catch (failure) {
       if (request !== generation.current) return;
       setConnection((current) => current === "ready" ? current : "error");
       setError(failure instanceof Error ? failure.message : "Unable to connect to the Mac mini agent.");
     }
   }, [supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${AGENT_ORIGIN}/api/owner-auth`, {
+      credentials: "include",
+      cache: "no-store",
+    }).then(async (response) => {
+      const body = await response.json().catch(() => null) as { authenticated?: unknown } | null;
+      if (cancelled) return;
+      if (response.ok && body?.authenticated === true) {
+        rememberAgentSession(true);
+        setConnection("ready");
+      } else {
+        frameReloadPending.current = true;
+      }
+    }).catch(() => {
+      // The normal owner-token exchange below remains the recovery path.
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (loading || !user || !isAdmin) return;
@@ -57,8 +104,21 @@ export function AgentFrame() {
     };
   }, [connect, isAdmin, loading, user]);
 
-  if (connection === "ready" && user && isAdmin) {
-    return <main className="agent-page"><iframe className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+  useEffect(() => {
+    if (loading || user || authError) return;
+    generation.current++;
+    frameReloadPending.current = true;
+    rememberAgentSession(false);
+    void fetch(`${AGENT_ORIGIN}/api/owner-auth`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => {
+      // The outer account is still signed out; a later visit retries cleanup.
+    });
+  }, [authError, loading, user]);
+
+  if (connection === "ready" && (loading || (user && isAdmin))) {
+    return <main className="agent-page"><iframe key={frameGeneration} className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
   }
 
   if (loading) {

@@ -40,13 +40,24 @@ test("agent page exchanges the Supabase bearer token without putting it in the i
   assert.doesNotMatch(source, /src=.*access_token/);
 });
 
-test("agent session refresh keeps the live iframe mounted", async () => {
+test("agent session restore and refresh keep the live iframe mounted", async () => {
   const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
-  const readyGate = source.indexOf('if (connection === "ready" && user && isAdmin)');
+  const readyGate = source.indexOf('if (connection === "ready" && (loading || (user && isAdmin)))');
   const loadingGate = source.indexOf("if (loading)");
 
   assert.notEqual(readyGate, -1);
   assert.ok(readyGate < loadingGate, "the ready iframe must survive background auth loading");
+  assert.match(source, /hasAgentSessionHint\(\) \? "ready" : "idle"/);
+  assert.match(source, /cache: "no-store"/);
+  assert.match(source, /rememberAgentSession\(true\)/);
+  assert.match(source, /key=\{frameGeneration\}/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "error"\)/);
+});
+
+test("agent sign-out clears both the hint and remote owner session", async () => {
+  const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
+  assert.match(source, /if \(loading \|\| user \|\| authError\) return;/);
+  assert.match(source, /rememberAgentSession\(false\)/);
+  assert.match(source, /method: "DELETE"/);
 });
