@@ -45,6 +45,7 @@
 
 .site-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .site-card { background: var(--view); border: 1px solid var(--separator); border-radius: 4px; cursor: pointer; min-height: 86px; position: relative; }
+.site-card-link { color: inherit; display: block; text-decoration: none; }
 .site-card.reorderable { cursor: grab; user-select: none; }
 .site-card.dragging { box-shadow: 0 10px 24px rgba(0, 0, 0, .24); cursor: grabbing; opacity: .9; }
 .site-card:hover { background: color-mix(in srgb, var(--accent) 12%, var(--view)); border-color: var(--accent); }

@@ -125,51 +125,48 @@ function SiteCard({
     if (isDragging) didDrag.current = true;
   }, [isDragging]);
 
-  function openSite() {
-    window.open(site.url, "_blank", "noopener,noreferrer");
-  }
-
   return (
     <article
       className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
       ref={setNodeRef}
-      role="link"
-      tabIndex={0}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
       onPointerDownCapture={() => { didDrag.current = false; }}
-      onClick={() => {
-        if (didDrag.current || shouldBlockOpen()) {
-          didDrag.current = false;
-          return;
-        }
-        openSite();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" && event.target === event.currentTarget) openSite();
-      }}
       {...(canReorder ? listeners : {})}
     >
-      <div className="site-card-body">
-        <span className="site-logo">
-          <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
-          {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
-          {icon && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              alt=""
-              draggable={false}
-              src={icon}
-              onLoad={(event) => { event.currentTarget.style.display = ""; }}
-              onError={(event) => { event.currentTarget.style.display = "none"; }}
-            />
-          )}
-        </span>
-        <span className="site-card-copy">
-          <strong>{site.name}</strong>
-          <small>{site.description || site.url}</small>
-          <em>{category?.name ?? "Uncategorized"}</em>
-        </span>
-      </div>
+      <a
+        className="site-card-link"
+        href={site.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => {
+          if (didDrag.current || shouldBlockOpen()) {
+            event.preventDefault();
+            didDrag.current = false;
+          }
+        }}
+      >
+        <div className="site-card-body">
+          <span className="site-logo">
+            <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
+            {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
+            {icon && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt=""
+                draggable={false}
+                src={icon}
+                onLoad={(event) => { event.currentTarget.style.display = ""; }}
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+              />
+            )}
+          </span>
+          <span className="site-card-copy">
+            <strong>{site.name}</strong>
+            <small>{site.description || site.url}</small>
+            <em>{category?.name ?? "Uncategorized"}</em>
+          </span>
+        </div>
+      </a>
       <span className="site-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
         <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" disabled={!isAdmin} onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
         <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>
