@@ -6,7 +6,7 @@ if [ "${#NEWS_FEED_PROXY_SECRET}" -lt 32 ]; then
   exit 1
 fi
 
-token=$(printf %s 'cau-news-feed-v1' |
+token=$(printf %s 'cau-news-feed-v2' |
   openssl dgst -sha256 -hmac "$NEWS_FEED_PROXY_SECRET" -binary |
   openssl base64 -A |
   tr '+/' '-_' |

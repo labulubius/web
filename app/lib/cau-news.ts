@@ -232,7 +232,7 @@ function proxySecret() {
 }
 
 export function cauFeedToken() {
-  return createHmac("sha256", proxySecret()).update("cau-news-feed-v1").digest("base64url");
+  return createHmac("sha256", proxySecret()).update("cau-news-feed-v2").digest("base64url");
 }
 
 export function validCauFeedToken(token: string) {
