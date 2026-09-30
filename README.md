@@ -20,7 +20,7 @@ A personal web workspace with a KDE Breeze-inspired interface. The public pages 
 ## Architecture
 
 - Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data, icons and the private note use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
-- The main UI is deployed to Vercel. The `web` machine also runs this Next.js application behind Nginx and Cloudflare Tunnel. `drive.labulubius.com` serves persistent Drive APIs and the server-side News/Forums relay target; `share.labulubius.com` serves Share APIs and public links. News and Forums requests from the Vercel UI go through same-origin `/api/news` and `/api/forums` before being relayed to `web`.
+- The main UI is deployed to Vercel. The `web` machine also runs this Next.js application behind Nginx and Cloudflare Tunnel. `drive.labulubius.com` serves persistent Drive APIs and the server-side News/Forums relay target; `feeds.labulubius.com` serves generated authenticated RSS sources; `share.labulubius.com` serves Share APIs and public links. News and Forums requests from the Vercel UI go through same-origin `/api/news` and `/api/forums` before being relayed to `web`.
 - Drive and Share files, News preferences and the Forums directory live **outside Git** on `web`. FreshRSS and its PostgreSQL database run in Docker there. Do not treat a Vercel deployment filesystem as persistent storage.
 
 ## Local development
@@ -58,7 +58,7 @@ npm run start  # Run the production build
 
 Apply the SQL migrations and set up the administrator account using [supabase/README.md](supabase/README.md). Set the two `NEXT_PUBLIC_SUPABASE_*` variables for both deployments (the publishable key is not a service-role secret). On `web`, configure distinct writable absolute `DRIVE_DATA_DIR` and `SHARE_DATA_DIR` paths outside the repository; do not set these directories on Vercel. Configure FreshRSS credentials for the `web` service separately; never expose them with `NEXT_PUBLIC_` variables.
 
-Build and run the Next.js service on `web` behind a reverse proxy, preserving the original `Host` header for host-specific behavior. Configure the Cloudflare Tunnel and DNS for the Drive and Share hostnames, then deploy the main UI on Vercel. News and Forums API relays require a working `drive.labulubius.com` endpoint. Back up the server-side file directories, News preferences, Forums directory and FreshRSS data separately from Git and Supabase. The installed five-day News retention job and its operational checks are described in [NEWS.md](NEWS.md).
+Build and run the Next.js service on `web` behind a reverse proxy, preserving the original `Host` header for host-specific behavior. Configure the Cloudflare Tunnel and DNS for the Drive, Feeds and Share hostnames, then deploy the main UI on Vercel. News and Forums API relays require a working `drive.labulubius.com` endpoint. Back up the server-side file directories, News preferences, Forums directory and FreshRSS data separately from Git and Supabase. The installed five-day News retention job and its operational checks are described in [NEWS.md](NEWS.md).
 
 More details: [DRIVE.md](DRIVE.md), [SHARE.md](SHARE.md), [NEWS.md](NEWS.md), [FORUMS.md](FORUMS.md), [operations and restore verification](OPERATIONS.md), [supabase/README.md](supabase/README.md).
 
