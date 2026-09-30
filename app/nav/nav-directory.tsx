@@ -135,6 +135,7 @@ function SiteCard({
     >
       <a
         className="site-card-link"
+        draggable={false}
         href={site.url}
         target="_blank"
         rel="noopener noreferrer"
