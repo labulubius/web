@@ -17,7 +17,11 @@ export function AgentFrame() {
 
   const connect = useCallback(async () => {
     const request = ++generation.current;
-    setConnection("connecting");
+    // Refreshing the cross-origin session must not unmount the iframe. Mobile
+    // browsers suspend this page while the system image picker is open; a
+    // Supabase token refresh when the page resumes used to switch this state
+    // back to "connecting", destroying Pi Web and its in-memory attachment.
+    setConnection((current) => current === "ready" ? current : "connecting");
     setError("");
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
@@ -38,7 +42,7 @@ export function AgentFrame() {
       setConnection("ready");
     } catch (failure) {
       if (request !== generation.current) return;
-      setConnection("error");
+      setConnection((current) => current === "ready" ? current : "error");
       setError(failure instanceof Error ? failure.message : "Unable to connect to the Mac mini agent.");
     }
   }, [supabase]);
@@ -52,6 +56,10 @@ export function AgentFrame() {
       window.clearInterval(refresh);
     };
   }, [connect, isAdmin, loading, user]);
+
+  if (connection === "ready" && user && isAdmin) {
+    return <main className="agent-page"><iframe className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+  }
 
   if (loading) {
     return <main className="agent-gate"><div className="agent-gate-card"><p>Checking owner access…</p></div></main>;
@@ -73,5 +81,5 @@ export function AgentFrame() {
     return <main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p>{connection === "connecting" ? "Connecting securely to the Mac mini…" : error || "Agent connection is unavailable."}</p>{connection === "error" && <button type="button" onClick={() => void connect()}>Retry connection</button>}</div></main>;
   }
 
-  return <main className="agent-page"><iframe className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+  return null;
 }

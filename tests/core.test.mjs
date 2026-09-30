@@ -39,3 +39,14 @@ test("agent page exchanges the Supabase bearer token without putting it in the i
   assert.match(source, /src=\{AGENT_ORIGIN\}/);
   assert.doesNotMatch(source, /src=.*access_token/);
 });
+
+test("agent session refresh keeps the live iframe mounted", async () => {
+  const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
+  const readyGate = source.indexOf('if (connection === "ready" && user && isAdmin)');
+  const loadingGate = source.indexOf("if (loading)");
+
+  assert.notEqual(readyGate, -1);
+  assert.ok(readyGate < loadingGate, "the ready iframe must survive background auth loading");
+  assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
+  assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "error"\)/);
+});
