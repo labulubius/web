@@ -11,6 +11,7 @@ token=$(printf %s 'ciee-news-feed-v1' |
   openssl base64 -A |
   tr '+/' '-_' |
   tr -d '=')
+authorization=$(printf 'ciee:%s' "$token" | openssl base64 -A)
 
-printf 'url = "http://127.0.0.1:3000/api/news/ciee/%s"\n' "$token" |
+printf 'url = "http://127.0.0.1:3000/api/news/ciee"\nheader = "Authorization: Basic %s"\n' "$authorization" |
   curl --config - --fail --silent --show-error --max-time 90 --output /dev/null
