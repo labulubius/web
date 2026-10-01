@@ -5,6 +5,7 @@ import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
+import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
 
@@ -40,6 +41,54 @@ test("CAU notices are sanitized, deduplicated, and retained for five days", () =
   assert.match(rss, /通知 &amp; 安排/);
   assert.match(rss, /第一句话。第二句话！/);
   assert.doesNotMatch(rss, /bad\(\)|第三句话/);
+});
+
+test("CIEE listings accept only the configured public notice column", () => {
+  const html = `
+    <a title="通知 &amp; 安排" href="/art/2026/9/30/art_50450_1139245.html">valid</a>
+    <a href="https://evil.example/art/2026/9/30/art_50450_1.html" title="external">bad</a>
+    <a href="/art/2026/9/30/art_50390_2.html" title="other column">bad</a>
+    <a href="/art/2026/2/30/art_50450_3.html" title="invalid date">bad</a>`;
+  const listings = parseCieeListings(html);
+  assert.equal(listings.length, 1);
+  assert.deepEqual(listings[0], {
+    id: "1139245",
+    title: "通知 & 安排",
+    published: Date.UTC(2026, 8, 30, 4),
+    url: "https://ciee.cau.edu.cn/art/2026/9/30/art_50450_1139245.html",
+  });
+});
+
+test("CIEE articles are summarized without scripts or attachments", () => {
+  const listing = parseCieeListings('<a href="/art/2026/9/30/art_50450_1139245.html" title="列表标题">notice</a>')[0];
+  const html = `<meta name="i_columnid" content="50450">
+    <meta content="1139245" name="i_articleid">
+    <meta name="ArticleTitle" content="更新后的通知 &amp; 说明">
+    <meta name="PubDate" content="2026-09-30 17:18">
+    <!--ZJEG_RSS.content.begin--><p>第一句话。</p><script>secret()</script><p>第二句话！第三句话。</p>
+    <a href="/module/download/downfile.jsp?filename=private.doc">附件中的个人材料.doc</a><!--ZJEG_RSS.content.end-->`;
+  const notice = parseCieeArticle(html, listing);
+  assert.equal(notice.title, "更新后的通知 & 说明");
+  assert.equal(notice.published, Date.UTC(2026, 8, 30, 9, 18));
+  assert.equal(notice.summary, "第一句话。第二句话！");
+  assert.doesNotMatch(notice.summary, /secret|附件|个人材料/);
+  assert.throws(() => parseCieeArticle(html.replace('content="50450"', 'content="50390"'), listing), /metadata changed/);
+});
+
+test("CIEE notices are deduplicated, retained for five days, and XML escaped", () => {
+  const now = Date.UTC(2026, 8, 30, 12);
+  const base = {
+    id: "1139245", title: "旧标题", summary: "旧摘要", published: now - 1000,
+    url: "https://ciee.cau.edu.cn/art/2026/9/30/art_50450_1139245.html",
+  };
+  const notices = normalizeCieeNotices([base, { ...base, title: "A & B", summary: "<更新>" }], now);
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].title, "A & B");
+  assert.equal(retainCieeNotices(notices, now + CIEE_RETENTION_MS + 1).length, 0);
+  const rss = renderCieeRss(notices, now);
+  assert.match(rss, /<title>A &amp; B<\/title>/);
+  assert.match(rss, /<description>&lt;更新&gt;<\/description>/);
+  assert.match(rss, /<guid isPermaLink="false">ciee:1139245<\/guid>/);
 });
 
 test("news summaries contain no more than two short sentences", () => {

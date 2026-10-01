@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh public CIEE notices every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+RandomizedDelaySec=1min
+Persistent=true
+Unit=labulubius-ciee-news-refresh.service
+
+[Install]
+WantedBy=timers.target

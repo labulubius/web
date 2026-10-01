@@ -10,6 +10,8 @@ Run `scripts/health-check.sh` to check the main, Drive, and Share hostnames. Ove
 
 `labulubius-cau-news-refresh.timer` refreshes the authenticated school-notice feed every 30 minutes. Check it with `systemctl status labulubius-cau-news-refresh.timer` and `journalctl -u labulubius-cau-news-refresh.service`. Login failures do not log credentials or response bodies. Rotate the encrypted credentials with `systemd-creds encrypt --name=cau-username` and `--name=cau-password`, then restart `labulubius-web.service`.
 
+`labulubius-ciee-news-refresh.timer` independently refreshes the public CIEE notice feed every 30 minutes. Check it with `systemctl status labulubius-ciee-news-refresh.timer` and `journalctl -u labulubius-ciee-news-refresh.service`. Its cache is `${NEWS_DATA_DIR:-~/.local/share/labulubius/news}/ciee-feed.json`; a failed refresh keeps the last successful cache. Install the root-owned wrapper from `scripts/ciee-news-refresh.sh` and the unit templates from `deploy/systemd/`.
+
 ## Security headers
 
 Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive/Share origins. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on all three hostnames after changes to Vercel, Cloudflare, or a reverse proxy.
