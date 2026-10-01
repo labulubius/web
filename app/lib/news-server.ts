@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { execFile } from "node:child_process";
 import { articleSummary } from "./news-article-summary";
+import { normalizeNewsArticleUrl } from "./news-article-url";
 import type { NewsArticle, NewsFeed } from "./news-server-types";
 import { originalNewsFeedUrl } from "./news-feed-proxy";
 
@@ -160,8 +161,7 @@ LIMIT 51;`;
   const hasMore = rows.length > 50;
   const page = rows.slice(0, 50);
   const articles = await Promise.all(page.map(async (item) => {
-    let url = "";
-    try { if (["http:", "https:"].includes(new URL(item.url).protocol)) url = item.url; } catch { /* no unsafe links */ }
+    const url = normalizeNewsArticleUrl(item.url);
     const summary = await articleSummary(url, plainText(item.summary || ""));
     return {
       id: item.id, title: plainText(item.title || "Untitled"), url,

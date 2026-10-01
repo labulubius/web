@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
+import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
@@ -41,6 +42,15 @@ test("CAU notices are sanitized, deduplicated, and retained for five days", () =
   assert.match(rss, /通知 &amp; 安排/);
   assert.match(rss, /第一句话。第二句话！/);
   assert.doesNotMatch(rss, /bad\(\)|第三句话/);
+});
+
+test("news article URLs decode feed entities without allowing unsafe schemes", () => {
+  const expected = "https://one.cau.edu.cn/tp_up/view?m=up#act=up/pim/showpim&id=8036284171743232";
+  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&amp;id=")), expected);
+  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&amp;amp;id=")), expected);
+  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&#38;id=")), expected);
+  assert.equal(normalizeNewsArticleUrl("javascript:alert(1)"), "");
+  assert.equal(normalizeNewsArticleUrl("not a URL"), "");
 });
 
 test("CIEE listings accept only the configured public notice column", () => {
