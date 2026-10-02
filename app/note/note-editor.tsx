@@ -1,6 +1,8 @@
 "use client";
 
+import { StickyNote } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { OwnerAccess } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
 
 type SaveState = "loading" | "saved" | "pending" | "saving" | "error" | "conflict";
@@ -137,12 +139,9 @@ export function NoteEditor() {
     else schedule();
   }
 
-  if (loading) return <section className="note-view"><p>Checking account…</p></section>;
-  if (authError) return <section className="note-view"><p className="note-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
-  if (!isAdmin) return <section className="note-view" inert>
-    <header className="note-header"><div><h1>Private Note</h1><p>Plain text · Private to Owner · Autosaved</p></div></header>
-    <textarea className="note-text" aria-label="Private note (administrator only)" disabled value="" placeholder="Private to the administrator" readOnly />
-  </section>;
+  if (loading) return <OwnerAccess icon={<StickyNote size={28} />} title="Private Note" description="Checking owner access…" />;
+  if (authError) return <OwnerAccess icon={<StickyNote size={28} />} title="Private Note" description="The account check could not be completed." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry account check</button>} />;
+  if (!isAdmin) return <OwnerAccess icon={<StickyNote size={28} />} title="Private Note" description="Only the site owner can read or edit this private note. Use Sign in in the top toolbar to continue." />;
 
   return (
     <section className="note-view">

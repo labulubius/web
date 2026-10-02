@@ -102,7 +102,7 @@ export function ShareManager() {
   const { folders, entries } = directory;
   if (loading) return <section className="share-view"><p>Checking account…</p></section>;
   if (authError) return <section className="share-view"><p className="share-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
-  if (!isAdmin) return <OwnerAccess icon={<Share2 size={28} />} title="Public Share" description="Only the site owner can create and manage public file links. Sign in with the owner account to continue." />;
+  if (!isAdmin) return <OwnerAccess icon={<Share2 size={28} />} title="Public Share" description="Only the site owner can create and manage public file links. Use Sign in in the top toolbar to continue." />;
 
   return <section className="share-view">
     <header className="share-header">

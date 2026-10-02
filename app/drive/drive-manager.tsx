@@ -133,7 +133,7 @@ export function DriveManager() {
 
   if (loading) return <section className="drive-view"><p>Checking account…</p></section>;
   if (authError) return <section className="drive-view"><p className="drive-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></section>;
-  if (!isAdmin) return <OwnerAccess icon={<HardDrive size={28} />} title="Private Drive" description="Only the site owner can access and manage private files. Sign in with the owner account to continue." />;
+  if (!isAdmin) return <OwnerAccess icon={<HardDrive size={28} />} title="Private Drive" description="Only the site owner can access and manage private files. Use Sign in in the top toolbar to continue." />;
 
   return (
     <section className="drive-view">

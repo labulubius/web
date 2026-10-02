@@ -178,7 +178,7 @@ test("agent session restore and refresh keep the live iframe mounted", async () 
 
 test("agent sign-out clears both the hint and remote owner session", async () => {
   const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
-  assert.match(source, /if \(loading \|\| user \|\| authError\) return;/);
+  assert.match(source, /if \(loading \|\| user \|\| authError \|\| !hasAgentSessionHint\(\)\) return;/);
   assert.match(source, /rememberAgentSession\(false\)/);
   assert.match(source, /method: "DELETE"/);
 });
@@ -199,7 +199,10 @@ test("owner-only destinations remain visible and show access guidance", async ()
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
   const drive = await readFile(new URL("../app/drive/drive-manager.tsx", import.meta.url), "utf8");
   const share = await readFile(new URL("../app/share/share-manager.tsx", import.meta.url), "utf8");
+  const note = await readFile(new URL("../app/note/note-editor.tsx", import.meta.url), "utf8");
   const agent = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
+  const access = await readFile(new URL("../app/owner-access.tsx", import.meta.url), "utf8");
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
 
   assert.match(sidebar, /href="\/drive"/);
   assert.match(sidebar, /href="\/share"/);
@@ -207,8 +210,12 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.doesNotMatch(sidebar, /isAdmin && <Link href="\/(?:drive|share|agent)"/);
   assert.match(drive, /<OwnerAccess/);
   assert.match(share, /<OwnerAccess/);
-  assert.match(agent, /<OwnerAccess/);
+  assert.match(note, /<OwnerAccess/);
+  assert.doesNotMatch(note, /Private note \(administrator only\)/);
+  assert.match(agent, /className="agent-gate"/);
   assert.match(agent, /<SiteShell active="\/agent"/);
+  assert.doesNotMatch(access, /AccountControl/);
+  assert.match(shell, /<AccountControl \/>/);
 });
 
 test("sidebar controls render only for pages that provide a sidebar", async () => {

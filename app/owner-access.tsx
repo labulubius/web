@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AccountControl } from "./site-auth";
 
 export function OwnerAccess({
   icon,
@@ -23,7 +22,7 @@ export function OwnerAccess({
       <h1>{title}</h1>
       <p>{description}</p>
       {status && <p className="owner-access-status" role="alert">{status}</p>}
-      <div className="owner-access-actions">{action ?? <AccountControl />}</div>
+      {action && <div className="owner-access-actions">{action}</div>}
     </section>
   );
 }
