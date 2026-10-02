@@ -6,7 +6,7 @@ import { SiteShell } from "./site-shell";
 
 export default function Home() {
   return (
-    <SiteShell active="/" title="Home">
+    <SiteShell active="/" title="Home" hasSidebar>
       <div className="welcome-layout">
         <PlacesSidebar active="/" />
 

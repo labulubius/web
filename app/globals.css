@@ -247,6 +247,13 @@ html[data-theme="dark"] .plasma-desktop {
 .info-panel a { align-items: center; color: var(--link); display: flex; font-size: 11px; gap: 5px; text-decoration: none; white-space: nowrap; }
 .info-panel a:hover { text-decoration: underline; }
 
+.owner-access { align-items: center; display: flex; flex-direction: column; margin: 0 auto; max-width: 560px; padding: 72px 24px; text-align: center; }
+.owner-access-icon { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 6px; color: var(--link); display: flex; height: 58px; justify-content: center; margin-bottom: 18px; width: 58px; }
+.owner-access h1 { font-size: 24px; font-weight: 500; margin: 0; }
+.owner-access > p:not(.section-label) { color: var(--text-muted); font-size: 12px; line-height: 1.65; margin: 8px 0 0; }
+.owner-access .owner-access-status { color: var(--negative); }
+.owner-access-actions { display: flex; justify-content: center; margin-top: 18px; }
+
 .dialog-backdrop { align-items: center; background: rgba(0, 0, 0, .38); display: flex; inset: 0; justify-content: center; padding: 18px; position: fixed; z-index: 100; }
 .breeze-dialog { background: var(--window); border: 1px solid var(--frame); border-radius: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .32); max-height: calc(100dvh - 36px); overflow: auto; width: min(480px, 100%); }
 .breeze-dialog > header { align-items: center; background: var(--header); border-bottom: 1px solid var(--separator); display: flex; justify-content: space-between; min-height: 38px; padding: 6px 9px 6px 14px; }

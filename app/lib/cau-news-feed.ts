@@ -19,7 +19,9 @@ export function parseCauNoticePage(value: unknown) {
 }
 
 function decodeEntities(value: string) {
-  const named: Record<string, string> = { amp: "&", apos: "'", gt: ">", lt: "<", nbsp: " ", quot: '"' };
+  const named: Record<string, string> = {
+    amp: "&", apos: "'", ensp: " ", gt: ">", ldquo: "“", lt: "<", mdash: "—", middot: "·", nbsp: " ", quot: '"', rdquo: "”",
+  };
   return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, key: string) => {
     if (key[0] !== "#") return named[key.toLowerCase()] ?? entity;
     const hexadecimal = key[1]?.toLowerCase() === "x";

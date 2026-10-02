@@ -44,6 +44,22 @@ test("CAU notices are sanitized, deduplicated, and retained for five days", () =
   assert.doesNotMatch(rss, /bad\(\)|第三句话/);
 });
 
+test("CAU notice titles decode Chinese punctuation entities before RSS rendering", () => {
+  const now = Date.UTC(2026, 8, 30, 12);
+  const notices = normalizeCauNotices([{
+    RESOURCE_ID: "789",
+    PIM_TITLE: "关于开展&ldquo;第十二届&rdquo;&mdash;&mdash;先锋&middot;领航评选工作的通知",
+    PIM_CONTENT: "通知&ensp;内容。",
+    CREATE_TIME: now - 1000,
+  }], now);
+
+  assert.equal(notices[0].title, "关于开展“第十二届”——先锋·领航评选工作的通知");
+  assert.equal(notices[0].summary, "通知 内容。");
+  const rss = renderCauRss(notices, now);
+  assert.match(rss, /<title>关于开展“第十二届”——先锋·领航评选工作的通知<\/title>/);
+  assert.doesNotMatch(rss, /&amp;(?:ensp|ldquo|rdquo|mdash|middot);/);
+});
+
 test("news article URLs decode feed entities without allowing unsafe schemes", () => {
   const expected = "https://one.cau.edu.cn/tp_up/view?m=up#act=up/pim/showpim&id=8036284171743232";
   assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&amp;id=")), expected);
@@ -146,13 +162,14 @@ test("agent page exchanges the Supabase bearer token without putting it in the i
 
 test("agent session restore and refresh keep the live iframe mounted", async () => {
   const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
-  const readyGate = source.indexOf('if (connection === "ready" && (loading || (user && isAdmin)))');
+  const readyGate = source.indexOf('if (connection === "ready" && user && isAdmin)');
   const loadingGate = source.indexOf("if (loading)");
 
   assert.notEqual(readyGate, -1);
   assert.ok(readyGate < loadingGate, "the ready iframe must survive background auth loading");
   assert.match(source, /hasAgentSessionHint\(\) \? "ready" : "idle"/);
   assert.match(source, /cache: "no-store"/);
+  assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
   assert.match(source, /rememberAgentSession\(true\)/);
   assert.match(source, /key=\{frameGeneration\}/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
@@ -176,4 +193,30 @@ test("agent iframe stays mounted across workspace route changes", async () => {
   assert.match(keeper, /hidden=\{!isAgentRoute\}/);
   assert.match(keeper, /<AgentFrame \/>/);
   assert.doesNotMatch(page, /<AgentFrame \/>/);
+});
+
+test("owner-only destinations remain visible and show access guidance", async () => {
+  const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
+  const drive = await readFile(new URL("../app/drive/drive-manager.tsx", import.meta.url), "utf8");
+  const share = await readFile(new URL("../app/share/share-manager.tsx", import.meta.url), "utf8");
+  const agent = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
+
+  assert.match(sidebar, /href="\/drive"/);
+  assert.match(sidebar, /href="\/share"/);
+  assert.match(sidebar, /href="\/agent"/);
+  assert.doesNotMatch(sidebar, /isAdmin && <Link href="\/(?:drive|share|agent)"/);
+  assert.match(drive, /<OwnerAccess/);
+  assert.match(share, /<OwnerAccess/);
+  assert.match(agent, /<OwnerAccess/);
+  assert.match(agent, /<SiteShell active="\/agent"/);
+});
+
+test("sidebar controls render only for pages that provide a sidebar", async () => {
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
+  const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const drive = await readFile(new URL("../app/drive/page.tsx", import.meta.url), "utf8");
+
+  assert.match(shell, /hasSidebar && <button/);
+  assert.match(home, /title="Home" hasSidebar/);
+  assert.doesNotMatch(drive, /hasSidebar/);
 });

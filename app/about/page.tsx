@@ -4,7 +4,7 @@ import { SiteShell } from "../site-shell";
 
 export default function AboutPage() {
   return (
-    <SiteShell active="/about" title="About">
+    <SiteShell active="/about" title="About" hasSidebar>
       <div className="about-layout">
         <PlacesSidebar active="/about" />
         <div className="about-view">

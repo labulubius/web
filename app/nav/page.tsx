@@ -3,7 +3,7 @@ import { NavDirectory } from "./nav-directory";
 
 export default function NavPage() {
   return (
-    <SiteShell active="/nav" title="Web Navigator">
+    <SiteShell active="/nav" title="Web Navigator" hasSidebar>
       <NavDirectory />
     </SiteShell>
   );

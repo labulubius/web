@@ -1,7 +1,10 @@
 "use client";
 
+import { Bot } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccountControl, useSiteAuth } from "../site-auth";
+import { OwnerAccess } from "../owner-access";
+import { SiteShell } from "../site-shell";
+import { useSiteAuth } from "../site-auth";
 import "./agent.css";
 
 const AGENT_ORIGIN = "https://agent.labulubius.com";
@@ -75,6 +78,7 @@ export function AgentFrame() {
   }, [supabase]);
 
   useEffect(() => {
+    if (loading || !user || !isAdmin) return;
     let cancelled = false;
     void fetch(`${AGENT_ORIGIN}/api/owner-auth`, {
       credentials: "include",
@@ -92,7 +96,7 @@ export function AgentFrame() {
       // The normal owner-token exchange below remains the recovery path.
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [isAdmin, loading, user]);
 
   useEffect(() => {
     if (loading || !user || !isAdmin) return;
@@ -117,28 +121,25 @@ export function AgentFrame() {
     });
   }, [authError, loading, user]);
 
-  if (connection === "ready" && (loading || (user && isAdmin))) {
+  if (connection === "ready" && user && isAdmin) {
     return <main className="agent-page"><iframe key={frameGeneration} className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
   }
 
   if (loading) {
-    return <main className="agent-gate"><div className="agent-gate-card"><p>Checking owner access…</p></div></main>;
-  }
-
-  if (!user) {
-    return <main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p>Sign in with the site owner account to continue.</p><AccountControl /></div></main>;
+    return <SiteShell active="/agent" title="Pi Agent"><OwnerAccess icon={<Bot size={28} />} title="Pi Agent" description="Checking owner access…" /></SiteShell>;
   }
 
   if (authError) {
-    return <main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></div></main>;
+    return <SiteShell active="/agent" title="Pi Agent"><OwnerAccess icon={<Bot size={28} />} title="Pi Agent" description="The account check could not be completed." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry account check</button>} /></SiteShell>;
   }
 
-  if (!isAdmin) {
-    return <main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p>This page is available only to the site owner.</p><AccountControl /></div></main>;
+  if (!user || !isAdmin) {
+    return <SiteShell active="/agent" title="Pi Agent"><OwnerAccess icon={<Bot size={28} />} title="Pi Agent" description="Only the site owner can use the private Pi Agent. Sign in with the owner account to continue." /></SiteShell>;
   }
 
   if (connection !== "ready") {
-    return <main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p>{connection === "connecting" ? "Connecting securely to the Mac mini…" : error || "Agent connection is unavailable."}</p>{connection === "error" && <button type="button" onClick={() => void connect()}>Retry connection</button>}</div></main>;
+    const message = connection === "connecting" ? "Connecting securely to the Mac mini…" : error || "Agent connection is unavailable.";
+    return <SiteShell active="/agent" title="Pi Agent"><OwnerAccess icon={<Bot size={28} />} title="Pi Agent" description={connection === "error" ? "The agent connection could not be established." : message} status={connection === "error" ? message : undefined} action={connection === "error" ? <button className="account-control" type="button" onClick={() => void connect()}>Retry connection</button> : <span role="status">Please wait…</span>} /></SiteShell>;
   }
 
   return null;

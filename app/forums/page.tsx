@@ -23,7 +23,7 @@ export default async function ForumsPage({ searchParams }: PageProps<"/forums">)
   try { page = await forumTopicPage(sourceId, categoryId); }
   catch { page = { topics: [], failed: sources.map((source) => source.name), continuation: null }; }
 
-  return <SiteShell active="/forums" title="Communities">
+  return <SiteShell active="/forums" title="Communities" hasSidebar>
     <div className="forums-layout">
       <ForumsSidebar directory={directory} activeCategory={categoryId} activeSource={sourceId} />
       <section className="forums-content">

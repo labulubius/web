@@ -33,10 +33,12 @@ const navigation = [
 export function SiteShell({
   children,
   active,
+  hasSidebar = false,
 }: {
   children: ReactNode;
   active: string;
   title: string;
+  hasSidebar?: boolean;
 }) {
   const [mobileSidebar, setMobileSidebar] = useState({ page: active, open: false });
   const mobileSidebarOpen = mobileSidebar.page === active && mobileSidebar.open;
@@ -96,7 +98,7 @@ export function SiteShell({
     >
       <main className="breeze-window">
         <div className="tool-bar">
-          <button
+          {hasSidebar && <button
             className="sidebar-toggle mobile-sidebar-toggle"
             type="button"
             onClick={() => {
@@ -111,8 +113,8 @@ export function SiteShell({
           >
             <Menu size={18} />
             <span>Sidebar</span>
-          </button>
-          <button
+          </button>}
+          {hasSidebar && <button
             className="sidebar-toggle"
             type="button"
             onClick={toggleSidebar}
@@ -123,7 +125,7 @@ export function SiteShell({
           >
             <Menu size={20} />
             <span>Sidebar</span>
-          </button>
+          </button>}
           <nav aria-label="Main navigation">
             {navigation.map(({ href, label, icon: Icon }) => (
               <Link key={href} className={active === href ? "active" : ""} href={href} aria-current={active === href ? "page" : undefined} title={label}>

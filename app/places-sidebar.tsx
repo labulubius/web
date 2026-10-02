@@ -1,11 +1,9 @@
 "use client";
 
-import { Compass, HardDrive, Home, Info, MessagesSquare, Newspaper, Share2, Star, StickyNote } from "lucide-react";
-import { useSiteAuth } from "./site-auth";
+import { Bot, Compass, HardDrive, Home, Info, MessagesSquare, Newspaper, Share2, Star, StickyNote } from "lucide-react";
 import Link from "next/link";
 
 export function PlacesSidebar({ active }: { active: string }) {
-  const { isAdmin } = useSiteAuth();
   return (
     <aside className="places-sidebar" id="page-sidebar">
       <h2>Places</h2>
@@ -18,9 +16,10 @@ export function PlacesSidebar({ active }: { active: string }) {
         </Link>
         <Link href="/news"><Newspaper size={16} /> News</Link>
         <Link href="/forums"><MessagesSquare size={16} /> Forums</Link>
-        {isAdmin && <Link href="/drive"><HardDrive size={16} /> Drive</Link>}
-        {isAdmin && <Link href="/share"><Share2 size={16} /> Share</Link>}
+        <Link href="/drive"><HardDrive size={16} /> Drive</Link>
+        <Link href="/share"><Share2 size={16} /> Share</Link>
         <Link href="/note"><StickyNote size={16} /> Note</Link>
+        <Link href="/agent"><Bot size={16} /> Agent</Link>
         <Link className={active === "/about" ? "selected" : ""} href="/about">
           <Info size={16} /> About
         </Link>

@@ -5,5 +5,5 @@ import { NewsReader } from "./news-reader";
 export const metadata: Metadata = { title: "News" };
 
 export default function NewsPage() {
-  return <SiteShell active="/news" title="News"><NewsReader /></SiteShell>;
+  return <SiteShell active="/news" title="News" hasSidebar><NewsReader /></SiteShell>;
 }
