@@ -9,8 +9,8 @@ const AGENT_ORIGIN = "https://agent.labulubius.com";
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 const AGENT_SESSION_HINT_KEY = "pi-agent-session-established";
 
-function PiWebFrame({ generation = 0 }: { generation?: number }) {
-  return <main className="agent-page"><iframe key={generation} className="agent-frame" src={AGENT_ORIGIN} title="Pi Web" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+function PiWebFrame({ generation = 0, src = AGENT_ORIGIN }: { generation?: number; src?: string }) {
+  return <main className="agent-page"><iframe key={generation} className="agent-frame" src={src} title="Pi Web" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
 }
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
@@ -124,7 +124,11 @@ export function AgentFrame() {
   }, [authError, loading, user]);
 
   if (connection === "ready" && user && isAdmin) {
-    return <PiWebFrame generation={frameGeneration} />;
+    const handoff = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("handoff");
+    const frameUrl = handoff
+      ? `${AGENT_ORIGIN}?cwd=${encodeURIComponent("/Users/labulubius/Pi/workspace")}&prompt=${encodeURIComponent(handoff)}`
+      : AGENT_ORIGIN;
+    return <PiWebFrame generation={frameGeneration} src={frameUrl} />;
   }
 
   if (loading || authError || !user || !isAdmin) {

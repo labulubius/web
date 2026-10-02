@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Copy, Download, ExternalLink, File, Folder, FolderPlus, Link2, RefreshCw, Share2, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Bot, Copy, Download, ExternalLink, File, Folder, FolderPlus, Link2, RefreshCw, Share2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
+import { agentHandoffPath, pdfToEpubHandoff } from "../lib/agent-handoff";
 import { uploadInChunks } from "../lib/upload-client";
 import { OwnerAccess } from "../owner-access";
 import "./share.css";
@@ -94,6 +95,11 @@ export function ShareManager() {
     finally { setBusy(false); }
   }
 
+  function sendToPdfToEpub(entry: Entry) {
+    const prompt = pdfToEpubHandoff("share", entry.id, entry.name, entry.size);
+    window.location.assign(new URL(agentHandoffPath(prompt), window.location.origin));
+  }
+
   async function copy(text: string, label: string) {
     try { await navigator.clipboard.writeText(text); setMessage(`${label} copied.`); setError(""); }
     catch { setError("Clipboard unavailable. Open the link and copy it from the address bar."); }
@@ -146,6 +152,7 @@ export function ShareManager() {
               <span className="share-detail">{new Date(entry.created).toLocaleDateString()}</span>
               <div className="share-row-actions">
                 <button type="button" onClick={() => void copy(url, "Link")} title="Copy public link" aria-label={`Copy public link for ${entry.name}`}><Link2 size={16} /></button>
+                {entry.name.toLowerCase().endsWith(".pdf") && <button type="button" onClick={() => sendToPdfToEpub(entry)} title="Convert to EPUB with Pi" aria-label={`Convert ${entry.name} to EPUB`}><Bot size={16} /></button>}
                 {entry.type === "image" && <button type="button" onClick={() => void copy(`![${entry.name}](${url})`, "Markdown")} title="Copy Markdown image" aria-label={`Copy Markdown image for ${entry.name}`}><Copy size={16} /></button>}
                 <a href={url} target="_blank" rel="noopener noreferrer" title={entry.type === "image" ? "Open image" : "Download file"} aria-label={`${entry.type === "image" ? "Open" : "Download"} ${entry.name}`}>{entry.type === "image" ? <ExternalLink size={16} /> : <Download size={16} />}</a>
                 <button type="button" className="share-remove" onClick={() => void removeFile(entry)} disabled={busy} title="Remove public file" aria-label={`Remove ${entry.name}`}><Trash2 size={16} /></button>

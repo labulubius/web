@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Download, File, Folder, FolderPlus, HardDrive, RefreshCw, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Bot, Download, File, Folder, FolderPlus, HardDrive, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
+import { agentHandoffPath, pdfToEpubHandoff } from "../lib/agent-handoff";
 import { uploadInChunks } from "../lib/upload-client";
 import { OwnerAccess } from "../owner-access";
 import "./drive.css";
@@ -107,6 +108,12 @@ export function DriveManager() {
     });
   }
 
+  function sendToPdfToEpub(entry: Entry) {
+    const remote = [listedPath, entry.name].filter(Boolean).join("/");
+    const prompt = pdfToEpubHandoff("drive", remote, entry.name, entry.size);
+    window.location.assign(new URL(agentHandoffPath(prompt), window.location.origin));
+  }
+
   function download(entry: Entry) {
     void run(async () => {
       // Pick the destination before the first await, while the click still has user activation.
@@ -155,7 +162,7 @@ export function DriveManager() {
           {entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => setParts([...(listedPath ? listedPath.split("/") : []), entry.name])}>{entry.name}</button> : <span className="drive-name">{entry.name}</span>}
           <span className="drive-detail">{entry.type === "file" ? `${(entry.size / 1024).toFixed(1)} KB` : "Folder"}</span>
           <span className="drive-detail">{new Date(entry.modified).toLocaleDateString()}</span>
-          <span className="drive-row-actions">{entry.type === "file" && <button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>}
+          <span className="drive-row-actions">{entry.type === "file" && <><button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>{entry.name.toLowerCase().endsWith(".pdf") && <button className="drive-icon-button" aria-label={`Convert ${entry.name} to EPUB`} title="Convert to EPUB with Pi" type="button" disabled={busy} onClick={() => sendToPdfToEpub(entry)}><Bot size={17} /></button>}</>}
           <button className="drive-icon-button drive-delete" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={17} /></button></span>
         </li>)}</ul></div>}
     </section>

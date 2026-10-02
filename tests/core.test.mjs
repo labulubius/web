@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
+import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
@@ -9,6 +10,18 @@ import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import nextConfig from "../next.config.ts";
+
+test("PDF handoff carries a private structured reference into Agent", () => {
+  const prompt = pdfToEpubHandoff("drive", "Books/中文扫描.pdf", "中文扫描.pdf", 1234);
+  assert.match(prompt, /^\/skill:pdf-to-epub/);
+  assert.match(prompt, /<pi-file-reference>/);
+  assert.match(prompt, /"source":"drive"/);
+  assert.match(prompt, /"remote":"Books\/中文扫描.pdf"/);
+  const path = agentHandoffPath(prompt);
+  assert.ok(path.startsWith("/agent?handoff="));
+  assert.equal(decodeURIComponent(path.split("=", 2)[1]), prompt);
+  assert.throws(() => pdfToEpubHandoff("share", "", "book.pdf", 1), /Invalid/);
+});
 
 test("CAU login encryption matches the university CAS implementation", () => {
   assert.equal(cauLoginCipher("abc"), "39644174795FB4D0");
@@ -157,7 +170,8 @@ test("agent page exchanges the Supabase bearer token without putting it in the i
   assert.match(source, /Authorization: `Bearer \$\{token\}`/);
   assert.match(source, /credentials: "include"/);
   assert.match(source, /function PiWebFrame/);
-  assert.match(source, /src=\{AGENT_ORIGIN\}/);
+  assert.match(source, /src=\{src\}/);
+  assert.match(source, /src=\{frameUrl\}/);
   assert.doesNotMatch(source, /src=.*access_token/);
   assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
 });
@@ -173,7 +187,7 @@ test("agent session restore and refresh keep the live iframe mounted", async () 
   assert.match(source, /cache: "no-store"/);
   assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
   assert.match(source, /rememberAgentSession\(true\)/);
-  assert.match(source, /<PiWebFrame generation=\{frameGeneration\} \/>/);
+  assert.match(source, /<PiWebFrame generation=\{frameGeneration\} src=\{frameUrl\} \/>/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "error"\)/);
 });
