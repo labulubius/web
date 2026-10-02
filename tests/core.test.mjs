@@ -222,12 +222,16 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.match(shell, /<AccountControl \/>/);
 });
 
-test("sidebar controls render only for pages that provide a sidebar", async () => {
+test("sidebar controls render for the configured workspace pages", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const drive = await readFile(new URL("../app/drive/page.tsx", import.meta.url), "utf8");
+  const share = await readFile(new URL("../app/share/page.tsx", import.meta.url), "utf8");
+  const note = await readFile(new URL("../app/note/page.tsx", import.meta.url), "utf8");
 
   assert.match(shell, /hasSidebar && <button/);
   assert.match(home, /title="Home" hasSidebar/);
-  assert.doesNotMatch(drive, /hasSidebar/);
+  assert.match(drive, /title="Private Drive" hasSidebar/);
+  assert.match(share, /title="Public Share" hasSidebar/);
+  assert.match(note, /title="Private Note" hasSidebar/);
 });
