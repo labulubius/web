@@ -156,14 +156,16 @@ test("agent page exchanges the Supabase bearer token without putting it in the i
   assert.match(source, /\/api\/owner-auth/);
   assert.match(source, /Authorization: `Bearer \$\{token\}`/);
   assert.match(source, /credentials: "include"/);
+  assert.match(source, /function PiWebFrame/);
   assert.match(source, /src=\{AGENT_ORIGIN\}/);
   assert.doesNotMatch(source, /src=.*access_token/);
+  assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
 });
 
 test("agent session restore and refresh keep the live iframe mounted", async () => {
   const source = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
   const readyGate = source.indexOf('if (connection === "ready" && user && isAdmin)');
-  const loadingGate = source.indexOf("if (loading)");
+  const loadingGate = source.indexOf("if (loading || authError || !user || !isAdmin)");
 
   assert.notEqual(readyGate, -1);
   assert.ok(readyGate < loadingGate, "the ready iframe must survive background auth loading");
@@ -171,7 +173,7 @@ test("agent session restore and refresh keep the live iframe mounted", async () 
   assert.match(source, /cache: "no-store"/);
   assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
   assert.match(source, /rememberAgentSession\(true\)/);
-  assert.match(source, /key=\{frameGeneration\}/);
+  assert.match(source, /<PiWebFrame generation=\{frameGeneration\} \/>/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
   assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "error"\)/);
 });
@@ -212,7 +214,9 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.match(share, /<OwnerAccess/);
   assert.match(note, /<OwnerAccess/);
   assert.doesNotMatch(note, /Private note \(administrator only\)/);
-  assert.match(agent, /className="agent-gate"/);
+  assert.match(agent, /if \(loading \|\| authError \|\| !user \|\| !isAdmin\)/);
+  assert.match(agent, /return <PiWebFrame \/>/);
+  assert.doesNotMatch(agent, /Use Sign in in the top toolbar/);
   assert.match(agent, /<SiteShell active="\/agent"/);
   assert.doesNotMatch(access, /AccountControl/);
   assert.match(shell, /<AccountControl \/>/);

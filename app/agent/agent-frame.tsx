@@ -9,6 +9,10 @@ const AGENT_ORIGIN = "https://agent.labulubius.com";
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 const AGENT_SESSION_HINT_KEY = "pi-agent-session-established";
 
+function PiWebFrame({ generation = 0 }: { generation?: number }) {
+  return <main className="agent-page"><iframe key={generation} className="agent-frame" src={AGENT_ORIGIN} title="Pi Web" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+}
+
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
 
 function hasAgentSessionHint(): boolean {
@@ -30,7 +34,7 @@ function rememberAgentSession(established: boolean): void {
 }
 
 export function AgentFrame() {
-  const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
+  const { supabase, user, isAdmin, loading, authError } = useSiteAuth();
   const [connection, setConnection] = useState<ConnectionState>(() => (
     hasAgentSessionHint() ? "ready" : "idle"
   ));
@@ -120,19 +124,11 @@ export function AgentFrame() {
   }, [authError, loading, user]);
 
   if (connection === "ready" && user && isAdmin) {
-    return <main className="agent-page"><iframe key={frameGeneration} className="agent-frame" src={AGENT_ORIGIN} title="Pi Agent on Mac mini" referrerPolicy="no-referrer" allow="clipboard-read; clipboard-write" /></main>;
+    return <PiWebFrame generation={frameGeneration} />;
   }
 
-  if (loading) {
-    return <SiteShell active="/agent" title="Pi Agent"><main className="agent-gate"><div className="agent-gate-card"><p role="status">Checking owner access…</p></div></main></SiteShell>;
-  }
-
-  if (authError) {
-    return <SiteShell active="/agent" title="Pi Agent"><main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></div></main></SiteShell>;
-  }
-
-  if (!user || !isAdmin) {
-    return <SiteShell active="/agent" title="Pi Agent"><main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p>This page is available only to the site owner. Use Sign in in the top toolbar to continue.</p></div></main></SiteShell>;
+  if (loading || authError || !user || !isAdmin) {
+    return <PiWebFrame />;
   }
 
   if (connection !== "ready") {
