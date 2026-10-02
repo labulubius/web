@@ -12,7 +12,18 @@ import sharp from "sharp";
 const ORIGIN = "https://labulubius.com";
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export type ShareEntry = { id: string; name: string; size: number; storedSize?: number; type: "image" | "file"; created: string; folderId?: string | null };
+export type ShareEntry = {
+  id: string;
+  name: string;
+  size: number;
+  storedSize?: number;
+  type: "image" | "file";
+  created: string;
+  folderId?: string | null;
+  managedBy?: "pdf-to-epub-v1";
+  jobId?: string;
+  expiresAt?: string;
+};
 export type ShareFolder = { id: string; name: string; parentId: string | null; created: string };
 
 type Catalog<T> = { expires: number; value: Promise<T[]> };
@@ -26,8 +37,12 @@ function invalidateCatalogs(entries = true, folders = true) {
 }
 
 export function shareHost(request: Request) {
-  const host = new URL(request.url).hostname;
-  return host === "share.labulubius.com" || host === "localhost" || host === "127.0.0.1";
+  try {
+    const host = new URL(request.url).hostname;
+    return host === "share.labulubius.com" || host === "localhost" || host === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }
 
 export function cors(request: Request, response: Response) {
@@ -116,13 +131,19 @@ async function scanEntries() {
   return measured;
 }
 
+function isExpired(entry: ShareEntry, now = Date.now()) {
+  return entry.managedBy === "pdf-to-epub-v1"
+    && typeof entry.expiresAt === "string"
+    && (!Number.isFinite(Date.parse(entry.expiresAt)) || Date.parse(entry.expiresAt) <= now);
+}
+
 export async function list() {
   if (!entryCatalog || entryCatalog.expires <= Date.now()) {
     const value = scanEntries();
     entryCatalog = { expires: Date.now() + catalogTtl, value };
     value.catch(() => { if (entryCatalog?.value === value) entryCatalog = null; });
   }
-  return [...await entryCatalog.value];
+  return [...await entryCatalog.value].filter((entry) => !isExpired(entry));
 }
 
 export async function shareUsed() {
@@ -319,7 +340,7 @@ export async function remove(id: string) {
 
 export async function publicFile(id: string, request: Request, thumbnail = false) {
   const entry = await load(id);
-  if (!entry || (thumbnail && entry.type !== "image") || (entry.folderId && !await activeFolder(entry.folderId))) return new Response("Not found", { status: 404 });
+  if (!entry || isExpired(entry) || (thumbnail && entry.type !== "image") || (entry.folderId && !await activeFolder(entry.folderId))) return new Response("Not found", { status: 404 });
   const file = thumbnail ? location(id).thumb : location(id).blob;
   let handle;
   try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW); }

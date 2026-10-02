@@ -23,6 +23,14 @@ test("PDF handoff carries a private structured reference into Agent", () => {
   assert.throws(() => pdfToEpubHandoff("share", "", "book.pdf", 1), /Invalid/);
 });
 
+test("managed Share EPUBs disappear from listings and public downloads at expiry", async () => {
+  const source = await readFile(new URL("../app/lib/share-server.ts", import.meta.url), "utf8");
+  assert.match(source, /managedBy\?: "pdf-to-epub-v1"/);
+  assert.match(source, /Date\.parse\(entry\.expiresAt\) <= now/);
+  assert.match(source, /filter\(\(entry\) => !isExpired\(entry\)\)/);
+  assert.match(source, /if \(!entry \|\| isExpired\(entry\)/);
+});
+
 test("CAU login encryption matches the university CAS implementation", () => {
   assert.equal(cauLoginCipher("abc"), "39644174795FB4D0");
   assert.equal(cauLoginCipher("12345678"), "C1BB5938DF9F2190B89172CB54C8C33A");
