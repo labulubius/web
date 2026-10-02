@@ -1,4 +1,4 @@
-.directory-view { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
+.directory-view { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
 .directory-sidebar { background: var(--window); border-right: 1px solid var(--separator); min-width: 0; overflow: hidden; padding: 13px 8px; transition: border-color 180ms ease, padding 180ms ease; }
 .plasma-desktop[data-sidebar-collapsed="true"] .directory-view { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .directory-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
@@ -36,11 +36,10 @@
 .breeze-search input::-webkit-search-cancel-button { display: none; }
 .breeze-search button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text-muted); display: flex; height: 22px; justify-content: center; padding: 0; width: 22px; }
 .breeze-search button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); }
-.directory-action, .account-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 6px; height: 32px; padding: 0 9px; white-space: nowrap; }
-.directory-action:hover, .account-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
+.directory-action { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 6px; height: 32px; padding: 0 9px; white-space: nowrap; }
+.directory-action:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .directory-action.primary, .breeze-dialog button.primary { background: var(--accent); border-color: var(--accent); color: white; }
 .directory-action:disabled { cursor: not-allowed; opacity: .5; }
-.account-control > svg:last-child:not(:first-child) { margin-left: 2px; }
 .directory-notice { background: color-mix(in srgb, var(--neutral) 12%, var(--view)); border: 1px solid color-mix(in srgb, var(--neutral) 55%, var(--separator)); border-radius: 4px; color: var(--text); font-size: 11px; margin-bottom: 14px; padding: 9px 11px; }
 
 .site-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -72,25 +71,6 @@
 .empty-state button { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); font-size: 11px; padding: 6px 12px; }
 .empty-state button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 
-.dialog-backdrop { align-items: center; background: rgba(0, 0, 0, .38); display: flex; inset: 0; justify-content: center; padding: 18px; position: fixed; z-index: 100; }
-.breeze-dialog { background: var(--window); border: 1px solid var(--frame); border-radius: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .32); max-height: calc(100dvh - 36px); overflow: auto; width: min(480px, 100%); }
-.breeze-dialog > header { align-items: center; background: var(--header); border-bottom: 1px solid var(--separator); display: flex; justify-content: space-between; min-height: 38px; padding: 6px 9px 6px 14px; }
-.breeze-dialog h2 { font-size: 13px; font-weight: 500; margin: 0; }
-.breeze-dialog > header button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); display: flex; height: 27px; justify-content: center; padding: 0; width: 27px; }
-.breeze-dialog > header button:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
-.breeze-dialog form { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
-.breeze-dialog label { color: var(--text); display: flex; flex-direction: column; font-size: 11px; gap: 5px; }
-.breeze-dialog label small { color: var(--text-muted); }
-.breeze-dialog input, .breeze-dialog select, .breeze-dialog textarea { background: var(--view); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); font: inherit; font-size: 12px; min-height: 31px; padding: 6px 8px; resize: vertical; width: 100%; }
-.breeze-dialog input:focus, .breeze-dialog select:focus, .breeze-dialog textarea:focus { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); outline: 0; }
-.form-grid { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
-.breeze-dialog .checkbox-label { align-items: center; flex-direction: row; gap: 7px; }
-.breeze-dialog .checkbox-label input { min-height: 0; width: auto; }
-.form-error { background: color-mix(in srgb, var(--negative) 10%, var(--view)); border: 1px solid color-mix(in srgb, var(--negative) 55%, var(--separator)); border-radius: 3px; color: var(--text); font-size: 10px; margin: 0; padding: 7px 8px; }
-.breeze-dialog form > footer { border-top: 1px solid var(--separator); display: flex; gap: 7px; justify-content: flex-end; margin: 3px -16px -16px; padding: 10px 16px; }
-.breeze-dialog form > footer button { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); font-size: 11px; min-width: 72px; padding: 6px 11px; }
-.breeze-dialog form > footer button:hover { border-color: var(--accent); }
-.breeze-dialog form > footer button:disabled { opacity: .55; }
 
 @media (max-width: 980px) {
   .directory-header { align-items: stretch; flex-direction: column; }

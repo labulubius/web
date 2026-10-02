@@ -52,7 +52,7 @@ export function ForumsSidebar({ directory, activeCategory, activeSource }: { dir
 
   return <>
     <aside className="forums-sidebar" id="page-sidebar" aria-label="Community sources">
-      <div className="forums-sidebar-heading"><h2>Communities</h2>{isAdmin && <button type="button" disabled={busy} onClick={() => setDialog({ kind: "category" })} title="Add category" aria-label="Add category"><Plus size={14} /></button>}</div>
+      <div className="forums-sidebar-heading"><h2>Forums</h2>{isAdmin && <button type="button" disabled={busy} onClick={() => setDialog({ kind: "category" })} title="Add category" aria-label="Add category"><Plus size={14} /></button>}</div>
       <div className="forums-category-row"><button type="button" className={!activeCategory && !activeSource ? "active" : ""} onClick={() => openCategory(null)}><LayoutGrid size={16} /><span>All discussions</span></button></div>
       <div className="forums-source-list">{directory.categories.map((category) => <section key={category.id}>
         <div className="forums-category-row"><button type="button" className={activeCategory === category.id ? "active" : ""} aria-expanded={!collapsed.includes(category.id)} onClick={() => openCategory(category.id)}>{collapsed.includes(category.id) ? <Folder size={16} /> : <FolderOpen size={16} />}<span title={category.name}>{category.name}</span></button>

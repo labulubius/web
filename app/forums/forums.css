@@ -1,14 +1,14 @@
-.forums-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
+.forums-layout { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100%; }
 .forums-sidebar { background: var(--window); border-right: 1px solid var(--separator); min-width: 0; overflow: hidden; padding: 13px 8px; }
 .forums-sidebar-heading { align-items: center; display: flex; justify-content: space-between; margin: 8px 5px 5px 9px; }
 .forums-sidebar-heading h2 { color: var(--text-muted); font-size: 11px; font-weight: 500; margin: 0; }
 .forums-sidebar-heading button, .forums-row-actions button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--link); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
-.forums-sidebar-heading button:hover, .forums-row-actions button:hover { background: var(--window-alt); }
+.forums-sidebar-heading button:hover, .forums-row-actions button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .forums-category-row { align-items: center; display: flex; position: relative; }
 .forums-category-row > button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: flex; flex: 1; font-size: 12px; gap: 8px; min-height: 33px; min-width: 0; padding: 6px 9px; text-align: left; }
 .forums-category-row > button svg { color: var(--link); flex: none; }
 .forums-category-row > button span, .forums-source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.forums-category-row > button:hover, .forums-source:hover { background: var(--window-alt); }
+.forums-category-row > button:hover, .forums-source:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .forums-category-row > button.active { background: var(--accent); color: white; }
 .forums-category-row > button.active svg { color: white; }
 .forums-category-row:has(.forums-row-actions) > button { padding-right: 53px; }
@@ -21,7 +21,7 @@
 .forums-source-check input { accent-color: var(--link); cursor: pointer; margin: 0; }
 .forums-source-check input:disabled { cursor: default; }
 .forums-source-name { background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; flex: 1; font-size: 12px; min-height: 33px; min-width: 0; overflow: hidden; padding: 5px 53px 5px 1px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.forums-source-name:hover { background: var(--window-alt); }
+.forums-source-name:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .forums-source-name.active { background: var(--accent); color: white; }
 .forums-row-actions { align-items: center; display: flex; position: absolute; right: 4px; }
 .forums-category-row > button.active + .forums-row-actions button { color: white; }

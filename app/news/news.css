@@ -1,4 +1,4 @@
-.news-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
+.news-layout { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100%; transition: grid-template-columns 180ms ease; }
 .news-sidebar { background: var(--window); border-right: 1px solid var(--separator); min-width: 0; overflow: hidden; padding: 13px 8px; transition: border-color 180ms ease, padding 180ms ease; }
 .plasma-desktop[data-sidebar-collapsed="true"] .news-layout { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .news-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
