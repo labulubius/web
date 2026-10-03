@@ -2,6 +2,8 @@
 
 A personal web workspace with a KDE Breeze-inspired interface. The public pages organize links and reading sources; a Supabase-authenticated site administrator manages the directory, files, feeds, forums and a private note.
 
+All interface work must follow the scoped visual, interaction, accessibility and permission rules in [DESIGN.md](DESIGN.md).
+
 ## Pages
 
 | Route | Purpose | Data / access |
