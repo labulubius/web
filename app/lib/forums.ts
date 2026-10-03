@@ -169,11 +169,6 @@ async function rssTopics(source: ForumSource): Promise<ForumTopic[]> {
 }
 
 export async function latestTopics(source: ForumSource): Promise<ForumTopic[]> {
-  if (process.env.VERCEL) {
-    const response = await fetch(`https://drive.labulubius.com/api/forums?view=topics&source=${encodeURIComponent(source.id)}`, { cache: "no-store", signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error("Community source unavailable.");
-    return response.json() as Promise<ForumTopic[]>;
-  }
   if (source.kind === "discourse") return discourseTopics(source);
   if (source.kind === "v2ex") return v2exTopics();
   if (source.kind === "hackernews") return hackerNewsTopics(source);
@@ -223,15 +218,6 @@ async function aggregateTopics(sourceId: string | null, categoryId: string | nul
 }
 
 export async function forumTopicPage(sourceId: string | null, categoryId: string | null, cursor: string | null = null): Promise<ForumTopicPage> {
-  if (process.env.VERCEL) {
-    const query = new URLSearchParams({ view: "aggregate" });
-    if (cursor) query.set("cursor", cursor);
-    if (sourceId) query.set("source", sourceId);
-    if (categoryId) query.set("category", categoryId);
-    const response = await fetch(`https://drive.labulubius.com/api/forums?${query}`, { cache: "no-store", signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error("Communities unavailable.");
-    return response.json() as Promise<ForumTopicPage>;
-  }
   const match = cursor?.match(/^([0-9a-f-]{36})\.(\d{1,6})$/) ?? null;
   const offset = match ? Number(match[2]) : 0;
   const result = await aggregateTopics(sourceId, categoryId, match?.[1] ?? null);

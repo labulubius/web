@@ -25,33 +25,12 @@ function sidebarData() {
   return sidebarCache;
 }
 
-// Vercel hosts the UI. Forward same-origin News requests over the existing
-// Cloudflare Tunnel to the web server; only the web server contacts FreshRSS.
-async function relay(request: Request) {
-  const incoming = new URL(request.url);
-  const target = new URL(`/api/news${incoming.search}`, "https://drive.labulubius.com");
-  const response = await fetch(target, {
-    method: request.method,
-    headers: {
-      ...(request.headers.get("authorization") ? { Authorization: request.headers.get("authorization")! } : {}),
-      ...(["PUT", "POST"].includes(request.method) ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(["PUT", "POST"].includes(request.method) ? { body: await request.text() } : {}),
-    cache: "no-store", signal: AbortSignal.timeout(55000),
-  });
-  return new Response(response.body, {
-    status: response.status,
-    headers: { ...privateNewsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 function errorResponse() {
   return Response.json({ error: "News is temporarily unavailable." }, { status: 503, headers: privateNewsHeaders });
 }
 
 export async function GET(request: Request) {
   try {
-    if (process.env.VERCEL) return await relay(request);
     const url = new URL(request.url);
     if (url.searchParams.get("view") === "sidebar") {
       const [{ feeds, categories }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
@@ -98,7 +77,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (process.env.VERCEL) return await relay(request);
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
     const raw = await request.text();
@@ -131,7 +109,6 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    if (process.env.VERCEL) return await relay(request);
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
     const body = await request.text();

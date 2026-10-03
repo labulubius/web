@@ -91,11 +91,6 @@ function normalizeDirectory(raw: unknown): ForumDirectory {
 }
 
 export async function loadForumDirectory(): Promise<ForumDirectory> {
-  if (process.env.VERCEL) {
-    const response = await fetch("https://drive.labulubius.com/api/forums", { cache: "no-store", signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw new Error("Forum directory unavailable.");
-    return normalizeDirectory(await response.json());
-  }
   try { return normalizeDirectory(JSON.parse(await readFile(file, "utf8"))); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return structuredClone(initial); throw error; }
 }

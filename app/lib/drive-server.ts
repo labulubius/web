@@ -6,7 +6,7 @@ import path from "node:path";
 
 const DRIVE_UI_ORIGIN = "https://labulubius.com";
 
-// The UI runs on Vercel; storage and these APIs run on the web server.
+// Drive storage and APIs are available only on the dedicated Drive host.
 export async function withDriveCors(request: Request, handler: () => Promise<Response>): Promise<Response> {
   const response = await handler();
   if (request.headers.get("origin") === DRIVE_UI_ORIGIN) {

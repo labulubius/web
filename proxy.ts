@@ -12,10 +12,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 307);
   }
 
-  if (isNavHost && !request.nextUrl.pathname.startsWith("/nav")) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/nav${url.pathname === "/" ? "" : url.pathname}`;
-    return NextResponse.rewrite(url);
+  if (isNavHost) {
+    const path = request.nextUrl.pathname.startsWith("/nav")
+      ? request.nextUrl.pathname
+      : `/nav${request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname}`;
+    const url = new URL(path, "https://labulubius.com");
+    url.search = request.nextUrl.search;
+    return NextResponse.redirect(url, 308);
   }
 
   return NextResponse.next();

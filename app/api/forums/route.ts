@@ -5,24 +5,8 @@ import { newsAdmin, privateNewsHeaders } from "../../lib/news-server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function relay(request: Request) {
-  const incoming = new URL(request.url);
-  const response = await fetch(`https://drive.labulubius.com/api/forums${incoming.search}`, {
-    method: request.method,
-    headers: {
-      ...(request.headers.get("authorization") ? { Authorization: request.headers.get("authorization")! } : {}),
-      ...(request.method === "POST" ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(request.method === "POST" ? { body: await request.text() } : {}),
-    cache: "no-store", signal: AbortSignal.timeout(20000),
-  });
-  const cacheControl = response.headers.get("cache-control");
-  return new Response(response.body, { status: response.status, headers: { ...privateNewsHeaders, ...(cacheControl ? { "Cache-Control": cacheControl } : {}), "Content-Type": "application/json" } });
-}
-
 export async function GET(request: Request) {
   try {
-    if (process.env.VERCEL) return await relay(request);
     const url = new URL(request.url);
     const directory = await loadForumDirectory();
     const view = url.searchParams.get("view");
@@ -47,7 +31,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (process.env.VERCEL) return await relay(request);
     if (!await newsAdmin(request)) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
     const raw = await request.text();
     if (raw.length > 5000) return Response.json({ error: "Request too large." }, { status: 413, headers: privateNewsHeaders });
