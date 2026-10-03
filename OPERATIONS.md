@@ -8,7 +8,7 @@ Run `scripts/health-check.sh` to check the main, Drive, Share, Feeds and Agent h
 
 ## Production deployment
 
-VM100 is the only web production host. The checkout is `/home/debian/labulubius`, and `labulubius-web.service` runs its production build on `127.0.0.1:3000`. The Mac mini Agent reaches it with `ssh web` and edits that checkout directly. Before committing or restarting production, require a clean review of `git diff` and run:
+VM100 is the only web production host and the only Web code workspace. The checkout is `/home/debian/labulubius`, and `labulubius-web.service` runs its production build on `127.0.0.1:3000`. Do not clone or maintain the Web repository on the Mac mini. The Mac mini Agent must reach the VM with `ssh web` and edit the VM100 checkout directly. Before committing or restarting production, require a clean review of `git diff` and run:
 
 ```bash
 npm run lint
