@@ -5,6 +5,7 @@ import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
+import { addDays, compareTasks, localDate, minutesToTime, timeToMinutes } from "../app/lib/tasks.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
@@ -146,6 +147,30 @@ test("news summaries contain no more than two short sentences", () => {
   assert.match(longChinese, /…$/);
 });
 
+test("task planner dates and times stay local and use 15-minute slots", () => {
+  assert.equal(localDate(new Date(2026, 9, 3, 1, 30)), "2026-10-03");
+  assert.equal(addDays("2026-12-31", 1), "2027-01-01");
+  assert.equal(addDays("2028-02-28", 1), "2028-02-29");
+  assert.equal(timeToMinutes("09:08"), 555);
+  assert.equal(timeToMinutes("23:59"), 1425);
+  assert.equal(timeToMinutes("25:00"), null);
+  assert.equal(minutesToTime(555), "09:15");
+});
+
+test("task planner sorting keeps open and anytime tasks first", () => {
+  const base = {
+    id: "1", owner_id: "owner", title: "Task", notes: "", status: "open",
+    scheduled_date: "2026-10-03", start_minute: null, position: 1,
+    completed_at: null, created_at: "2026-10-03T00:00:00Z", updated_at: "2026-10-03T00:00:00Z",
+  };
+  const tasks = [
+    { ...base, id: "completed", status: "completed", completed_at: "2026-10-03T10:00:00Z" },
+    { ...base, id: "timed", start_minute: 540 },
+    { ...base, id: "anytime" },
+  ].sort(compareTasks);
+  assert.deepEqual(tasks.map(({ id }) => id), ["anytime", "timed", "completed"]);
+});
+
 test("storage quota includes pending and converted output bytes", () => {
   assert.equal(fitsStorageQuota(80, 10, 10, 100), true);
   assert.equal(fitsStorageQuota(80, 10, 11, 100), false);
@@ -242,6 +267,22 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.match(agent, /<SiteShell active="\/agent"/);
   assert.doesNotMatch(access, /AccountControl/);
   assert.match(shell, /<AccountControl \/>/);
+});
+
+test("Home planner remains owner-only and its database policy fails closed", async () => {
+  const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const planner = await readFile(new URL("../app/tasks/task-planner.tsx", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/202610020001_tasks.sql", import.meta.url), "utf8");
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
+
+  assert.match(home, /<TaskPlanner \/>/);
+  assert.match(home, /robots: \{ index: false, follow: false \}/);
+  assert.match(planner, /if \(!user \|\| !isAdmin\) return <OwnerAccess/);
+  assert.match(planner, /if \(loading \|\| !isAdmin \|\| !user\) return;/);
+  assert.match(planner, /\.eq\("owner_id", user\.id\)/);
+  assert.match(migration, /alter table public\.tasks enable row level security/);
+  assert.match(migration, /owner_id = \(select auth\.uid\(\)\) and public\.site_is_admin\(\)/);
+  assert.doesNotMatch(shell, /href: "\/tasks"/);
 });
 
 test("sidebar controls render for the configured workspace pages", async () => {
