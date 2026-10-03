@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-// Persistent on the web server; never stored in the Vercel deployment filesystem.
+// Persistent on the web VM outside the Git checkout.
 const directory = process.env.NEWS_DATA_DIR || path.join(os.homedir(), ".local", "share", "labulubius", "news");
 
 function preferencePath(userId: string) {

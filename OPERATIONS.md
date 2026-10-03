@@ -4,7 +4,20 @@
 
 `GET /api/health` is an unauthenticated liveness check. It returns only `{"status":"ok"}` with `Cache-Control: no-store`; it intentionally does not disclose dependency, disk, version, path, or credential details.
 
-Run `scripts/health-check.sh` to check the main, Drive, and Share hostnames. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `SHARE_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+Run `scripts/health-check.sh` to check the main, Drive, Share, Feeds and Agent hostnames. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `SHARE_ORIGIN`, `FEEDS_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+
+## Production deployment
+
+VM100 is the only web production host. The checkout is `/home/debian/labulubius`, and `labulubius-web.service` runs its production build on `127.0.0.1:3000`. The Mac mini Agent reaches it with `ssh web` and edits that checkout directly. Before committing or restarting production, require a clean review of `git diff` and run:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+Commit and push the verified revision to GitHub, restart `labulubius-web.service`, then run `scripts/health-check.sh`. GitHub is the source history and CI remote; it is not a deployment target. Never use `git clean` or a destructive reset on the production checkout without separately checking ignored environment files and the persistent data directories. Roll back by checking out or reverting to a known-good Git revision, rebuilding, restarting the service and repeating the health checks.
 
 ## CAU notice synchronization
 
@@ -14,7 +27,7 @@ Run `scripts/health-check.sh` to check the main, Drive, and Share hostnames. Ove
 
 ## Security headers
 
-Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive/Share origins. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on all three hostnames after changes to Vercel, Cloudflare, or a reverse proxy.
+Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive/Share origins. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on the main, Drive and Share hostnames after changes to Cloudflare Tunnel or a reverse proxy.
 
 ## Backups and restore drills
 

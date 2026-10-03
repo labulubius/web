@@ -1,12 +1,12 @@
 # Public Share
 
-The administrator manages files and nested folders at `https://labulubius.com/share` (Vercel). Upload and management APIs, and public links at `/f/<UUID>` (file) and `/s/<UUID>` (folder), are served from `https://share.labulubius.com` on the `web` machine. Share is separate from the private Drive: never point `SHARE_DATA_DIR` and `DRIVE_DATA_DIR` at the same directory.
+The administrator manages files and nested folders at `https://labulubius.com/share`. Upload and management APIs, and public links at `/f/<UUID>` (file) and `/s/<UUID>` (folder), are served from `https://share.labulubius.com` on the same `web` VM. Share is separate from the private Drive: never point `SHARE_DATA_DIR` and `DRIVE_DATA_DIR` at the same directory.
 
 ## Deployment
 
-1. Set `SHARE_DATA_DIR` on `web` in `.env.local` to an absolute writable directory outside the repository (for example `/home/debian/share-data`). Keep it owned by the web service user and private (mode `0700`). **Do not set it on Vercel.** Both deployments need the appropriate Supabase public URL and publishable key.
+1. Set `SHARE_DATA_DIR` on `web` in `.env.local` to an absolute writable directory outside the repository (for example `/home/debian/share-data`). Keep it owned by the web service user and private (mode `0700`). The web deployment also needs the appropriate Supabase public URL and publishable key.
 2. Route `share.labulubius.com` to the local Next.js service (`http://127.0.0.1:3000`) through Cloudflare Tunnel, ahead of any catch-all rule, and configure/verify its DNS. The current `web` tunnel configuration contains a Share hostname entry; verify the complete ingress and live DNS when deploying rather than assuming the hostname reaches this server.
-3. Build/restart the `web` service and deploy the main-site UI. Test an administrator upload, a public file and folder link, and link revocation before publishing files.
+3. Build and restart the `web` service. Test an administrator upload, a public file and folder link, and link revocation before publishing files.
 4. Back up the **entire** `SHARE_DATA_DIR` as one unit, including `blobs/`, `thumbs/`, `meta/`, `folders/` and any upload state. Restore together. Git and Supabase backups do not include these files.
 
 Every management request verifies a Supabase Bearer token and `site_is_admin()`; CORS only permits `https://labulubius.com`. There is no public listing or root folder link. A folder link grants access to its descendants, while sharing only a child does not reveal its parent. A completed folder deletion revokes its descendant folder and file links at the origin. Recursive deletion deliberately removes the root metadata last, so an interrupted deletion remains reachable and can be retried rather than becoming an inaccessible orphan. Public file responses use `Cache-Control: no-store`, but copies already downloaded or cached elsewhere cannot be revoked.
