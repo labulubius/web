@@ -13,6 +13,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const locks = new Map<string, Promise<void>>();
 
+type ReadResult = { data: TaskData; migrated: boolean };
+
 function object(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -33,28 +35,50 @@ function parseProject(value: unknown): TaskProject {
   return value as TaskProject;
 }
 
-function parseTask(value: unknown): PersonalTask {
+function commonTask(value: unknown) {
   if (!object(value) || !UUID.test(String(value.id)) || typeof value.title !== "string" || !value.title || value.title.length > 200 ||
       typeof value.notes !== "string" || value.notes.length > 5000 ||
       !(value.projectId === null || (typeof value.projectId === "string" && UUID.test(value.projectId))) ||
-      !(value.date === null || validDate(value.date)) ||
-      !(value.startMinute === null || (Number.isInteger(value.startMinute) && Number(value.startMinute) >= 0 && Number(value.startMinute) <= 1410 && Number(value.startMinute) % 30 === 0)) ||
-      !Number.isInteger(value.durationMinutes) || Number(value.durationMinutes) < 30 || Number(value.durationMinutes) > 1440 || Number(value.durationMinutes) % 30 !== 0 ||
-      (value.startMinute !== null && (value.date === null || Number(value.startMinute) + Number(value.durationMinutes) > 1440)) ||
-      !(value.completedAt === null || validIso(value.completedAt)) || !validIso(value.createdAt) || !validIso(value.updatedAt)) {
-    throw new Error("Stored task data is invalid.");
-  }
-  return value as PersonalTask;
+      !validIso(value.createdAt) || !validIso(value.updatedAt)) throw new Error("Stored task data is invalid.");
+  return value;
 }
 
-function parseData(value: unknown): TaskData {
-  if (!object(value) || value.version !== 1 || !Array.isArray(value.tasks) || !Array.isArray(value.projects)) throw new Error("Stored task data is invalid.");
+function parseTask(value: unknown): PersonalTask {
+  const task = commonTask(value);
+  const startDate = task.startDate;
+  const endDate = task.endDate;
+  if (!((startDate === null && endDate === null) || (validDate(startDate) && validDate(endDate) && startDate <= endDate))) {
+    throw new Error("Stored task data is invalid.");
+  }
+  return task as PersonalTask;
+}
+
+function migrateLegacyTask(value: unknown): PersonalTask | null {
+  const task = commonTask(value);
+  if (!(task.completedAt === null || validIso(task.completedAt)) || !(task.date === null || validDate(task.date)) ||
+      !(task.startMinute === null || (Number.isInteger(task.startMinute) && Number(task.startMinute) >= 0 && Number(task.startMinute) <= 1410 && Number(task.startMinute) % 30 === 0)) ||
+      !Number.isInteger(task.durationMinutes) || Number(task.durationMinutes) < 30 || Number(task.durationMinutes) > 1440 || Number(task.durationMinutes) % 30 !== 0) {
+    throw new Error("Stored task data is invalid.");
+  }
+  if (task.completedAt !== null) return null;
+  return {
+    id: String(task.id), title: String(task.title), notes: String(task.notes), projectId: task.projectId as string | null,
+    startDate: task.date as string | null, endDate: task.date as string | null,
+    createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
+  };
+}
+
+function parseData(value: unknown): ReadResult {
+  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || (value.version !== 1 && value.version !== 2)) {
+    throw new Error("Stored task data is invalid.");
+  }
   const projects = value.projects.map(parseProject);
-  const tasks = value.tasks.map(parseTask);
+  const tasks = value.version === 1 ? value.tasks.map(migrateLegacyTask).filter((task): task is PersonalTask => task !== null) : value.tasks.map(parseTask);
   const projectIds = new Set(projects.map((project) => project.id));
-  if (new Set(projects.map((project) => project.id)).size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length ||
-      tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) throw new Error("Stored task data is invalid.");
-  return { version: 1, tasks, projects };
+  if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
+    throw new Error("Stored task data is invalid.");
+  }
+  return { data: { version: 2, tasks, projects }, migrated: value.version === 1 };
 }
 
 export async function tasksRoot() {
@@ -79,11 +103,11 @@ async function locked<T>(root: string, task: () => Promise<T>): Promise<T> {
   finally { release(); if (locks.get(root) === next) locks.delete(root); }
 }
 
-async function readData(root: string): Promise<TaskData> {
+async function readData(root: string): Promise<ReadResult> {
   let handle;
   try { handle = await open(path.join(root, DATA_FILE), constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, tasks: [], projects: [] };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 2, tasks: [], projects: [] }, migrated: false };
     throw error;
   }
   try { return parseData(JSON.parse(await handle.readFile("utf8"))); }
@@ -110,7 +134,11 @@ async function writeData(root: string, data: TaskData) {
 
 export async function loadTaskData() {
   const root = await tasksRoot();
-  return readData(root);
+  return locked(root, async () => {
+    const result = await readData(root);
+    if (result.migrated) await writeData(root, result.data);
+    return result.data;
+  });
 }
 
 function text(value: unknown, label: string, maximum: number, allowEmpty = false) {
@@ -126,45 +154,30 @@ function projectId(value: unknown, projects: TaskProject[]) {
   return value;
 }
 
-function date(value: unknown) {
+function optionalDate(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   if (!validDate(value)) throw new Error("Invalid task date.");
   return value;
 }
 
-function startMinute(value: unknown, taskDate: string | null) {
-  if (value === null || value === undefined || value === "") return null;
-  if (!taskDate || !Number.isInteger(value) || Number(value) < 0 || Number(value) > 1410 || Number(value) % 30 !== 0) throw new Error("Invalid task time.");
-  return Number(value);
-}
-
-function duration(value: unknown, start: number | null) {
-  const result = value === undefined ? 30 : Number(value);
-  if (!Number.isInteger(result) || result < 30 || result > 1440 || result % 30 !== 0 || (start !== null && start + result > 1440)) {
-    throw new Error("Invalid task duration.");
-  }
-  return result;
+function taskRange(startValue: unknown, endValue: unknown) {
+  const startDate = optionalDate(startValue);
+  const endDate = optionalDate(endValue);
+  if ((startDate === null) !== (endDate === null) || (startDate && endDate && startDate > endDate)) throw new Error("Invalid task date range.");
+  return { startDate, endDate };
 }
 
 export async function createTask(input: unknown) {
   if (!object(input)) throw new Error("Invalid task.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
-    const taskDate = date(input.date);
-    const start = startMinute(input.startMinute, taskDate);
+    const { data } = await readData(root);
+    const range = taskRange(input.startDate, input.endDate);
     const now = new Date().toISOString();
     const task: PersonalTask = {
-      id: randomUUID(),
-      title: text(input.title, "task title", 200),
+      id: randomUUID(), title: text(input.title, "task title", 200),
       notes: input.notes === undefined ? "" : text(input.notes, "task notes", 5000, true),
-      projectId: projectId(input.projectId, data.projects),
-      date: taskDate,
-      startMinute: start,
-      durationMinutes: duration(input.durationMinutes, start),
-      completedAt: null,
-      createdAt: now,
-      updatedAt: now,
+      projectId: projectId(input.projectId, data.projects), ...range, createdAt: now, updatedAt: now,
     };
     data.tasks.unshift(task);
     await writeData(root, data);
@@ -173,27 +186,22 @@ export async function createTask(input: unknown) {
 }
 
 export async function updateTask(id: string, input: unknown) {
-  if (!UUID.test(id) || !object(input)) throw new Error("Invalid task.");
+  if (!UUID.test(id) || !object(input) || "completed" in input) throw new Error("Invalid task.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
+    const { data } = await readData(root);
     const index = data.tasks.findIndex((task) => task.id === id);
     if (index < 0) throw new Error("Task not found.");
     const current = data.tasks[index];
-    const taskDate = "date" in input ? date(input.date) : current.date;
-    const start = "startMinute" in input ? startMinute(input.startMinute, taskDate) : taskDate ? current.startMinute : null;
-    const task: PersonalTask = {
+    const range = "startDate" in input || "endDate" in input ? taskRange("startDate" in input ? input.startDate : current.startDate, "endDate" in input ? input.endDate : current.endDate) : { startDate: current.startDate, endDate: current.endDate };
+    data.tasks[index] = {
       ...current,
       title: "title" in input ? text(input.title, "task title", 200) : current.title,
       notes: "notes" in input ? text(input.notes, "task notes", 5000, true) : current.notes,
       projectId: "projectId" in input ? projectId(input.projectId, data.projects) : current.projectId,
-      date: taskDate,
-      startMinute: start,
-      durationMinutes: "durationMinutes" in input ? duration(input.durationMinutes, start) : duration(current.durationMinutes, start),
-      completedAt: "completed" in input ? input.completed === true ? new Date().toISOString() : input.completed === false ? null : (() => { throw new Error("Invalid completion state."); })() : current.completedAt,
+      ...range,
       updatedAt: new Date().toISOString(),
     };
-    data.tasks[index] = task;
     await writeData(root, data);
     return data;
   });
@@ -203,7 +211,7 @@ export async function deleteTask(id: string) {
   if (!UUID.test(id)) throw new Error("Invalid task.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
+    const { data } = await readData(root);
     const index = data.tasks.findIndex((task) => task.id === id);
     if (index < 0) throw new Error("Task not found.");
     data.tasks.splice(index, 1);
@@ -216,7 +224,7 @@ export async function createProject(input: unknown) {
   if (!object(input)) throw new Error("Invalid project.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
+    const { data } = await readData(root);
     const name = text(input.name, "project name", 80);
     if (data.projects.some((project) => project.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("Project name already exists.");
     const now = new Date().toISOString();
@@ -230,13 +238,12 @@ export async function updateProject(id: string, input: unknown) {
   if (!UUID.test(id) || !object(input)) throw new Error("Invalid project.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
+    const { data } = await readData(root);
     const project = data.projects.find((item) => item.id === id);
     if (!project) throw new Error("Project not found.");
     const name = text(input.name, "project name", 80);
     if (data.projects.some((item) => item.id !== id && item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("Project name already exists.");
-    project.name = name;
-    project.updatedAt = new Date().toISOString();
+    project.name = name; project.updatedAt = new Date().toISOString();
     await writeData(root, data);
     return data;
   });
@@ -246,7 +253,7 @@ export async function deleteProject(id: string) {
   if (!UUID.test(id)) throw new Error("Invalid project.");
   const root = await tasksRoot();
   return locked(root, async () => {
-    const data = await readData(root);
+    const { data } = await readData(root);
     const index = data.projects.findIndex((project) => project.id === id);
     if (index < 0) throw new Error("Project not found.");
     data.projects.splice(index, 1);
@@ -263,10 +270,7 @@ export async function requireTasksAdmin(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error("Supabase is not configured.");
-  const client = createClient(url, key, {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${match[1]}` } },
-  });
+  const client = createClient(url, key, { auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false }, global: { headers: { Authorization: `Bearer ${match[1]}` } } });
   const { data: user, error: userError } = await client.auth.getUser(match[1]);
   if (userError || !user.user) return false;
   const { data, error } = await client.rpc("site_is_admin");
@@ -288,10 +292,7 @@ export function tasksError(error: unknown) {
   const conflict = message === "Project name already exists.";
   const known = message.startsWith("Invalid") || message.startsWith("TASKS_DATA_DIR");
   if (!missing && !conflict && !known) console.error("Task operation failed:", { code, name: error instanceof Error ? error.name : "UnknownError", message });
-  return Response.json({ error: missing ? message : conflict ? message : known ? message : "Task operation failed." }, {
-    status: missing ? 404 : conflict ? 409 : known ? 400 : 500,
-    headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
-  });
+  return Response.json({ error: missing ? message : conflict ? message : known ? message : "Task operation failed." }, { status: missing ? 404 : conflict ? 409 : known ? 400 : 500, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
 
 export const taskPrivateHeaders = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };

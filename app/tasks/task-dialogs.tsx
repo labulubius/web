@@ -1,15 +1,11 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { Check, Trash2, X } from "lucide-react";
 import { FormEvent, useMemo } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
-import { timeLabel } from "./task-calendar";
 import type { PersonalTask, TaskDraft, TaskProject } from "./task-types";
 
-export type TaskDialogValue = {
-  task?: PersonalTask;
-  defaults?: Partial<TaskDraft>;
-};
+export type TaskDialogValue = { task?: PersonalTask; defaults?: Partial<TaskDraft> };
 
 export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete, onDelete }: {
   value: TaskDialogValue;
@@ -17,7 +13,7 @@ export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete,
   busy: boolean;
   onClose: () => void;
   onSave: (draft: TaskDraft) => Promise<void>;
-  onComplete: (task: PersonalTask, completed: boolean) => Promise<void>;
+  onComplete: (task: PersonalTask) => Promise<void>;
   onDelete: (task: PersonalTask) => Promise<void>;
 }) {
   const task = value.task;
@@ -25,27 +21,23 @@ export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete,
     title: task?.title ?? value.defaults?.title ?? "",
     notes: task?.notes ?? value.defaults?.notes ?? "",
     projectId: task?.projectId ?? value.defaults?.projectId ?? null,
-    date: task?.date ?? value.defaults?.date ?? null,
-    startMinute: task?.startMinute ?? value.defaults?.startMinute ?? null,
-    durationMinutes: task?.durationMinutes ?? value.defaults?.durationMinutes ?? 30,
+    startDate: task?.startDate ?? value.defaults?.startDate ?? null,
+    endDate: task?.endDate ?? value.defaults?.endDate ?? null,
   }), [task, value.defaults]);
-  const times = Array.from({ length: 48 }, (_, index) => index * 30);
-  const durations = Array.from({ length: 48 }, (_, index) => (index + 1) * 30);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const date = String(form.get("date") ?? "") || null;
-    const time = String(form.get("startMinute") ?? "");
-    const startMinute = date && time ? Number(time) : null;
-    const requestedDuration = Number(form.get("durationMinutes") ?? 30);
+    const enteredStart = String(form.get("startDate") ?? "") || null;
+    const enteredEnd = String(form.get("endDate") ?? "") || null;
+    const startDate = enteredStart ?? enteredEnd;
+    const endDate = enteredEnd ?? enteredStart;
     await onSave({
       title: String(form.get("title") ?? ""),
       notes: String(form.get("notes") ?? ""),
       projectId: String(form.get("projectId") ?? "") || null,
-      date,
-      startMinute,
-      durationMinutes: startMinute === null ? requestedDuration : Math.min(requestedDuration, 1440 - startMinute),
+      startDate,
+      endDate,
     });
   }
 
@@ -54,16 +46,14 @@ export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete,
     <form onSubmit={(event) => void submit(event)}>
       <label>Title<input name="title" defaultValue={initial.title} maxLength={200} required autoFocus /></label>
       <label>Notes<textarea name="notes" defaultValue={initial.notes} maxLength={5000} rows={4} /></label>
+      <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
       <div className="task-form-row">
-        <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-        <label>Date<input name="date" type="date" defaultValue={initial.date ?? ""} /></label>
+        <label>Start date<input name="startDate" type="date" defaultValue={initial.startDate ?? ""} /></label>
+        <label>End date<input name="endDate" type="date" defaultValue={initial.endDate ?? ""} /></label>
       </div>
-      <div className="task-form-row">
-        <label>Start time<select name="startMinute" defaultValue={initial.startMinute ?? ""}><option value="">No specific time</option>{times.map((minute) => <option key={minute} value={minute}>{timeLabel(minute)}</option>)}</select></label>
-        <label>Duration<select name="durationMinutes" defaultValue={initial.durationMinutes}>{durations.map((minutes) => <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} minutes` : `${Math.floor(minutes / 60)}${minutes % 60 ? ":30" : ""} hours`}</option>)}</select></label>
-      </div>
+      <p className="task-form-help">Leave both dates empty to keep the task in Inbox.</p>
       <footer className="task-dialog-footer">
-        {task && <div className="task-dialog-secondary"><button className="task-danger" type="button" disabled={busy} onClick={() => void onDelete(task)}><Trash2 size={14} /> Delete</button><button type="button" disabled={busy} onClick={() => void onComplete(task, !task.completedAt)}>{task.completedAt ? "Restore" : "Complete"}</button></div>}
+        {task && <div className="task-dialog-secondary"><button className="task-danger" type="button" disabled={busy} onClick={() => void onDelete(task)}><Trash2 size={14} /> Delete</button><button type="button" disabled={busy} onClick={() => void onComplete(task)}><Check size={14} /> Complete</button></div>}
         <span className="task-dialog-spacer" />
         <button type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
       </footer>

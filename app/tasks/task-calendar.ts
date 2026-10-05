@@ -1,8 +1,4 @@
-import type { PersonalTask } from "./task-types";
-
-export const SLOT_MINUTES = 30;
-export const SLOT_HEIGHT = 28;
-export const DAY_MINUTES = 24 * 60;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function localDate(value = new Date()) {
   const year = value.getFullYear();
@@ -12,47 +8,45 @@ export function localDate(value = new Date()) {
 }
 
 export function fromLocalDate(value: string) {
+  if (!DATE.test(value)) throw new Error("Invalid local date.");
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-export function addDays(value: string, days: number) {
+export function addDays(value: string, amount: number) {
   const date = fromLocalDate(value);
-  date.setDate(date.getDate() + days);
+  date.setDate(date.getDate() + amount);
   return localDate(date);
 }
 
-export function mondayOf(value = new Date()) {
-  const date = new Date(value.getFullYear(), value.getMonth(), value.getDate());
-  const weekday = date.getDay() || 7;
-  date.setDate(date.getDate() - weekday + 1);
+export function daysBetween(start: string, end: string) {
+  return Math.round((fromLocalDate(end).getTime() - fromLocalDate(start).getTime()) / 86_400_000);
+}
+
+export function monthStart(value = localDate()) {
+  return `${value.slice(0, 7)}-01`;
+}
+
+export function shiftMonth(value: string, amount: number) {
+  const date = fromLocalDate(monthStart(value));
+  date.setMonth(date.getMonth() + amount);
   return localDate(date);
 }
 
-export function timeLabel(minutes: number) {
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+export function monthDates(value: string) {
+  const start = monthStart(value);
+  const next = shiftMonth(start, 1);
+  return Array.from({ length: daysBetween(start, next) }, (_, index) => addDays(start, index));
 }
 
-export function shortDate(value: string, locale?: string) {
-  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(fromLocalDate(value));
+export function shortDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(fromLocalDate(value));
 }
 
-export function longDate(value: string, locale?: string) {
-  return new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric" }).format(fromLocalDate(value));
+export function longDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(fromLocalDate(value));
 }
 
-export type PositionedTask = { task: PersonalTask; lane: number; lanes: number };
-
-export function positionOverlaps(tasks: PersonalTask[]): PositionedTask[] {
-  const sorted = [...tasks].sort((a, b) => (a.startMinute ?? 0) - (b.startMinute ?? 0) || b.durationMinutes - a.durationMinutes);
-  const laneEnds: number[] = [];
-  const positioned = sorted.map((task) => {
-    const start = task.startMinute ?? 0;
-    let lane = laneEnds.findIndex((end) => end <= start);
-    if (lane < 0) lane = laneEnds.length;
-    laneEnds[lane] = start + task.durationMinutes;
-    return { task, lane, lanes: 1 };
-  });
-  const lanes = Math.max(1, laneEnds.length);
-  return positioned.map((item) => ({ ...item, lanes }));
+export function monthLabel(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(fromLocalDate(value));
 }

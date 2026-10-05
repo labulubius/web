@@ -8,7 +8,7 @@ All interface work must follow the scoped visual, interaction, accessibility and
 
 | Route | Purpose | Data / access |
 | --- | --- | --- |
-| `/` | Personal tasks, Inbox and weekly schedule | Administrator only; stored on the `web` server |
+| `/` | Personal tasks, Inbox and date-range Gantt chart | Administrator only; signed-out visitors see a generic Home screen |
 | `/nav` | Website directory, search, favorites and categories | Published entries are public; administrators edit entries and icons in the UI (Supabase) |
 | `/news` | FreshRSS-backed reader | Visitors can read the owner's selected, non-expired articles; administrators manage sources and categories |
 | `/forums` | Discourse topic browser | Visitors see the selected public sources; administrators manage the shared directory |

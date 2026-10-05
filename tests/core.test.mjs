@@ -8,7 +8,7 @@ import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
-import { addDays, mondayOf, positionOverlaps, timeLabel } from "../app/tasks/task-calendar.ts";
+import { addDays, daysBetween, monthDates, monthStart, shiftMonth } from "../app/tasks/task-calendar.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -46,22 +46,20 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(api, /requireTasksAdmin/);
   assert.match(api, /taskPrivateHeaders/);
   assert.match(server, /Cache-Control/);
-  assert.match(manager, /<OwnerAccess/);
+  assert.match(manager, /<HomeAccess/);
   assert.match(manager, /Session expired/);
+  assert.match(manager, /method: "DELETE"/);
+  assert.doesNotMatch(manager, /completedAt|view === "completed"/);
+  assert.match(server, /value\.version === 1/);
 });
 
-test("weekly task calendar uses Monday weeks and half-hour overlap lanes", () => {
-  const monday = mondayOf(new Date(2026, 9, 7));
-  assert.equal(monday, "2026-10-05");
-  assert.equal(addDays(monday, 6), "2026-10-11");
-  assert.equal(timeLabel(570), "09:30");
-  const base = { id: "1", title: "", notes: "", projectId: null, date: monday, durationMinutes: 60, completedAt: null, createdAt: "", updatedAt: "" };
-  const positioned = positionOverlaps([
-    { ...base, id: "1", startMinute: 540 },
-    { ...base, id: "2", startMinute: 570 },
-    { ...base, id: "3", startMinute: 660 },
-  ]);
-  assert.deepEqual(positioned.map(({ lane, lanes }) => [lane, lanes]), [[0, 2], [1, 2], [0, 2]]);
+test("task Gantt calendar uses inclusive day ranges and month navigation", () => {
+  const october = monthStart("2026-10-19");
+  assert.equal(october, "2026-10-01");
+  assert.equal(shiftMonth(october, 1), "2026-11-01");
+  assert.equal(addDays(october, 30), "2026-10-31");
+  assert.equal(daysBetween("2026-10-05", "2026-10-11"), 6);
+  assert.equal(monthDates(october).length, 31);
 });
 
 test("CAU login encryption matches the university CAS implementation", () => {
@@ -278,7 +276,7 @@ test("sidebar controls render for the configured workspace pages", async () => {
   const note = await readFile(new URL("../app/note/page.tsx", import.meta.url), "utf8");
 
   assert.match(shell, /hasSidebar && <button/);
-  assert.match(home, /title="Tasks" hasSidebar/);
+  assert.match(home, /title="Home" hasSidebar/);
   assert.match(drive, /title="Private Drive" hasSidebar/);
   assert.match(share, /redirect\("\/drive"\)/);
   assert.match(note, /title="Private Note" hasSidebar/);

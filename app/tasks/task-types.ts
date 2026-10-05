@@ -10,18 +10,16 @@ export type PersonalTask = {
   title: string;
   notes: string;
   projectId: string | null;
-  date: string | null;
-  startMinute: number | null;
-  durationMinutes: number;
-  completedAt: string | null;
+  startDate: string | null;
+  endDate: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type TaskData = {
-  version: 1;
+  version: 2;
   tasks: PersonalTask[];
   projects: TaskProject[];
 };
 
-export type TaskDraft = Pick<PersonalTask, "title" | "notes" | "projectId" | "date" | "startMinute" | "durationMinutes">;
+export type TaskDraft = Pick<PersonalTask, "title" | "notes" | "projectId" | "startDate" | "endDate">;
