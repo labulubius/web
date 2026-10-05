@@ -1,16 +1,16 @@
 "use client";
 
 import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, Circle, Folder, Home, Inbox, Pencil, Plus, RefreshCw } from "lucide-react";
+import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
-import { addDays, daysBetween, monthEnd, monthStart, rangeLabel, shiftRange, shortDate, validTimelineRange } from "./task-calendar";
+import { addDays, daysBetween, monthEnd, monthStart, rangeLabel, shortDate, validTimelineRange } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
 import { GanttView } from "./gantt-view";
 import type { PersonalTask, TaskData, TaskDraft, TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-type View = "gantt" | "inbox" | "project";
+type View = "gantt" | "all" | "project";
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
 
 function HomeAccess({ description, status, action }: { description: string; status?: string; action?: ReactNode }) {
@@ -24,29 +24,35 @@ function HomeAccess({ description, status, action }: { description: string; stat
   </section>;
 }
 
-function TaskList({ tasks, empty, projects, onOpen, onComplete }: {
+function TaskList({ tasks, empty, projects, onOpen, onComplete, onDelete }: {
   tasks: PersonalTask[];
   empty: string;
   projects: TaskProject[];
   onOpen: (value: TaskDialogValue) => void;
   onComplete: (task: PersonalTask) => void;
+  onDelete: (task: PersonalTask) => void;
 }) {
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   if (!tasks.length) return <div className="task-empty"><CheckCircle2 size={30} /><strong>Nothing here</strong><span>{empty}</span></div>;
   return <ul className="task-list">{tasks.map((task) => <li key={task.id}>
     <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={() => onComplete(task)}><Circle size={15} /></button>
     <button className="task-list-main" type="button" onClick={() => onOpen({ task })}>
-      <strong>{task.title}</strong><span>{task.projectId ? task.startDate && task.endDate ? `${projectNames.get(task.projectId) ?? "Project"} · ${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : `${projectNames.get(task.projectId) ?? "Project"} · Not scheduled` : "Inbox"}</span>
+      <strong>{task.title}</strong><span>{task.projectId ? task.startDate && task.endDate ? `${projectNames.get(task.projectId) ?? "Project"} · ${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : `${projectNames.get(task.projectId) ?? "Project"} · Not scheduled` : "Uncategorized"}</span>
     </button>
+    <span className="task-list-actions">
+      <button type="button" onClick={() => onOpen({ task })} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
+      <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>
+    </span>
   </li>)}</ul>;
 }
 
 function readLocation(projects: TaskProject[]): StoredLocation | null {
   try {
     const value = JSON.parse(window.localStorage.getItem(LOCATION_KEY) ?? "null") as Partial<StoredLocation> | null;
-    if (!value || value.version !== 1 || !["gantt", "inbox", "project"].includes(String(value.view)) || !validTimelineRange(value.timelineStart, value.timelineEnd)) return null;
-    if (value.view === "project" && (!value.projectId || !projects.some((project) => project.id === value.projectId))) return { ...value, view: "inbox", projectId: null } as StoredLocation;
-    return { version: 1, view: value.view as View, projectId: value.view === "project" ? value.projectId ?? null : null, timelineStart: String(value.timelineStart), timelineEnd: String(value.timelineEnd) };
+    if (!value || value.version !== 1 || !["gantt", "all", "inbox", "project"].includes(String(value.view)) || !validTimelineRange(value.timelineStart, value.timelineEnd)) return null;
+    const savedView: View = String(value.view) === "inbox" ? "all" : value.view as View;
+    if (savedView === "project" && (!value.projectId || !projects.some((project) => project.id === value.projectId))) return { ...value, view: "all", projectId: null } as StoredLocation;
+    return { version: 1, view: savedView, projectId: savedView === "project" ? value.projectId ?? null : null, timelineStart: String(value.timelineStart), timelineEnd: String(value.timelineEnd) };
   } catch {
     return null;
   }
@@ -156,9 +162,9 @@ export function TaskManager() {
   }
 
   async function deleteProject(project: TaskProject) {
-    if (!window.confirm(`Delete project “${project.name}”? Its tasks will move to Inbox and lose their dates.`)) return;
-    const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" }, "Project deleted. Its tasks moved to Inbox.");
-    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("inbox"); } }
+    if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and lose their dates.`)) return;
+    const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" }, "Project deleted. Its tasks are now Uncategorized.");
+    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("all"); } }
   }
 
   async function quickAdd(event: FormEvent<HTMLFormElement>) {
@@ -167,7 +173,7 @@ export function TaskManager() {
     const title = String(new FormData(form).get("title") ?? "").trim();
     if (!title) return;
     const selectedProject = view === "project" ? projectId : null;
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) }, selectedProject ? "Task added to project." : "Task added to Inbox.");
+    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) }, selectedProject ? "Task added to project." : "Task added.");
     if (ok) form.reset();
   }
 
@@ -182,13 +188,6 @@ export function TaskManager() {
     setTimelineStart(startDate); setTimelineEnd(endDate); setError(""); setMessage("");
   }
 
-  function moveRange(direction: -1 | 1) {
-    const next = shiftRange(timelineStart, timelineEnd, direction);
-    setTimelineStart(next.startDate); setTimelineEnd(next.endDate); setError(""); setMessage("");
-  }
-
-  function currentMonth() { setTimelineStart(monthStart()); setTimelineEnd(monthEnd()); setError(""); setMessage(""); }
-
   function dragEnd(event: DragEndEvent) {
     if (!data || !event.over || saving) return;
     const id = String(event.active.id).replace(/^task:/, "");
@@ -200,11 +199,11 @@ export function TaskManager() {
     void patchTask(task, { startDate: match[1], endDate: addDays(match[1], length) }, "Task dates updated.");
   }
 
-  const inboxTasks = useMemo(() => data?.tasks.filter((task) => task.projectId === null) ?? [], [data]);
+  const allTasks = useMemo(() => data?.tasks ?? [], [data]);
   const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
   const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
-  const title = view === "inbox" ? "Inbox" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
-  const description = view === "inbox" ? "Tasks outside projects." : view === "project" ? "Scheduled and unscheduled tasks in this project." : rangeLabel(timelineStart, timelineEnd);
+  const title = view === "all" ? "All tasks" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
+  const description = view === "all" ? "All project and uncategorized tasks." : view === "project" ? "Scheduled and unscheduled tasks in this project." : rangeLabel(timelineStart, timelineEnd);
 
   if (loading) return <HomeAccess description="Opening home…" />;
   if (authError) return <HomeAccess description="Home is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
@@ -217,7 +216,7 @@ export function TaskManager() {
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
         <nav aria-label="Task navigation">
-          <button className={view === "inbox" ? "selected" : ""} aria-current={view === "inbox" ? "page" : undefined} type="button" onClick={() => select("inbox")}><Inbox size={16} /><span>Inbox</span><small>{inboxTasks.length}</small></button>
+          <button className={view === "all" ? "selected" : ""} aria-current={view === "all" ? "page" : undefined} type="button" onClick={() => select("all")}><ListTodo size={16} /><span>All tasks</span><small>{allTasks.length}</small></button>
           <button className={view === "gantt" ? "selected" : ""} aria-current={view === "gantt" ? "page" : undefined} type="button" onClick={() => select("gantt")}><CalendarRange size={16} /><span>Gantt</span></button>
         </nav>
         <div className="tasks-project-heading"><h2>Projects</h2><button type="button" onClick={() => setProjectDialog("new")} aria-label="Create project" title="Create project"><Plus size={14} /></button></div>
@@ -227,18 +226,15 @@ export function TaskManager() {
       <main className="task-main">
         <header className="task-header">
           <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1><span>{description}</span></div>
-          {view === "gantt" && <div className="task-range-tools">
-            <div className="task-range-shift"><button type="button" onClick={() => moveRange(-1)} aria-label="Previous date range" title="Previous date range"><ChevronLeft size={17} /></button><button type="button" onClick={currentMonth}>This month</button><button type="button" onClick={() => moveRange(1)} aria-label="Next date range" title="Next date range"><ChevronRight size={17} /></button></div>
-            <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>
-          </div>}
+          {view === "gantt" && <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>}
         </header>
-        <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : "Add a task to Inbox…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
+        <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
         {message && <p className="task-message" role="status">{message}</p>}
         {error && <p className="task-error" role="alert">{error}</p>}
-        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={data.tasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate }, "Task dates updated.")} /> : <TaskList tasks={view === "inbox" ? inboxTasks : projectTasks} empty={view === "inbox" ? "Your Inbox is clear." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} />}
+        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={data.tasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate }, "Task dates updated.")} /> : <TaskList tasks={view === "all" ? allTasks : projectTasks} empty={view === "all" ? "There are no tasks yet." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
-    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} onClose={() => setTaskDialog(null)} onSave={saveTask} onComplete={completeTask} onDelete={deleteTask} />}
+    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} onClose={() => setTaskDialog(null)} onSave={saveTask} />}
     {projectDialog && <ProjectDialog project={projectDialog === "new" ? undefined : projectDialog} busy={saving} onClose={() => setProjectDialog(null)} onSave={saveProject} onDelete={deleteProject} />}
   </DndContext>;
 }

@@ -62,11 +62,6 @@ export function validTimelineRange(start: unknown, end: unknown): start is strin
   return validLocalDate(start) && validLocalDate(end) && start <= end && end <= maximumRangeEnd(start);
 }
 
-export function shiftRange(start: string, end: string, direction: -1 | 1) {
-  const amount = (daysBetween(start, end) + 1) * direction;
-  return { startDate: addDays(start, amount), endDate: addDays(end, amount) };
-}
-
 export function shortDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(fromLocalDate(value));
 }

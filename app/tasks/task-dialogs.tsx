@@ -1,20 +1,18 @@
 "use client";
 
-import { Check, Trash2, X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
 import type { PersonalTask, TaskDraft, TaskProject } from "./task-types";
 
 export type TaskDialogValue = { task?: PersonalTask; defaults?: Partial<TaskDraft> };
 
-export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete, onDelete }: {
+export function TaskDialog({ value, projects, busy, onClose, onSave }: {
   value: TaskDialogValue;
   projects: TaskProject[];
   busy: boolean;
   onClose: () => void;
   onSave: (draft: TaskDraft) => Promise<void>;
-  onComplete: (task: PersonalTask) => Promise<void>;
-  onDelete: (task: PersonalTask) => Promise<void>;
 }) {
   const task = value.task;
   const initial = useMemo<TaskDraft>(() => ({
@@ -39,17 +37,15 @@ export function TaskDialog({ value, projects, busy, onClose, onSave, onComplete,
   return <AccessibleDialog labelledBy="task-dialog-title" busy={busy} onClose={onClose} className="task-dialog">
     <header><h2 id="task-dialog-title">{task ? "Task details" : "New task"}</h2><button type="button" disabled={busy} onClick={onClose} aria-label="Close"><X size={17} /></button></header>
     <form onSubmit={(event) => void submit(event)}>
-      <label>Title<input name="title" defaultValue={initial.title} maxLength={200} required autoFocus /></label>
-      <label>Project<select name="projectId" value={selectedProject} onChange={(event) => setSelectedProject(event.target.value)}><option value="">No project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-      {selectedProject ? <>
-        <div className="task-form-row">
-          <label>Start date<input name="startDate" type="date" defaultValue={initial.startDate ?? ""} /></label>
-          <label>End date<input name="endDate" type="date" defaultValue={initial.endDate ?? ""} /></label>
-        </div>
-        <p className="task-form-help">Leave both dates empty to keep this task only in its project. Add dates to show it in Gantt.</p>
-      </> : <p className="task-form-help">Tasks without a project stay in Inbox and do not appear in Gantt.</p>}
+      <div className="task-form-primary">
+        <label>Title<input name="title" defaultValue={initial.title} maxLength={200} required autoFocus /></label>
+        <label>Project<select name="projectId" value={selectedProject} onChange={(event) => setSelectedProject(event.target.value)}><option value="">Uncategorized</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+      </div>
+      {selectedProject && <div className="task-form-row">
+        <label>Start date<input name="startDate" type="date" defaultValue={initial.startDate ?? ""} /></label>
+        <label>End date<input name="endDate" type="date" defaultValue={initial.endDate ?? ""} /></label>
+      </div>}
       <footer className="task-dialog-footer">
-        {task && <div className="task-dialog-secondary"><button className="task-danger" type="button" disabled={busy} onClick={() => void onDelete(task)}><Trash2 size={14} /> Delete</button><button type="button" disabled={busy} onClick={() => void onComplete(task)}><Check size={14} /> Complete</button></div>}
         <span className="task-dialog-spacer" />
         <button type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
       </footer>

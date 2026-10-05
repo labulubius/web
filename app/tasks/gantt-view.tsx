@@ -86,7 +86,7 @@ export function GanttView({ timelineStart, timelineEnd, tasks, projects, onOpen,
   const gridStyle = { "--gantt-days": dates.length, minWidth: `${minWidth}px` } as CSSProperties;
   const createOn = (date: string) => onOpen({ defaults: { startDate: date, endDate: date } });
 
-  return <div className="task-gantt-view">
+  return <div className={`task-gantt-view${scheduled.length === 0 ? " is-empty" : ""}`}>
     <div className="gantt-scroll" tabIndex={0} aria-label={`Gantt chart from ${longDate(timelineStart)} to ${longDate(timelineEnd)}`}>
       <div className="gantt-grid" style={gridStyle}>
         <div className="gantt-header-row">
@@ -99,7 +99,7 @@ export function GanttView({ timelineStart, timelineEnd, tasks, projects, onOpen,
             </div>;
           })}
         </div>
-        {scheduled.length === 0 ? <div className="gantt-row gantt-empty-row"><div className="gantt-task-label"><span className="sr-only">No scheduled tasks in this date range.</span></div>{dates.map((date) => <DayCell key={date} rowId="empty" date={date} today={today} onCreate={() => createOn(date)} />)}</div> : scheduled.map((task) => <div className="gantt-row" key={task.id}>
+        {scheduled.map((task) => <div className="gantt-row" key={task.id}>
           <button type="button" className="gantt-task-label" onClick={() => onOpen({ task })}><strong title={task.title}>{task.title}</strong><span>{shortDate(task.startDate!)} – {shortDate(task.endDate!)}</span></button>
           {dates.map((date) => <DayCell key={date} rowId={task.id} date={date} today={today} onCreate={() => createOn(date)} />)}
           <GanttBar task={task} dates={dates} projects={projects} onOpen={() => onOpen({ task })} onComplete={() => onComplete(task)} onResize={(startDate, endDate) => onResize(task, startDate, endDate)} />
