@@ -35,7 +35,7 @@ try {
   await Promise.all([rejectSymlinks(tasks), rejectSymlinks(drive), rejectSymlinks(news), rejectSymlinks(forums)]);
   try {
     const taskData = await json(path.join(tasks, "tasks.json"));
-    if (![1, 2].includes(taskData?.version) || !Array.isArray(taskData.tasks) || !Array.isArray(taskData.projects)) throw new Error("Tasks backup has an invalid data structure.");
+    if (![1, 2, 3].includes(taskData?.version) || !Array.isArray(taskData.tasks) || !Array.isArray(taskData.projects)) throw new Error("Tasks backup has an invalid data structure.");
   } catch (error) { if (error?.code !== "ENOENT") throw error; }
   const driveShares = path.join(drive, ".drive-shares");
   try { await jsonDirectory(driveShares); }

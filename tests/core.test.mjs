@@ -8,7 +8,7 @@ import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
-import { addDays, daysBetween, monthDates, monthStart, shiftMonth } from "../app/tasks/task-calendar.ts";
+import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, shiftRange, validTimelineRange } from "../app/tasks/task-calendar.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -38,6 +38,9 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   const server = await readFile(new URL("../app/lib/tasks-server.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/tasks/route.ts", import.meta.url), "utf8");
   const manager = await readFile(new URL("../app/tasks/task-manager.tsx", import.meta.url), "utf8");
+  const dialog = await readFile(new URL("../app/tasks/task-dialogs.tsx", import.meta.url), "utf8");
+  const gantt = await readFile(new URL("../app/tasks/gantt-view.tsx", import.meta.url), "utf8");
+  const types = await readFile(new URL("../app/tasks/task-types.ts", import.meta.url), "utf8");
   assert.match(server, /TASKS_DATA_DIR/);
   assert.match(server, /O_NOFOLLOW/);
   assert.match(server, /await handle\.sync\(\)/);
@@ -49,17 +52,30 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(manager, /<HomeAccess/);
   assert.match(manager, /Session expired/);
   assert.match(manager, /method: "DELETE"/);
+  assert.match(manager, /site-tasks-location-v1/);
+  assert.ok(manager.indexOf("<span>Inbox</span>") < manager.indexOf("<span>Gantt</span>"));
   assert.doesNotMatch(manager, /completedAt|view === "completed"/);
+  assert.doesNotMatch(dialog, /textarea|name="notes"/);
+  assert.doesNotMatch(types, /notes:/);
+  assert.doesNotMatch(gantt, /No tasks this month/);
   assert.match(server, /value\.version === 1/);
+  assert.match(server, /value\.version === 2/);
+  assert.match(server, /version: 3/);
+  assert.match(server, /startDate: null, endDate: null/);
 });
 
-test("task Gantt calendar uses inclusive day ranges and month navigation", () => {
+test("task Gantt calendar supports inclusive custom ranges across months", () => {
   const october = monthStart("2026-10-19");
   assert.equal(october, "2026-10-01");
-  assert.equal(shiftMonth(october, 1), "2026-11-01");
-  assert.equal(addDays(october, 30), "2026-10-31");
-  assert.equal(daysBetween("2026-10-05", "2026-10-11"), 6);
-  assert.equal(monthDates(october).length, 31);
+  assert.equal(monthEnd(october), "2026-10-31");
+  assert.equal(shiftMonth("2026-01-31", 1), "2026-02-28");
+  assert.equal(addDays("2026-10-31", 1), "2026-11-01");
+  assert.equal(daysBetween("2026-10-05", "2026-11-05"), 31);
+  assert.deepEqual(dateRange("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
+  assert.equal(maximumRangeEnd("2026-10-05"), "2026-12-04");
+  assert.equal(validTimelineRange("2026-10-05", "2026-12-04"), true);
+  assert.equal(validTimelineRange("2026-10-05", "2026-12-05"), false);
+  assert.deepEqual(shiftRange("2026-10-30", "2026-11-02", 1), { startDate: "2026-11-03", endDate: "2026-11-06" });
 });
 
 test("CAU login encryption matches the university CAS implementation", () => {

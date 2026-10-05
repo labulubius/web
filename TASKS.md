@@ -4,18 +4,17 @@ The root route `/` is a private, administrator-only task manager. Signed-out and
 
 ## Views and behavior
 
-The task manager includes:
+Tasks have two modes derived from project membership:
 
-- Inbox for tasks that have not been assigned dates;
-- a month-scale Gantt chart with one-day columns;
-- inclusive start and end dates, without times of day;
-- optional single-level projects and project-filtered charts;
-- task title and notes;
-- drag scheduling, range movement and edge resizing, with equivalent date fields in the task dialog.
+- Inbox contains tasks without a project. These tasks have no dates and never appear in Gantt.
+- Project pages contain all tasks assigned to that project. Project tasks may remain unscheduled or use an inclusive start and end date.
+- Gantt contains only scheduled project tasks.
 
-Completing a task permanently deletes it. There is no completed-task history or restore view. Explicit Delete remains a separately confirmed destructive action.
+The Gantt chart uses one-day columns and an administrator-selected date range of at most two months. It supports ranges across month boundaries, whole-range navigation, task movement and edge resizing. The browser remembers the selected Inbox, Gantt or project location and the valid Gantt date range. Only opaque project IDs and navigation dates are saved locally; task content is not.
 
-The first version intentionally excludes time-of-day planning, week planning, dependencies, progress percentages, milestones, recurrence, reminders, labels, priority levels, nested projects, collaboration and external calendar synchronization.
+Tasks contain a title, optional project and optional project-only date range. They do not contain descriptions, notes or times of day. Completing a task permanently deletes it. There is no completed-task history or restore view. Explicit Delete remains a separately confirmed destructive action.
+
+The current version intentionally excludes dependencies, progress percentages, milestones, recurrence, reminders, labels, priority levels, nested projects, collaboration and external calendar synchronization.
 
 ## Persistence and migration
 
@@ -27,17 +26,19 @@ ${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}/tasks.json
 
 `TASKS_DATA_DIR`, when set, must be an absolute real directory outside the repository. The service creates the directory with owner-only permissions. Writes are serialized within the web process and committed through an exclusive temporary file, `fsync`, and atomic rename. Reads and writes reject symbolic links. Task IDs and project IDs are opaque UUIDs.
 
-Version 2 stores optional inclusive `startDate` and `endDate` values as local `YYYY-MM-DD` dates. Both values are null for Inbox tasks. Version 1 week-planner data is migrated atomically on first authenticated read: active dated tasks become one-day ranges, active undated tasks remain in Inbox, and historical completed tasks are discarded.
+Version 3 stores optional inclusive `startDate` and `endDate` values as local `YYYY-MM-DD` dates only for project tasks. Both values may be null for unscheduled project tasks and must be null for Inbox tasks. Version 1 and version 2 data migrate atomically on first authenticated read. Historical completed tasks are discarded, old notes are removed, and dates are cleared from tasks without a project.
+
+Deleting a project preserves its tasks by moving them into Inbox and clearing their dates.
 
 ## API and security
 
 The management API is under `/api/tasks` and `/api/tasks/projects`. Every read and mutation requires a Supabase bearer token and a successful `site_is_admin` check. Responses use private, no-store caching headers. Browser UI state is not treated as authorization.
 
-The API validates request size, UUIDs, field lengths, real calendar dates, ordered date ranges and project references. Completion uses the authenticated task DELETE endpoint and leaves no completed record.
+The API validates request size, UUIDs, field lengths, real calendar dates, ordered date ranges, project references and the rule that only project tasks may have dates. Completion uses the authenticated task DELETE endpoint and leaves no completed record.
 
 ## Backup and restore
 
-Back up the entire Tasks directory with the other persistent datasets. An empty directory is valid before the first task is created. The backup verifier accepts both version 1 and version 2 so an older backup can be restored and migrated by the application:
+Back up the entire Tasks directory with the other persistent datasets. An empty directory is valid before the first task is created. The backup verifier accepts versions 1, 2 and 3 so older backups can be restored and migrated by the application:
 
 ```bash
 node scripts/verify-backup.mjs \
@@ -48,4 +49,4 @@ node scripts/verify-backup.mjs \
   --freshrss-dump /restore/freshrss.dump
 ```
 
-Restore only while the application is stopped or into an isolated directory. Do not edit `tasks.json` manually. After restoration, verify Inbox, Gantt ranges, project assignment, completion deletion and explicit deletion with the administrator account.
+Restore only while the application is stopped or into an isolated directory. Do not edit `tasks.json` manually. After restoration, verify Inbox classification, project task scheduling, cross-month Gantt ranges, completion deletion and explicit deletion with the administrator account.

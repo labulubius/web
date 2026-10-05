@@ -35,50 +35,74 @@ function parseProject(value: unknown): TaskProject {
   return value as TaskProject;
 }
 
-function commonTask(value: unknown) {
+function commonTask(value: unknown, legacy: boolean) {
   if (!object(value) || !UUID.test(String(value.id)) || typeof value.title !== "string" || !value.title || value.title.length > 200 ||
-      typeof value.notes !== "string" || value.notes.length > 5000 ||
       !(value.projectId === null || (typeof value.projectId === "string" && UUID.test(value.projectId))) ||
-      !validIso(value.createdAt) || !validIso(value.updatedAt)) throw new Error("Stored task data is invalid.");
+      !validIso(value.createdAt) || !validIso(value.updatedAt) ||
+      (legacy && (typeof value.notes !== "string" || value.notes.length > 5000))) throw new Error("Stored task data is invalid.");
   return value;
 }
 
-function parseTask(value: unknown): PersonalTask {
-  const task = commonTask(value);
+function storedRange(task: Record<string, unknown>) {
   const startDate = task.startDate;
   const endDate = task.endDate;
   if (!((startDate === null && endDate === null) || (validDate(startDate) && validDate(endDate) && startDate <= endDate))) {
     throw new Error("Stored task data is invalid.");
   }
-  return task as PersonalTask;
+  return { startDate: startDate as string | null, endDate: endDate as string | null };
+}
+
+function parseTask(value: unknown): PersonalTask {
+  const task = commonTask(value, false);
+  const range = storedRange(task);
+  if (task.projectId === null && range.startDate !== null) throw new Error("Stored task data is invalid.");
+  return {
+    id: String(task.id), title: String(task.title), projectId: task.projectId as string | null, ...range,
+    createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
+  };
+}
+
+function migrateVersionTwoTask(value: unknown): PersonalTask {
+  const task = commonTask(value, true);
+  const range = storedRange(task);
+  const project = task.projectId as string | null;
+  return {
+    id: String(task.id), title: String(task.title), projectId: project,
+    startDate: project ? range.startDate : null, endDate: project ? range.endDate : null,
+    createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
+  };
 }
 
 function migrateLegacyTask(value: unknown): PersonalTask | null {
-  const task = commonTask(value);
+  const task = commonTask(value, true);
   if (!(task.completedAt === null || validIso(task.completedAt)) || !(task.date === null || validDate(task.date)) ||
       !(task.startMinute === null || (Number.isInteger(task.startMinute) && Number(task.startMinute) >= 0 && Number(task.startMinute) <= 1410 && Number(task.startMinute) % 30 === 0)) ||
       !Number.isInteger(task.durationMinutes) || Number(task.durationMinutes) < 30 || Number(task.durationMinutes) > 1440 || Number(task.durationMinutes) % 30 !== 0) {
     throw new Error("Stored task data is invalid.");
   }
   if (task.completedAt !== null) return null;
+  const project = task.projectId as string | null;
+  const date = project ? task.date as string | null : null;
   return {
-    id: String(task.id), title: String(task.title), notes: String(task.notes), projectId: task.projectId as string | null,
-    startDate: task.date as string | null, endDate: task.date as string | null,
+    id: String(task.id), title: String(task.title), projectId: project,
+    startDate: date, endDate: date,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
 
 function parseData(value: unknown): ReadResult {
-  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || (value.version !== 1 && value.version !== 2)) {
+  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3].includes(Number(value.version))) {
     throw new Error("Stored task data is invalid.");
   }
   const projects = value.projects.map(parseProject);
-  const tasks = value.version === 1 ? value.tasks.map(migrateLegacyTask).filter((task): task is PersonalTask => task !== null) : value.tasks.map(parseTask);
+  const tasks = value.version === 1
+    ? value.tasks.map(migrateLegacyTask).filter((task): task is PersonalTask => task !== null)
+    : value.version === 2 ? value.tasks.map(migrateVersionTwoTask) : value.tasks.map(parseTask);
   const projectIds = new Set(projects.map((project) => project.id));
   if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
     throw new Error("Stored task data is invalid.");
   }
-  return { data: { version: 2, tasks, projects }, migrated: value.version === 1 };
+  return { data: { version: 3, tasks, projects }, migrated: value.version !== 3 };
 }
 
 export async function tasksRoot() {
@@ -107,7 +131,7 @@ async function readData(root: string): Promise<ReadResult> {
   let handle;
   try { handle = await open(path.join(root, DATA_FILE), constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 2, tasks: [], projects: [] }, migrated: false };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 3, tasks: [], projects: [] }, migrated: false };
     throw error;
   }
   try { return parseData(JSON.parse(await handle.readFile("utf8"))); }
@@ -169,15 +193,18 @@ function taskRange(startValue: unknown, endValue: unknown) {
 
 export async function createTask(input: unknown) {
   if (!object(input)) throw new Error("Invalid task.");
+  if ("notes" in input) throw new Error("Invalid task.");
   const root = await tasksRoot();
   return locked(root, async () => {
     const { data } = await readData(root);
+    const selectedProject = projectId(input.projectId, data.projects);
     const range = taskRange(input.startDate, input.endDate);
+    if (!selectedProject && range.startDate) throw new Error("Invalid project task date range.");
     const now = new Date().toISOString();
     const task: PersonalTask = {
-      id: randomUUID(), title: text(input.title, "task title", 200),
-      notes: input.notes === undefined ? "" : text(input.notes, "task notes", 5000, true),
-      projectId: projectId(input.projectId, data.projects), ...range, createdAt: now, updatedAt: now,
+      id: randomUUID(), title: text(input.title, "task title", 200), projectId: selectedProject,
+      startDate: selectedProject ? range.startDate : null, endDate: selectedProject ? range.endDate : null,
+      createdAt: now, updatedAt: now,
     };
     data.tasks.unshift(task);
     await writeData(root, data);
@@ -186,20 +213,26 @@ export async function createTask(input: unknown) {
 }
 
 export async function updateTask(id: string, input: unknown) {
-  if (!UUID.test(id) || !object(input) || "completed" in input) throw new Error("Invalid task.");
+  if (!UUID.test(id) || !object(input) || "completed" in input || "notes" in input) throw new Error("Invalid task.");
   const root = await tasksRoot();
   return locked(root, async () => {
     const { data } = await readData(root);
     const index = data.tasks.findIndex((task) => task.id === id);
     if (index < 0) throw new Error("Task not found.");
     const current = data.tasks[index];
-    const range = "startDate" in input || "endDate" in input ? taskRange("startDate" in input ? input.startDate : current.startDate, "endDate" in input ? input.endDate : current.endDate) : { startDate: current.startDate, endDate: current.endDate };
+    const selectedProject = "projectId" in input ? projectId(input.projectId, data.projects) : current.projectId;
+    const range = "startDate" in input || "endDate" in input
+      ? taskRange("startDate" in input ? input.startDate : current.startDate, "endDate" in input ? input.endDate : current.endDate)
+      : { startDate: current.startDate, endDate: current.endDate };
+    if (!selectedProject && range.startDate && !("projectId" in input && !("startDate" in input) && !("endDate" in input))) {
+      throw new Error("Invalid project task date range.");
+    }
     data.tasks[index] = {
       ...current,
       title: "title" in input ? text(input.title, "task title", 200) : current.title,
-      notes: "notes" in input ? text(input.notes, "task notes", 5000, true) : current.notes,
-      projectId: "projectId" in input ? projectId(input.projectId, data.projects) : current.projectId,
-      ...range,
+      projectId: selectedProject,
+      startDate: selectedProject ? range.startDate : null,
+      endDate: selectedProject ? range.endDate : null,
       updatedAt: new Date().toISOString(),
     };
     await writeData(root, data);
@@ -258,7 +291,7 @@ export async function deleteProject(id: string) {
     if (index < 0) throw new Error("Project not found.");
     data.projects.splice(index, 1);
     const now = new Date().toISOString();
-    data.tasks = data.tasks.map((task) => task.projectId === id ? { ...task, projectId: null, updatedAt: now } : task);
+    data.tasks = data.tasks.map((task) => task.projectId === id ? { ...task, projectId: null, startDate: null, endDate: null, updatedAt: now } : task);
     await writeData(root, data);
     return data;
   });
