@@ -8,6 +8,7 @@ import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
+import { addDays, mondayOf, positionOverlaps, timeLabel } from "../app/tasks/task-calendar.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -31,6 +32,36 @@ test("Drive shares use opaque metadata and protected path resolution", async () 
   assert.match(shares, /O_NOFOLLOW/);
   assert.match(publicRoute, /Content-Disposition/);
   assert.match(publicRoute, /Cache-Control": "no-store"/);
+});
+
+test("personal tasks keep private atomic storage and owner-only APIs", async () => {
+  const server = await readFile(new URL("../app/lib/tasks-server.ts", import.meta.url), "utf8");
+  const api = await readFile(new URL("../app/api/tasks/route.ts", import.meta.url), "utf8");
+  const manager = await readFile(new URL("../app/tasks/task-manager.tsx", import.meta.url), "utf8");
+  assert.match(server, /TASKS_DATA_DIR/);
+  assert.match(server, /O_NOFOLLOW/);
+  assert.match(server, /await handle\.sync\(\)/);
+  assert.match(server, /await rename\(/);
+  assert.match(server, /site_is_admin/);
+  assert.match(api, /requireTasksAdmin/);
+  assert.match(api, /taskPrivateHeaders/);
+  assert.match(server, /Cache-Control/);
+  assert.match(manager, /<OwnerAccess/);
+  assert.match(manager, /Session expired/);
+});
+
+test("weekly task calendar uses Monday weeks and half-hour overlap lanes", () => {
+  const monday = mondayOf(new Date(2026, 9, 7));
+  assert.equal(monday, "2026-10-05");
+  assert.equal(addDays(monday, 6), "2026-10-11");
+  assert.equal(timeLabel(570), "09:30");
+  const base = { id: "1", title: "", notes: "", projectId: null, date: monday, durationMinutes: 60, completedAt: null, createdAt: "", updatedAt: "" };
+  const positioned = positionOverlaps([
+    { ...base, id: "1", startMinute: 540 },
+    { ...base, id: "2", startMinute: 570 },
+    { ...base, id: "3", startMinute: 660 },
+  ]);
+  assert.deepEqual(positioned.map(({ lane, lanes }) => [lane, lanes]), [[0, 2], [1, 2], [0, 2]]);
 });
 
 test("CAU login encryption matches the university CAS implementation", () => {
@@ -247,7 +278,7 @@ test("sidebar controls render for the configured workspace pages", async () => {
   const note = await readFile(new URL("../app/note/page.tsx", import.meta.url), "utf8");
 
   assert.match(shell, /hasSidebar && <button/);
-  assert.match(home, /title="Home" hasSidebar/);
+  assert.match(home, /title="Tasks" hasSidebar/);
   assert.match(drive, /title="Private Drive" hasSidebar/);
   assert.match(share, /redirect\("\/drive"\)/);
   assert.match(note, /title="Private Note" hasSidebar/);

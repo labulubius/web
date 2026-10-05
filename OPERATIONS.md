@@ -33,6 +33,7 @@ Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and pro
 
 Back up these independent data sets together at a documented point in time:
 
+- `${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}`, including `tasks.json` when tasks have been created;
 - the complete `DRIVE_DATA_DIR`, including `.upload-sessions`;
 - `${NEWS_DATA_DIR}` preferences and Watchboards;
 - `${FORUMS_DATA_DIR}/directory.json`;
@@ -45,10 +46,11 @@ Perform periodic restores into isolated directories, never over live data. Befor
 
 ```bash
 node scripts/verify-backup.mjs \
+  --tasks /restore/tasks \
   --drive /restore/drive \
   --news /restore/news \
   --forums /restore/forums \
   --freshrss-dump /restore/freshrss.dump
 ```
 
-The verifier is read-only. It rejects symlinks, malformed Drive share-link JSON, and unreadable PostgreSQL dump catalogs. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.
+The verifier is read-only. It rejects symlinks, malformed task or Drive share-link JSON, and unreadable PostgreSQL dump catalogs. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.
