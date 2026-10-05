@@ -4,8 +4,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const args = Object.fromEntries(process.argv.slice(2).flatMap((value, index, all) => value.startsWith("--") ? [[value.slice(2), all[index + 1]]] : []));
-if (!args.drive || !args.share || !args.news || !args.forums) {
-  console.error("Usage: verify-backup.mjs --drive DIR --share DIR --news DIR --forums DIR [--freshrss-dump FILE]");
+if (!args.drive || !args.news || !args.forums) {
+  console.error("Usage: verify-backup.mjs --drive DIR --news DIR --forums DIR [--freshrss-dump FILE]");
   process.exit(2);
 }
 
@@ -29,25 +29,12 @@ async function jsonDirectory(root) {
 
 try {
   const drive = await directory(args.drive, "Drive backup");
-  const share = await directory(args.share, "Share backup");
   const news = await directory(args.news, "News backup");
   const forums = await directory(args.forums, "Forums backup");
-  if (drive === share || drive.startsWith(`${share}${path.sep}`) || share.startsWith(`${drive}${path.sep}`)) throw new Error("Drive and Share backups must be separate, non-nested directories.");
-  await Promise.all([rejectSymlinks(drive), rejectSymlinks(share), rejectSymlinks(news), rejectSymlinks(forums)]);
-
-  for (const required of ["meta", "folders", "blobs", "thumbs"]) await directory(path.join(share, required), `Share ${required}`);
-  for (const name of await readdir(path.join(share, "meta"))) {
-    if (!name.endsWith(".json")) continue;
-    const entry = await json(path.join(share, "meta", name));
-    if (!entry.id || `${entry.id}.json` !== name) throw new Error(`Invalid Share metadata: ${name}`);
-    const blob = await lstat(path.join(share, "blobs", entry.id));
-    if (!blob.isFile() || blob.isSymbolicLink()) throw new Error(`Missing Share blob: ${entry.id}`);
-    if (entry.type === "image") {
-      const thumb = await lstat(path.join(share, "thumbs", `${entry.id}.webp`));
-      if (!thumb.isFile() || thumb.isSymbolicLink()) throw new Error(`Missing Share thumbnail: ${entry.id}`);
-    }
-  }
-  await jsonDirectory(path.join(share, "folders"));
+  await Promise.all([rejectSymlinks(drive), rejectSymlinks(news), rejectSymlinks(forums)]);
+  const driveShares = path.join(drive, ".drive-shares");
+  try { await jsonDirectory(driveShares); }
+  catch (error) { if ((error).code !== "ENOENT") throw error; }
   await jsonDirectory(news);
   await json(path.join(forums, "directory.json"));
 

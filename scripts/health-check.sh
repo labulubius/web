@@ -4,7 +4,6 @@ set -euo pipefail
 origins=(
   "${MAIN_ORIGIN:-https://labulubius.com}"
   "${DRIVE_ORIGIN:-https://drive.labulubius.com}"
-  "${SHARE_ORIGIN:-https://share.labulubius.com}"
   "${FEEDS_ORIGIN:-https://feeds.labulubius.com}"
 )
 

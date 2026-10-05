@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bot, Download, File, Folder, FolderPlus, HardDrive, RefreshCw, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Bot, Copy, Download, File, Folder, FolderPlus, HardDrive, Link2, RefreshCw, Trash2, Unlink, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { agentHandoffPath, pdfToEpubHandoff } from "../lib/agent-handoff";
@@ -8,7 +8,7 @@ import { uploadInChunks } from "../lib/upload-client";
 import { OwnerAccess } from "../owner-access";
 import "./drive.css";
 
-type Entry = { name: string; type: "file" | "folder"; size: number; modified: string };
+type Entry = { name: string; type: "file" | "folder"; size: number; modified: string; shareId: string | null };
 
 export function DriveManager() {
   const { supabase, isAdmin, loading, authError, retryAuth } = useSiteAuth();
@@ -20,6 +20,7 @@ export function DriveManager() {
   const [loadingList, setLoadingList] = useState(true);
   const [listFailed, setListFailed] = useState(false);
   const [progress, setProgress] = useState("");
+  const [message, setMessage] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const listRequest = useRef<{ id: number; controller: AbortController } | null>(null);
   const path = parts.join("/");
@@ -75,9 +76,46 @@ export function DriveManager() {
   async function run(task: () => Promise<void>) {
     setBusy(true);
     setError("");
+    setMessage("");
     try { await task(); await reload(); }
     catch (failure) { setError(failure instanceof Error ? failure.message : "Drive operation failed."); }
     finally { setBusy(false); }
+  }
+
+  function publicUrl(id: string) {
+    return new URL(`/share/${id}`, window.location.origin).href;
+  }
+
+  async function copyPublicLink(id: string) {
+    const url = publicUrl(id);
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage("Public link copied to the clipboard.");
+    } catch {
+      window.prompt("Copy this public link:", url);
+      setMessage("Public link is ready to copy.");
+    }
+  }
+
+  function createShare(entry: Entry) {
+    const targetPath = [listedPath, entry.name].filter(Boolean).join("/");
+    void run(async () => {
+      const response = await api("/api/drive/shares", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: targetPath }),
+      });
+      const data = await response.json() as { share: { id: string } };
+      await copyPublicLink(data.share.id);
+    });
+  }
+
+  function revokeShare(entry: Entry) {
+    if (!entry.shareId || !window.confirm(`Revoke the public link for “${entry.name}”? Anyone using it will lose access.`)) return;
+    void run(async () => {
+      await api(`/api/drive/shares/${encodeURIComponent(entry.shareId!)}`, { method: "DELETE" });
+      setMessage("Public link revoked.");
+    });
   }
 
   function createFolder() {
@@ -154,6 +192,7 @@ export function DriveManager() {
         <button className="drive-refresh" type="button" onClick={() => void reload()} disabled={loadingList || busy} aria-label="Refresh files" title="Refresh files"><RefreshCw size={16} /></button>
       </div>
       {progress && <p role="status">{progress}</p>}
+      {message && <p className="drive-notice" role="status">{message}</p>}
       {error && <p className="drive-error" role="alert">{error}</p>}
       {loadingList ? <p className="drive-empty" role="status">Loading files…</p> : listFailed ? <p className="drive-empty">Could not load files. Check the error above and try Refresh files.</p> : entries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>This folder is empty</strong><span>Use Upload files or New folder to get started.</span></div> :
         <div className="drive-list-wrap"><div className="drive-columns" aria-hidden="true"><span>Name</span><span>Size / type</span><span>Modified</span><span>Actions</span></div>
@@ -163,6 +202,7 @@ export function DriveManager() {
           <span className="drive-detail">{entry.type === "file" ? `${(entry.size / 1024).toFixed(1)} KB` : "Folder"}</span>
           <span className="drive-detail">{new Date(entry.modified).toLocaleDateString()}</span>
           <span className="drive-row-actions">{entry.type === "file" && <><button className="drive-icon-button" aria-label={`Download ${entry.name}`} title="Download" type="button" disabled={busy} onClick={() => download(entry)}><Download size={17} /></button>{entry.name.toLowerCase().endsWith(".pdf") && <button className="drive-icon-button" aria-label={`Convert ${entry.name} to EPUB`} title="Convert to EPUB with Pi" type="button" disabled={busy} onClick={() => sendToPdfToEpub(entry)}><Bot size={17} /></button>}</>}
+          {entry.shareId ? <><button className="drive-icon-button" aria-label={`Copy public link for ${entry.name}`} title="Copy public link" type="button" disabled={busy} onClick={() => void copyPublicLink(entry.shareId!)}><Copy size={17} /></button><button className="drive-icon-button drive-unshare" aria-label={`Revoke public link for ${entry.name}`} title="Revoke public link" type="button" disabled={busy} onClick={() => revokeShare(entry)}><Unlink size={17} /></button></> : <button className="drive-icon-button" aria-label={`Share ${entry.name}`} title="Create public link" type="button" disabled={busy} onClick={() => createShare(entry)}><Link2 size={17} /></button>}
           <button className="drive-icon-button drive-delete" aria-label={`Delete ${entry.name}`} title="Delete" type="button" disabled={busy} onClick={() => remove(entry)}><Trash2 size={17} /></button></span>
         </li>)}</ul></div>}
     </section>

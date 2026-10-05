@@ -1,6 +1,7 @@
 import { readdir, lstat, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../lib/drive-server";
+import { driveError, drivePreflight, driveRoot, isDriveInternalName, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../lib/drive-server";
+import { listDriveShares, revokeDriveSharesForPath } from "../../lib/drive-shares";
 import { locked } from "../../lib/upload-sessions";
 
 export const runtime = "nodejs";
@@ -14,11 +15,13 @@ export async function GET(request: Request) {
     const parts = segments(new URL(request.url).searchParams.get("path") ?? "");
     const dir = parts.length ? await resolveDrivePath(parts) : await driveRoot();
     if (!(await lstat(dir)).isDirectory()) throw new Error("Invalid drive path.");
+    const shareByPath = new Map((await listDriveShares()).map((share) => [share.path, share.id]));
     const entries = await Promise.all((await readdir(dir, { withFileTypes: true }))
-      .filter((entry) => !entry.name.startsWith(".drive-upload-") && entry.name !== ".upload-sessions" && (entry.isFile() || entry.isDirectory()))
+      .filter((entry) => !isDriveInternalName(entry.name) && (entry.isFile() || entry.isDirectory()))
       .map(async (entry) => {
         const stat = await lstat(path.join(dir, entry.name));
-        return { name: entry.name, type: entry.isDirectory() ? "folder" : "file", size: stat.size, modified: stat.mtime.toISOString() };
+        const entryPath = [...parts, entry.name].join("/");
+        return { name: entry.name, type: entry.isDirectory() ? "folder" : "file", size: stat.size, modified: stat.mtime.toISOString(), shareId: shareByPath.get(entryPath) ?? null };
       }));
     entries.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "folder" ? -1 : 1));
     return Response.json({ entries }, { headers: privateHeaders });
@@ -54,6 +57,7 @@ export async function DELETE(request: Request) {
       // rm does not follow symlinks inside a directory, but reject symlinks at the target.
       await rm(target, { recursive: true });
     });
+    await revokeDriveSharesForPath(parts.join("/"));
     return Response.json({ ok: true }, { headers: privateHeaders });
   } catch (error) { return driveError(error); }
   });

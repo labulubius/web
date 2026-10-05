@@ -1,6 +1,6 @@
 import { link, lstat, readdir } from "node:fs/promises";
 import path from "node:path";
-import { driveError, drivePreflight, driveRoot, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
+import { driveError, drivePreflight, driveRoot, isDriveInternalName, privateHeaders, requireDriveAdmin, resolveDrivePath, segments, validateName, withDriveCors } from "../../../lib/drive-server";
 import { appendChunk, createSession, discard, loadSession, locked, offset, smallJson, tempPath } from "../../../lib/upload-sessions";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export function OPTIONS(request: Request) { return drivePreflight(request); }
 async function driveUsed(root: string): Promise<number> {
   let total = 0;
   for (const item of await readdir(root, { withFileTypes: true })) {
-    if (item.name === ".upload-sessions") continue;
+    if (isDriveInternalName(item.name)) continue;
     const file = path.join(root, item.name);
     const stat = await lstat(file);
     if (stat.isSymbolicLink()) continue;

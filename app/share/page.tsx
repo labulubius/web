@@ -1,6 +1,5 @@
-import { SiteShell } from "../site-shell";
-import { ShareManager } from "./share-manager";
+import { redirect } from "next/navigation";
 
 export default function SharePage() {
-  return <SiteShell active="/share" title="Public Share" hasSidebar><ShareManager /></SiteShell>;
+  redirect("/drive");
 }

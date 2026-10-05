@@ -54,9 +54,13 @@ export function segments(value: unknown): string[] {
   return parts;
 }
 
+export function isDriveInternalName(name: string) {
+  return name === ".upload-sessions" || name === ".drive-shares" || name.startsWith(".drive-upload-");
+}
+
 export function validateName(name: unknown): asserts name is string {
   if (typeof name !== "string" || !name || name === "." || name === ".." ||
-      name.length > 255 || /[/\\\x00-\x1f\x7f]/.test(name) || name.startsWith(".drive-upload-")) {
+      name.length > 255 || /[/\\\x00-\x1f\x7f]/.test(name) || isDriveInternalName(name)) {
     throw new Error("Invalid file or folder name.");
   }
 }
@@ -87,7 +91,7 @@ export async function resolveDrivePath(parts: string[], includeLast = true) {
 export function driveError(error: unknown) {
   const code = (error as NodeJS.ErrnoException).code;
   const message = error instanceof Error ? error.message : "Drive operation failed.";
-  const known = message.startsWith("Invalid") || message.startsWith("File") || message.startsWith("Folder") || message.startsWith("Upload") || message.startsWith("Name") || message.startsWith("Cannot") || message.startsWith("Storage") || message.startsWith("Not enough");
+  const known = message.startsWith("Invalid") || message.startsWith("File") || message.startsWith("Folder") || message.startsWith("Upload") || message.startsWith("Name") || message.startsWith("Cannot") || message.startsWith("Only") || message.startsWith("Share") || message.startsWith("Storage") || message.startsWith("Not enough");
   if (!known && code !== "ENOENT" && code !== "EEXIST") {
     // Do not log the request, authorization header, or bearer token.
     console.error("Drive operation failed:", { code, name: error instanceof Error ? error.name : "UnknownError", message });

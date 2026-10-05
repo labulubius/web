@@ -1,4 +1,4 @@
-export type PdfInputSource = "drive" | "share";
+export type PdfInputSource = "drive";
 
 export function pdfToEpubHandoff(
   source: PdfInputSource,

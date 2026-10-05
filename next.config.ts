@@ -10,9 +10,9 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://drive.labulubius.com https://share.labulubius.com https://agent.labulubius.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://drive.labulubius.com https://agent.labulubius.com",
   "frame-src https://agent.labulubius.com",
-  "media-src 'self' https://share.labulubius.com",
+  "media-src 'self'",
   "worker-src 'self' blob:",
 ].join("; ");
 

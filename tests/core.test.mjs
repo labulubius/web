@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { fitsStorageQuota, STORAGE_TOTAL_BYTES } from "../app/lib/storage-quota.ts";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
@@ -20,15 +19,18 @@ test("PDF handoff carries a private structured reference into Agent", () => {
   const path = agentHandoffPath(prompt);
   assert.ok(path.startsWith("/agent?handoff="));
   assert.equal(decodeURIComponent(path.split("=", 2)[1]), prompt);
-  assert.throws(() => pdfToEpubHandoff("share", "", "book.pdf", 1), /Invalid/);
+  assert.throws(() => pdfToEpubHandoff("drive", "", "book.pdf", 1), /Invalid/);
 });
 
-test("managed Share EPUBs disappear from listings and public downloads at expiry", async () => {
-  const source = await readFile(new URL("../app/lib/share-server.ts", import.meta.url), "utf8");
-  assert.match(source, /managedBy\?: "pdf-to-epub-v1"/);
-  assert.match(source, /Date\.parse\(entry\.expiresAt\) <= now/);
-  assert.match(source, /filter\(\(entry\) => !isExpired\(entry\)\)/);
-  assert.match(source, /if \(!entry \|\| isExpired\(entry\)/);
+test("Drive shares use opaque metadata and protected path resolution", async () => {
+  const shares = await readFile(new URL("../app/lib/drive-shares.ts", import.meta.url), "utf8");
+  const publicRoute = await readFile(new URL("../app/api/share/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(shares, /const SHARE_DIRECTORY = "\.drive-shares"/);
+  assert.match(shares, /randomUUID\(\)/);
+  assert.match(shares, /resolveDrivePath/);
+  assert.match(shares, /O_NOFOLLOW/);
+  assert.match(publicRoute, /Content-Disposition/);
+  assert.match(publicRoute, /Cache-Control": "no-store"/);
 });
 
 test("CAU login encryption matches the university CAS implementation", () => {
@@ -146,13 +148,6 @@ test("news summaries contain no more than two short sentences", () => {
   assert.match(longChinese, /…$/);
 });
 
-test("storage quota includes pending and converted output bytes", () => {
-  assert.equal(fitsStorageQuota(80, 10, 10, 100), true);
-  assert.equal(fitsStorageQuota(80, 10, 11, 100), false);
-  assert.equal(fitsStorageQuota(STORAGE_TOTAL_BYTES, 0, 1), false);
-  assert.equal(fitsStorageQuota(-1, 0, 0), false);
-});
-
 test("health response is minimal and not cached", async () => {
   const response = health();
   assert.equal(response.status, 200);
@@ -166,6 +161,7 @@ test("global headers include baseline browser protections", async () => {
   assert.match(headers.get("content-security-policy"), /frame-ancestors 'none'/);
   assert.match(headers.get("content-security-policy"), /frame-src https:\/\/agent\.labulubius\.com/);
   assert.match(headers.get("content-security-policy"), /connect-src[^;]*https:\/\/agent\.labulubius\.com/);
+  assert.doesNotMatch(headers.get("content-security-policy"), /share\.labulubius\.com/);
   assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.equal(headers.get("x-frame-options"), "DENY");
   assert.ok(headers.has("referrer-policy"));
@@ -222,18 +218,16 @@ test("agent iframe stays mounted across workspace route changes", async () => {
 test("owner-only destinations remain visible and show access guidance", async () => {
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
   const drive = await readFile(new URL("../app/drive/drive-manager.tsx", import.meta.url), "utf8");
-  const share = await readFile(new URL("../app/share/share-manager.tsx", import.meta.url), "utf8");
   const note = await readFile(new URL("../app/note/note-editor.tsx", import.meta.url), "utf8");
   const agent = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
   const access = await readFile(new URL("../app/owner-access.tsx", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
 
   assert.match(sidebar, /href="\/drive"/);
-  assert.match(sidebar, /href="\/share"/);
+  assert.doesNotMatch(sidebar, /href="\/share"/);
   assert.match(sidebar, /href="\/agent"/);
   assert.doesNotMatch(sidebar, /isAdmin && <Link href="\/(?:drive|share|agent)"/);
   assert.match(drive, /<OwnerAccess/);
-  assert.match(share, /<OwnerAccess/);
   assert.match(note, /<OwnerAccess/);
   assert.doesNotMatch(note, /Private note \(administrator only\)/);
   assert.match(agent, /if \(loading \|\| authError \|\| !user \|\| !isAdmin\)/);
@@ -242,6 +236,7 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.match(agent, /<SiteShell active="\/agent"/);
   assert.doesNotMatch(access, /AccountControl/);
   assert.match(shell, /<AccountControl \/>/);
+  assert.doesNotMatch(shell, /href: "\/share"/);
 });
 
 test("sidebar controls render for the configured workspace pages", async () => {
@@ -254,6 +249,6 @@ test("sidebar controls render for the configured workspace pages", async () => {
   assert.match(shell, /hasSidebar && <button/);
   assert.match(home, /title="Home" hasSidebar/);
   assert.match(drive, /title="Private Drive" hasSidebar/);
-  assert.match(share, /title="Public Share" hasSidebar/);
+  assert.match(share, /redirect\("\/drive"\)/);
   assert.match(note, /title="Private Note" hasSidebar/);
 });
