@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
 import type { PersonalTask, TaskDraft, TaskProject } from "./task-types";
@@ -53,12 +53,11 @@ export function TaskDialog({ value, projects, busy, onClose, onSave }: {
   </AccessibleDialog>;
 }
 
-export function ProjectDialog({ project, busy, onClose, onSave, onDelete }: {
+export function ProjectDialog({ project, busy, onClose, onSave }: {
   project?: TaskProject;
   busy: boolean;
   onClose: () => void;
   onSave: (name: string) => Promise<void>;
-  onDelete: (project: TaskProject) => Promise<void>;
 }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,7 +67,7 @@ export function ProjectDialog({ project, busy, onClose, onSave, onDelete }: {
     <header><h2 id="project-dialog-title">{project ? "Edit project" : "New project"}</h2><button type="button" disabled={busy} onClick={onClose} aria-label="Close"><X size={17} /></button></header>
     <form onSubmit={(event) => void submit(event)}>
       <label>Project name<input name="name" defaultValue={project?.name ?? ""} maxLength={80} required autoFocus /></label>
-      <footer>{project && <button className="task-danger" type="button" disabled={busy} onClick={() => void onDelete(project)}><Trash2 size={14} /> Delete</button>}<span className="task-dialog-spacer" /><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer>
+      <footer><span className="task-dialog-spacer" /><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer>
     </form>
   </AccessibleDialog>;
 }

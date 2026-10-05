@@ -5,26 +5,33 @@
 .tasks-sidebar button { font: inherit; }
 .tasks-sidebar-heading, .tasks-project-heading { align-items: center; display: flex; justify-content: space-between; margin: 8px 5px 5px 9px; }
 .tasks-sidebar-heading h2, .tasks-project-heading h2 { color: var(--text-muted); font-size: 11px; font-weight: 500; margin: 0; }
-.tasks-sidebar-heading button, .tasks-project-heading button, .tasks-project-edit { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--link); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
-.tasks-sidebar-heading button:hover, .tasks-project-heading button:hover, .tasks-project-edit:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
+.tasks-sidebar-heading button, .tasks-project-heading button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--link); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
+.tasks-sidebar-heading button:hover, .tasks-project-heading button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .tasks-sidebar nav { display: flex; flex-direction: column; gap: 1px; }
-.tasks-sidebar nav button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: grid; font-size: 12px; gap: 8px; grid-template-columns: 16px minmax(0, 1fr) auto; padding: 7px 9px; text-align: left; }
+.tasks-sidebar nav button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: grid; font-size: 12px; gap: 8px; grid-template-columns: 16px minmax(0, 1fr); padding: 7px 9px; text-align: left; }
 .tasks-sidebar nav button svg { color: var(--link); }
-.tasks-sidebar nav button small { color: var(--text-muted); font-size: 10px; }
 .tasks-sidebar nav button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .tasks-sidebar nav button.selected { background: var(--accent); color: white; }
-.tasks-sidebar nav button.selected :is(svg, small) { color: white; }
+.tasks-sidebar nav button.selected svg { color: white; }
 .tasks-project-heading { border-top: 1px solid var(--separator); margin-top: 16px; padding-top: 12px; }
 .tasks-project-list { display: flex; flex-direction: column; gap: 1px; }
 .tasks-project-list > p { color: var(--text-muted); font-size: 10px; margin: 8px 9px; }
-.tasks-project-list > div { align-items: center; border-radius: 3px; display: grid; grid-template-columns: minmax(0, 1fr) 23px; }
-.tasks-project-list > div:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
-.tasks-project-list > div.selected { background: var(--accent); color: white; }
-.tasks-project-list > div > button:first-child { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: flex; font-size: 12px; gap: 8px; min-width: 0; padding: 7px 9px; text-align: left; }
-.tasks-project-list > div > button:first-child svg { color: var(--link); flex: none; }
-.tasks-project-list > div.selected > button:first-child svg { color: white; }
+.tasks-project-list > div { align-items: center; display: flex; min-width: 204px; position: relative; }
+.tasks-project-list > div.reorderable > button:first-child { cursor: grab; touch-action: none; }
+.tasks-project-list > div.reorderable > button:first-child:active { cursor: grabbing; }
+.tasks-project-list > div.dragging { box-shadow: 0 5px 14px rgba(0, 0, 0, .18); opacity: .78; }
+.tasks-project-list > div > button:first-child { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); display: grid; flex: 1; font-size: 12px; gap: 8px; grid-template-columns: auto minmax(0, 1fr); min-height: 33px; min-width: 0; padding: 6px 62px 6px 9px; text-align: left; }
+.tasks-project-list > div > button:first-child:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
+.tasks-project-list > div > button:first-child svg { color: var(--link); }
 .tasks-project-list > div > button:first-child span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tasks-project-list > div.selected .tasks-project-edit { color: white; }
+.tasks-project-list > div.selected > button:first-child { background: var(--accent); color: white; }
+.tasks-project-list > div.selected > button:first-child svg { color: white; }
+.tasks-project-actions { align-items: center; display: flex; gap: 3px; position: absolute; right: 4px; }
+.tasks-project-actions button { align-items: center; background: color-mix(in srgb, var(--window) 78%, transparent); border: 0; border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; flex: none; height: 23px; justify-content: center; padding: 0; width: 23px; }
+.tasks-project-actions button:hover { color: var(--text); }
+.tasks-project-actions button:last-child:hover { color: var(--negative); }
+.tasks-project-list > div.selected .tasks-project-actions button { background: color-mix(in srgb, var(--accent) 70%, var(--window)); color: white; }
+.tasks-project-list > div.selected .tasks-project-actions button:last-child:hover { background: var(--negative); color: white; }
 
 .task-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; padding: 22px; }
 .task-header { align-items: flex-end; display: flex; flex: none; gap: 18px; justify-content: space-between; padding-bottom: 16px; }
@@ -111,8 +118,6 @@
 .task-form-primary, .task-form-row { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .breeze-dialog form > footer.task-dialog-footer { align-items: center; }
 .task-dialog-spacer { flex: 1; }
-.breeze-dialog button.task-danger { align-items: center; color: var(--negative); display: inline-flex; gap: 5px; }
-.breeze-dialog button.task-danger:hover { border-color: var(--negative); }
 .sr-only { height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 @media (max-width: 760px) {

@@ -9,6 +9,7 @@ import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, validTimelineRange } from "../app/tasks/task-calendar.ts";
+import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -42,6 +43,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   const gantt = await readFile(new URL("../app/tasks/gantt-view.tsx", import.meta.url), "utf8");
   const types = await readFile(new URL("../app/tasks/task-types.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
+  const projectsApi = await readFile(new URL("../app/api/tasks/projects/route.ts", import.meta.url), "utf8");
   assert.match(server, /TASKS_DATA_DIR/);
   assert.match(server, /O_NOFOLLOW/);
   assert.match(server, /await handle\.sync\(\)/);
@@ -67,10 +69,23 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(gantt, /No tasks this month|gantt-empty-row/);
   assert.match(gantt, /scheduled\.map/);
   assert.match(styles, /task-gantt-view\.is-empty/);
+  assert.match(manager, /SortableProjectRow/);
+  assert.doesNotMatch(manager, /allTasks.length/);
+  assert.match(manager, /view !== "gantt"/);
+  assert.match(projectsApi, /reorderProjects/);
   assert.match(server, /value\.version === 1/);
   assert.match(server, /value\.version === 2/);
   assert.match(server, /version: 3/);
   assert.match(server, /startDate: null, endDate: null/);
+});
+
+test("task projects reorder only with an exact opaque-ID set", () => {
+  const first = { id: "11111111-1111-4111-8111-111111111111", name: "First", createdAt: "2026-10-05T00:00:00.000Z", updatedAt: "2026-10-05T00:00:00.000Z" };
+  const second = { id: "22222222-2222-4222-8222-222222222222", name: "Second", createdAt: "2026-10-05T00:00:00.000Z", updatedAt: "2026-10-05T00:00:00.000Z" };
+  assert.deepEqual(reorderTaskProjects([first, second], [second.id, first.id]), [second, first]);
+  assert.throws(() => reorderTaskProjects([first, second], [first.id, first.id]), /Invalid project order/);
+  assert.throws(() => reorderTaskProjects([first, second], [first.id]), /Invalid project order/);
+  assert.throws(() => reorderTaskProjects([first, second], [first.id, "33333333-3333-4333-8333-333333333333"]), /Invalid project order/);
 });
 
 test("task Gantt calendar supports inclusive custom ranges across months", () => {

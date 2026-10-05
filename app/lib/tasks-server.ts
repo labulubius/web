@@ -6,6 +6,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { reorderTaskProjects } from "../tasks/project-order";
 import type { PersonalTask, TaskData, TaskProject } from "../tasks/task-types";
 
 const DATA_FILE = "tasks.json";
@@ -262,6 +263,17 @@ export async function createProject(input: unknown) {
     if (data.projects.some((project) => project.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("Project name already exists.");
     const now = new Date().toISOString();
     data.projects.push({ id: randomUUID(), name, createdAt: now, updatedAt: now });
+    await writeData(root, data);
+    return data;
+  });
+}
+
+export async function reorderProjects(input: unknown) {
+  if (!object(input)) throw new Error("Invalid project order.");
+  const root = await tasksRoot();
+  return locked(root, async () => {
+    const { data } = await readData(root);
+    data.projects = reorderTaskProjects(data.projects, input.projectIds);
     await writeData(root, data);
     return data;
   });

@@ -1,10 +1,12 @@
 "use client";
 
-import { DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { CalendarRange, CheckCircle2, Circle, GripVertical, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
-import { addDays, daysBetween, monthEnd, monthStart, rangeLabel, shortDate, validTimelineRange } from "./task-calendar";
+import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
 import { GanttView } from "./gantt-view";
 import type { PersonalTask, TaskData, TaskDraft, TaskProject } from "./task-types";
@@ -44,6 +46,24 @@ function TaskList({ tasks, empty, projects, onOpen, onComplete, onDelete }: {
       <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>
     </span>
   </li>)}</ul>;
+}
+
+function SortableProjectRow({ project, active, disabled, onSelect, onEdit, onDelete }: {
+  project: TaskProject;
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id, disabled });
+  return <div className={`${active ? "selected" : ""} reorderable${isDragging ? " dragging" : ""}`} ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
+    <button type="button" onClick={onSelect} aria-current={active ? "page" : undefined} {...attributes} {...listeners}><GripVertical size={15} /><span title={project.name}>{project.name}</span></button>
+    <span className="tasks-project-actions" onPointerDown={(event) => event.stopPropagation()}>
+      <button type="button" onClick={onEdit} aria-label={`Edit ${project.name}`} title="Edit project"><Pencil size={12} /></button>
+      <button type="button" onClick={onDelete} aria-label={`Delete ${project.name}`} title="Delete project"><Trash2 size={12} /></button>
+    </span>
+  </div>;
 }
 
 function readLocation(projects: TaskProject[]): StoredLocation | null {
@@ -188,6 +208,18 @@ export function TaskManager() {
     setTimelineStart(startDate); setTimelineEnd(endDate); setError(""); setMessage("");
   }
 
+  async function projectDragEnd(event: DragEndEvent) {
+    if (!data || !event.over || event.active.id === event.over.id || saving) return;
+    const sourceIndex = data.projects.findIndex((project) => project.id === event.active.id);
+    const targetIndex = data.projects.findIndex((project) => project.id === event.over?.id);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const before = data;
+    const projects = arrayMove(data.projects, sourceIndex, targetIndex);
+    setData({ ...data, projects });
+    const ok = await mutate("/api/tasks/projects", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectIds: projects.map((project) => project.id) }) }, "Projects reordered.");
+    if (!ok) setData(before);
+  }
+
   function dragEnd(event: DragEndEvent) {
     if (!data || !event.over || saving) return;
     const id = String(event.active.id).replace(/^task:/, "");
@@ -203,7 +235,7 @@ export function TaskManager() {
   const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
   const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
   const title = view === "all" ? "All tasks" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
-  const description = view === "all" ? "All project and uncategorized tasks." : view === "project" ? "Scheduled and unscheduled tasks in this project." : rangeLabel(timelineStart, timelineEnd);
+  const description = view === "all" ? "All project and uncategorized tasks." : "Scheduled and unscheduled tasks in this project.";
 
   if (loading) return <HomeAccess description="Opening home…" />;
   if (authError) return <HomeAccess description="Home is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
@@ -216,16 +248,20 @@ export function TaskManager() {
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
         <nav aria-label="Task navigation">
-          <button className={view === "all" ? "selected" : ""} aria-current={view === "all" ? "page" : undefined} type="button" onClick={() => select("all")}><ListTodo size={16} /><span>All tasks</span><small>{allTasks.length}</small></button>
+          <button className={view === "all" ? "selected" : ""} aria-current={view === "all" ? "page" : undefined} type="button" onClick={() => select("all")}><ListTodo size={16} /><span>All tasks</span></button>
           <button className={view === "gantt" ? "selected" : ""} aria-current={view === "gantt" ? "page" : undefined} type="button" onClick={() => select("gantt")}><CalendarRange size={16} /><span>Gantt</span></button>
         </nav>
         <div className="tasks-project-heading"><h2>Projects</h2><button type="button" onClick={() => setProjectDialog("new")} aria-label="Create project" title="Create project"><Plus size={14} /></button></div>
-        <div className="tasks-project-list">{data.projects.length === 0 ? <p>No projects yet</p> : data.projects.map((project) => <div key={project.id} className={view === "project" && projectId === project.id ? "selected" : ""}><button type="button" onClick={() => select("project", project.id)} aria-current={view === "project" && projectId === project.id ? "page" : undefined}><Folder size={15} /><span title={project.name}>{project.name}</span></button><button className="tasks-project-edit" type="button" onClick={() => setProjectDialog(project)} aria-label={`Edit ${project.name}`} title="Edit project"><Pencil size={12} /></button></div>)}</div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void projectDragEnd(event)}>
+          <SortableContext items={data.projects.map((project) => project.id)} strategy={verticalListSortingStrategy}>
+            <div className="tasks-project-list">{data.projects.length === 0 ? <p>No projects yet</p> : data.projects.map((project) => <SortableProjectRow key={project.id} project={project} active={view === "project" && projectId === project.id} disabled={saving} onSelect={() => select("project", project.id)} onEdit={() => setProjectDialog(project)} onDelete={() => void deleteProject(project)} />)}</div>
+          </SortableContext>
+        </DndContext>
       </aside>
 
       <main className="task-main">
         <header className="task-header">
-          <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1><span>{description}</span></div>
+          <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1>{view !== "gantt" && <span>{description}</span>}</div>
           {view === "gantt" && <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>}
         </header>
         <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
@@ -235,6 +271,6 @@ export function TaskManager() {
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} onClose={() => setTaskDialog(null)} onSave={saveTask} />}
-    {projectDialog && <ProjectDialog project={projectDialog === "new" ? undefined : projectDialog} busy={saving} onClose={() => setProjectDialog(null)} onSave={saveProject} onDelete={deleteProject} />}
+    {projectDialog && <ProjectDialog project={projectDialog === "new" ? undefined : projectDialog} busy={saving} onClose={() => setProjectDialog(null)} onSave={saveProject} />}
   </DndContext>;
 }
