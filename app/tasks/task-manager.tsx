@@ -3,7 +3,7 @@
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarRange, CheckCircle2, Circle, GripVertical, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
@@ -58,7 +58,7 @@ function SortableProjectRow({ project, active, disabled, onSelect, onEdit, onDel
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id, disabled });
   return <div className={`${active ? "selected" : ""} reorderable${isDragging ? " dragging" : ""}`} ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
-    <button type="button" onClick={onSelect} aria-current={active ? "page" : undefined} {...attributes} {...listeners}><GripVertical size={15} /><span title={project.name}>{project.name}</span></button>
+    <button type="button" onClick={onSelect} aria-current={active ? "page" : undefined} {...attributes} {...listeners}><Folder size={15} /><span title={project.name}>{project.name}</span></button>
     <span className="tasks-project-actions" onPointerDown={(event) => event.stopPropagation()}>
       <button type="button" onClick={onEdit} aria-label={`Edit ${project.name}`} title="Edit project"><Pencil size={12} /></button>
       <button type="button" onClick={onDelete} aria-label={`Delete ${project.name}`} title="Delete project"><Trash2 size={12} /></button>
