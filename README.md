@@ -1,6 +1,6 @@
 # Labulubius Workspace
 
-A personal web workspace with a KDE Breeze-inspired interface. The public pages organize links and reading sources; a Supabase-authenticated site administrator manages private tasks, files, feeds, forums and a private note.
+A personal web workspace with a KDE Breeze-inspired interface. The public pages organize links and reading sources; a Supabase-authenticated site administrator manages private tasks, files, feeds and forums.
 
 All interface work must follow the scoped visual, interaction, accessibility and permission rules in [DESIGN.md](DESIGN.md).
 
@@ -14,14 +14,13 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | `/forums` | Discourse topic browser | Visitors see the selected public sources; administrators manage the shared directory |
 | `/drive` | Private file manager and public-link manager | Administrator only; files live on the `web` server |
 | `/share/<id>` | Public file or folder link | Anyone holding an active opaque link |
-| `/note` | Private note | Administrator only; stored in Supabase |
 | `/about` | Project overview | Public |
 
 The navigator's canonical URL is `https://labulubius.com/nav`. The Drive subdomain redirects its page to the main-site UI, while its API remains on the dedicated Drive hostname.
 
 ## Architecture
 
-- Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data, icons and the private note use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
+- Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data and icons use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
 - The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel sends `labulubius.com`, `drive.labulubius.com` and `feeds.labulubius.com` to services on that VM. The main UI and same-origin News/Forums APIs run in the same Next.js process.
 - Personal task data, Drive files and their share-link metadata, News preferences and the Forums directory live **outside Git** on `web`. FreshRSS and its PostgreSQL database run in Docker there. GitHub stores source history and CI results, not production data.
 
