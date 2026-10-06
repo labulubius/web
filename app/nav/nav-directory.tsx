@@ -103,8 +103,6 @@ function SiteCard({
   onEdit,
   onDelete,
   onFavorite,
-  onPointerInteraction,
-  shouldBlockOpen,
 }: {
   site: Site;
   category?: Category;
@@ -113,26 +111,18 @@ function SiteCard({
   onEdit: () => void;
   onDelete: () => void;
   onFavorite: () => void;
-  onPointerInteraction: () => void;
-  shouldBlockOpen: () => boolean;
 }) {
   const icon = site.icon_url;
-  const didDrag = useRef(false);
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: site.id,
     disabled: !canReorder,
   });
-
-  useEffect(() => {
-    if (isDragging) didDrag.current = true;
-  }, [isDragging]);
 
   return (
     <article
       className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
-      onPointerDownCapture={() => { didDrag.current = false; onPointerInteraction(); }}
       {...(canReorder ? listeners : {})}
     >
       <a
@@ -141,11 +131,6 @@ function SiteCard({
         href={site.url}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={(event) => {
-          const globallyBlocked = shouldBlockOpen();
-          if (didDrag.current || globallyBlocked) event.preventDefault();
-          didDrag.current = false;
-        }}
       >
         <div className="site-card-body">
           <span className="site-logo">
@@ -514,7 +499,17 @@ export function NavDirectory() {
             }}
           >
             <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
-              <div className="site-grid">
+              <div
+                className="site-grid"
+                onPointerDownCapture={() => { blockSiteOpen.current = false; }}
+                onKeyDownCapture={() => { blockSiteOpen.current = false; }}
+                onClickCapture={(event) => {
+                  if (!blockSiteOpen.current || !(event.target instanceof Element) || !event.target.closest(".site-card-link")) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  blockSiteOpen.current = false;
+                }}
+              >
                 {filteredSites.map((site) => (
                   <SiteCard
                     key={site.id}
@@ -525,12 +520,6 @@ export function NavDirectory() {
                     onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                     onDelete={() => void deleteSite(site)}
                     onFavorite={() => void toggleFavorite(site)}
-                    onPointerInteraction={() => { blockSiteOpen.current = false; }}
-                    shouldBlockOpen={() => {
-                      const blocked = blockSiteOpen.current;
-                      blockSiteOpen.current = false;
-                      return blocked;
-                    }}
                   />
                 ))}
               </div>

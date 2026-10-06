@@ -439,9 +439,11 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.match(news, /\.news-category-row \{[^}]*min-width: 0/);
   assert.match(directory, /isAdmin \? <Folder size=\{16\}/);
   assert.match(directory, /onDragStart=\{\(\) => \{ blockSiteOpen\.current = true; \}\}/);
-  assert.match(directory, /onPointerInteraction=\{\(\) => \{ blockSiteOpen\.current = false; \}\}/);
-  assert.match(directory, /if \(didDrag\.current \|\| globallyBlocked\) event\.preventDefault\(\)/);
-  assert.doesNotMatch(directory, /blockSiteOpenUntil|GripVertical/);
+  assert.match(directory, /onPointerDownCapture=\{\(\) => \{ blockSiteOpen\.current = false; \}\}/);
+  assert.match(directory, /onClickCapture=\{\(event\) => \{/);
+  assert.match(directory, /event\.target\.closest\(\"\.site-card-link\"\)/);
+  assert.match(directory, /event\.preventDefault\(\);/);
+  assert.doesNotMatch(directory, /blockSiteOpenUntil|didDrag|onPointerInteraction|shouldBlockOpen|GripVertical/);
 });
 
 test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
