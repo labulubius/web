@@ -40,11 +40,8 @@ export function DriveManager() {
   const [rootFolders, setRootFolders] = useState<string[]>([]);
   const [listedPath, setListedPath] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [listFailed, setListFailed] = useState(false);
-  const [progress, setProgress] = useState("");
-  const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "name", direction: "asc" });
   const [view, setView] = useState<ViewMode>("details");
@@ -108,13 +105,11 @@ export function DriveManager() {
       setListedPath(targetMode === "files" ? targetPath : "");
       setSelected(new Set());
       setMenuKey(null);
-      setError("");
-    } catch (failure) {
+    } catch {
       if (listRequest.current?.id !== request.id || request.controller.signal.aborted) return;
       setEntries([]);
       setListedPath(targetMode === "files" ? targetPath : "");
       setListFailed(true);
-      setError(failure instanceof Error ? failure.message : "Could not load files.");
     } finally {
       if (listRequest.current?.id === request.id) setLoadingList(false);
     }
@@ -124,9 +119,9 @@ export function DriveManager() {
   useEffect(() => () => listRequest.current?.controller.abort(), []);
 
   async function run(task: () => Promise<void>) {
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true);
     try { await task(); await reload(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Drive operation failed."); }
+    catch { /* Operations fail silently without persistent notification bars. */ }
     finally { setBusy(false); }
   }
 
@@ -138,8 +133,8 @@ export function DriveManager() {
 
   async function copyPublicLink(id: string) {
     const url = publicUrl(id);
-    try { await navigator.clipboard.writeText(url); setMessage("Public link copied to the clipboard."); }
-    catch { window.prompt("Copy this public link:", url); setMessage("Public link is ready to copy."); }
+    try { await navigator.clipboard.writeText(url); }
+    catch { window.prompt("Copy this public link:", url); }
   }
 
   function createShare(entry: Entry) {
@@ -165,9 +160,7 @@ export function DriveManager() {
   function upload(files: FileList | null) {
     if (!files?.length || mode !== "files") return;
     void run(async () => {
-      try {
-        for (const file of Array.from(files)) await uploadInChunks(api, "/api/drive/upload", file, path, (sent) => setProgress(`Uploading ${file.name}: ${Math.round(100 * sent / file.size)}%`));
-      } finally { setProgress(""); }
+      for (const file of Array.from(files)) await uploadInChunks(api, "/api/drive/upload", file, path, () => undefined);
     });
     if (fileInput.current) fileInput.current.value = "";
   }
@@ -181,13 +174,11 @@ export function DriveManager() {
     if (action.kind === "revoke") {
       await run(async () => {
         await api(`/api/drive/shares/${encodeURIComponent(action.entry.shareId!)}`, { method: "DELETE" });
-        setMessage("Public link revoked.");
       });
       return;
     }
     await run(async () => {
       for (const entry of action.entries) await api("/api/drive", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: entryPath(entry) }) });
-      setMessage(action.entries.length === 1 ? "Item deleted." : `${action.entries.length} items deleted.`);
     });
   }
 
@@ -266,11 +257,9 @@ export function DriveManager() {
 
       {selectedEntries.length > 0 && <div className="drive-selection-bar"><strong>{selectedEntries.length} {selectedEntries.length === 1 ? "item" : "items"} selected</strong>{selectedEntry?.type === "file" && <button type="button" onClick={() => download(selectedEntry)}><Download size={15} /> Download</button>}{selectedEntry?.type === "file" && (selectedEntry.shareId ? <button type="button" onClick={() => void copyPublicLink(selectedEntry.shareId!)}><Copy size={15} /> Copy link</button> : <button type="button" onClick={() => createShare(selectedEntry)}><Link2 size={15} /> Public link</button>)}<button type="button" onClick={() => setInfoOpen(true)} disabled={!selectedEntry}><Info size={15} /> Information</button><button className="drive-danger-action" type="button" onClick={() => askDelete(selectedEntries)}><Trash2 size={15} /> Delete</button></div>}
 
-      <div className="drive-feedback" aria-live="polite">{progress && <p role="status">{progress}</p>}{message && <p className="drive-notice" role="status">{message}</p>}{error && <p className="drive-error" role="alert">{error}</p>}</div>
-
       <div className="drive-content">
         <section className="drive-items" aria-label={mode === "links" ? "Public links" : "Files"}>
-          {loadingList ? <div className="drive-empty" role="status">Loading files…</div> : listFailed ? <div className="drive-empty"><strong>Could not load files</strong><span>Check the error above and try Refresh files.</span></div> : shownEntries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>{search ? "No matching items" : mode === "links" ? "No public links" : "This folder is empty"}</strong><span>{search ? "Try a different search." : mode === "links" ? "Create a public link from a file in My Drive." : "Use Upload or New to get started."}</span></div> : view === "details" ? <div className="drive-details-wrap"><div className="drive-columns"><input type="checkbox" checked={allShownSelected} onChange={(event) => setSelected(event.target.checked ? new Set(shownEntries.map(entryKey)) : new Set())} aria-label="Select all visible items" /><span aria-hidden="true" /><button type="button" onClick={() => toggleSort("name")}>Name {sort.key === "name" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><button type="button" onClick={() => toggleSort("size")}>Size {sort.key === "size" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><button type="button" onClick={() => toggleSort("modified")}>Modified {sort.key === "modified" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><span>Public link</span><span>Actions</span></div><ul className="drive-list">{shownEntries.map((entry) => { const key = entryKey(entry); const checked = selected.has(key); return <li key={key} className={checked ? "selected" : ""}><input type="checkbox" checked={checked} onChange={(event) => toggleEntry(entry, event.target.checked)} aria-label={`Select ${entry.name}`} /><span className={`drive-file-icon ${entry.type}`}>{entryIcon(entry)}</span>{entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => navigate(entryPath(entry).split("/"))} title={entry.name}>{entry.name}</button> : <button className="drive-name" type="button" onClick={() => toggleEntry(entry, !checked)} title={entry.name}>{entry.name}</button>}<span className="drive-detail drive-size">{entry.type === "file" ? formatSize(entry.size) : "Folder"}</span><span className="drive-detail drive-modified">{new Date(entry.modified).toLocaleDateString()}</span><span className={`drive-link-state${entry.shareId ? " linked" : ""}`}>{entry.shareId ? <><Link2 size={13} /> Linked</> : "—"}</span><span className="drive-menu-wrap"><button className="drive-more" type="button" onClick={() => setMenuKey(menuKey === key ? null : key)} aria-expanded={menuKey === key} aria-label={`Actions for ${entry.name}`} title="Actions"><MoreVertical size={17} /></button>{menuKey === key && <span className="drive-menu" role="menu">{rowActions(entry)}</span>}</span></li>; })}</ul></div> : <ul className="drive-grid">{shownEntries.map((entry) => { const key = entryKey(entry); const checked = selected.has(key); return <li key={key} className={checked ? "selected" : ""}><label><input type="checkbox" checked={checked} onChange={(event) => toggleEntry(entry, event.target.checked)} /><span className={`drive-grid-icon ${entry.type}`}>{entryIcon(entry)}</span><strong title={entry.name}>{entry.name}</strong><small>{entry.type === "file" ? formatSize(entry.size) : "Folder"}</small>{entry.shareId && <span className="drive-grid-linked" title="Public link active"><Link2 size={14} /></span>}</label></li>; })}</ul>}
+          {loadingList ? <div className="drive-empty" role="status">Loading files…</div> : listFailed ? <div className="drive-empty"><strong>Could not load files</strong><span>Try Refresh files.</span></div> : shownEntries.length === 0 ? <div className="drive-empty"><Folder size={28} /><strong>{search ? "No matching items" : mode === "links" ? "No public links" : "This folder is empty"}</strong><span>{search ? "Try a different search." : mode === "links" ? "Create a public link from a file in My Drive." : "Use Upload or New to get started."}</span></div> : view === "details" ? <div className="drive-details-wrap"><div className="drive-columns"><input type="checkbox" checked={allShownSelected} onChange={(event) => setSelected(event.target.checked ? new Set(shownEntries.map(entryKey)) : new Set())} aria-label="Select all visible items" /><span aria-hidden="true" /><button type="button" onClick={() => toggleSort("name")}>Name {sort.key === "name" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><button type="button" onClick={() => toggleSort("size")}>Size {sort.key === "size" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><button type="button" onClick={() => toggleSort("modified")}>Modified {sort.key === "modified" ? sort.direction === "asc" ? "↑" : "↓" : ""}</button><span>Public link</span><span>Actions</span></div><ul className="drive-list">{shownEntries.map((entry) => { const key = entryKey(entry); const checked = selected.has(key); return <li key={key} className={checked ? "selected" : ""}><input type="checkbox" checked={checked} onChange={(event) => toggleEntry(entry, event.target.checked)} aria-label={`Select ${entry.name}`} /><span className={`drive-file-icon ${entry.type}`}>{entryIcon(entry)}</span>{entry.type === "folder" ? <button className="drive-name" type="button" onClick={() => navigate(entryPath(entry).split("/"))} title={entry.name}>{entry.name}</button> : <button className="drive-name" type="button" onClick={() => toggleEntry(entry, !checked)} title={entry.name}>{entry.name}</button>}<span className="drive-detail drive-size">{entry.type === "file" ? formatSize(entry.size) : "Folder"}</span><span className="drive-detail drive-modified">{new Date(entry.modified).toLocaleDateString()}</span><span className={`drive-link-state${entry.shareId ? " linked" : ""}`}>{entry.shareId ? <><Link2 size={13} /> Linked</> : "—"}</span><span className="drive-menu-wrap"><button className="drive-more" type="button" onClick={() => setMenuKey(menuKey === key ? null : key)} aria-expanded={menuKey === key} aria-label={`Actions for ${entry.name}`} title="Actions"><MoreVertical size={17} /></button>{menuKey === key && <span className="drive-menu" role="menu">{rowActions(entry)}</span>}</span></li>; })}</ul></div> : <ul className="drive-grid">{shownEntries.map((entry) => { const key = entryKey(entry); const checked = selected.has(key); return <li key={key} className={checked ? "selected" : ""}><label><input type="checkbox" checked={checked} onChange={(event) => toggleEntry(entry, event.target.checked)} /><span className={`drive-grid-icon ${entry.type}`}>{entryIcon(entry)}</span><strong title={entry.name}>{entry.name}</strong><small>{entry.type === "file" ? formatSize(entry.size) : "Folder"}</small>{entry.shareId && <span className="drive-grid-linked" title="Public link active"><Link2 size={14} /></span>}</label></li>; })}</ul>}
         </section>
 
         {selectedEntry && infoOpen && <aside className="drive-info" aria-label="File information"><header><h2>Information</h2><button type="button" onClick={() => setInfoOpen(false)} aria-label="Close information panel" title="Close"><X size={17} /></button></header><div className="drive-info-body"><div className={`drive-info-icon ${selectedEntry.type}`}>{entryIcon(selectedEntry)}</div><h3>{selectedEntry.name}</h3><p>{selectedEntry.type === "file" ? `${formatSize(selectedEntry.size)} file` : "Folder"}</p><dl><dt>Modified</dt><dd>{new Date(selectedEntry.modified).toLocaleString()}</dd><dt>Location</dt><dd>{entryPath(selectedEntry)}</dd><dt>Access</dt><dd>{selectedEntry.shareId ? "Anyone with the link can download" : "Private"}</dd></dl>{selectedEntry.type === "file" && <section className="drive-info-links"><h4>Public link</h4>{selectedEntry.shareId ? <><div><input value={publicUrl(selectedEntry.shareId)} readOnly aria-label="Public link" /><button type="button" onClick={() => void copyPublicLink(selectedEntry.shareId!)}>Copy</button></div><button className="drive-danger-action" type="button" onClick={() => revokeShare(selectedEntry)}><Unlink size={15} /> Revoke public link</button></> : <button type="button" onClick={() => createShare(selectedEntry)}><Link2 size={15} /> Create public link</button>}</section>}<div className="drive-info-actions">{selectedEntry.type === "folder" ? <button type="button" onClick={() => navigate(entryPath(selectedEntry).split("/"))}><FolderOpen size={15} /> Open</button> : <><button type="button" onClick={() => download(selectedEntry)}><Download size={15} /> Download</button>{selectedEntry.name.toLowerCase().endsWith(".pdf") && <button type="button" onClick={() => sendToPdfToEpub(selectedEntry)}><Bot size={15} /> Convert to EPUB</button>}</>}<button className="drive-danger-action" type="button" onClick={() => askDelete([selectedEntry])}><Trash2 size={15} /> Delete</button></div></div></aside>}
