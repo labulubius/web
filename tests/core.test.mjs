@@ -369,7 +369,10 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(newsTypes, /summary: string; source: string/);
   assert.match(newsServer, /'sourceId', e\.id_feed/);
   assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
-  assert.match(reader, /Items are temporarily unavailable\./);
+  assert.doesNotMatch(reader, /className=\"news-(?:error|success)\"/);
+  assert.doesNotMatch(styles, /\.news-error|\.news-success/);
+  assert.match(reader, /className=\"form-error\" role=\"alert\"/);
+  assert.match(reader, /Loading items…|Loading your subscriptions…/);
   assert.match(reader, /No items here yet\./);
   assert.match(reader, /<th>In All items<\/th>/);
   assert.ok(reader.indexOf('className="news-heading-search"') < reader.indexOf('className="news-add-action"'), "source search must precede the add button");
@@ -455,11 +458,9 @@ test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
-  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
   assert.match(proxy, /fetchPinnedNewsResource\(discourse\)/);
   assert.match(management, /Source already exists\./);
   assert.match(api, /selected, \.\.\.result/);
-  assert.match(reader, /Detected a Discourse forum and subscribed to/);
 });
 
 test("legacy forum sources map idempotently to independent News feeds", () => {

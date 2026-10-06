@@ -9,11 +9,7 @@ import "./feeds.css";
 
 type Dialog = { kind: "feed" | "tag" | "board"; id?: string } | null;
 type WatchboardState = { tags: { id: string; name: string }[]; watchboards: { id: string; name: string; tagIds: string[] }[]; sourceTags: Record<string, string[]> };
-type Directory = { feeds: NewsFeed[]; selected: string[]; discovery?: { url: string; method: "direct" | "html" | "discourse" | "rsshub" } };
-function discoveryNotice(discovery: NonNullable<Directory["discovery"]>) {
-  const lead = discovery.method === "discourse" ? "Detected a Discourse forum and subscribed to" : discovery.method === "html" ? "Discovered and subscribed to" : discovery.method === "rsshub" ? "Generated and subscribed to" : "Subscribed to";
-  return `${lead} ${discovery.url}`;
-}
+type Directory = { feeds: NewsFeed[]; selected: string[] };
 function mergeArticles<T extends { id: string; published: number }>(previous: T[], incoming: T[]) {
   const merged = new Map(previous.map((article) => [article.id, article]));
   for (const article of incoming) merged.set(article.id, article);
@@ -67,7 +63,6 @@ export function FeedsReader() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [initialSidebarLocation] = useState(readSidebarLocation);
   const [feedFilter, setFeedFilter] = useState<string | null>(() =>
@@ -261,7 +256,6 @@ export function FeedsReader() {
 
   function openDialog(kind: "board" | "feed" | "tag", id?: string) {
     dialogTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setNotice("");
     setDraftTags(kind === "board" ? [...(watchboards.watchboards.find((board) => board.id === id)?.tagIds || [])]
       : kind === "feed" && id ? [...(watchboards.sourceTags[id] || [])] : []);
     setDialog({ kind, id });
@@ -288,8 +282,6 @@ export function FeedsReader() {
       const data = await api("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) }) as Directory;
       setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected);
       closeDialog();
-      if (data.discovery) setNotice(discoveryNotice(data.discovery));
-      else setNotice(action.action === "deleteFeed" ? "Source removed." : "Source updated.");
       if (action.action === "deleteFeed") {
         setWatchboards((previous) => ({ ...previous, sourceTags: Object.fromEntries(Object.entries(previous.sourceTags).filter(([id]) => id !== action.feedId)) }));
         if (feedFilter === action.feedId) showFallbackSidebar();
@@ -330,7 +322,6 @@ export function FeedsReader() {
             ...(title ? { title } : {}),
           }) }) as Directory;
           setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected);
-          if (data.discovery) setNotice(discoveryNotice(data.discovery));
           if (!dialog.id) {
             added = true;
             feedId = data.feeds.find((feed) => !feeds.some((old) => old.id === feed.id))?.id;
@@ -354,7 +345,7 @@ export function FeedsReader() {
   }
 
   if (loading) return <div className="news-access">Checking your account…</div>;
-  if (authError) return <div className="news-access"><p className="news-error" role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></div>;
+  if (authError) return <div className="news-access"><p role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></div>;
   if (!isAdmin) {
     return <div className="news-layout">
       <aside className="news-sidebar" id="page-sidebar" aria-label="Feeds navigation">
@@ -365,7 +356,6 @@ export function FeedsReader() {
       </aside>
       <section className="news-content">
         <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>Feeds</h1><p>Your selected sources, powered by FreshRSS.</p></div></header>
-        {publicArticlesError && <p className="news-error" role="alert">Items are temporarily unavailable.</p>}
         {publicArticlesBusy && <p className="news-empty">Loading items…</p>}
         {!publicArticlesBusy && !publicArticlesError && !publicArticles.length && <p className="news-empty">No items here yet.</p>}
         <div className="news-articles">{publicArticles.map((article) => <NewsArticleItem article={article} key={article.id} />)}</div>
@@ -399,8 +389,6 @@ export function FeedsReader() {
       <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>{panel === "sources" ? "Sources" : panel === "tags" ? "Tags" : activeBoard?.name || feeds.find((feed) => feed.id === feedFilter)?.title || "Feeds"}</h1><p>{activeBoard ? `${matches(activeBoard)} matching sources` : panel === "sources" ? `${feeds.length} subscriptions · manage and tag your feeds` : panel === "tags" ? "Organize sources into watchboards." : "Your selected sources, powered by FreshRSS."}</p></div>{panel !== "articles" && <div className="news-heading-actions">
         {panel === "sources" ? <><label className="news-heading-search"><Search size={15} aria-hidden="true" /><input type="search" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} placeholder="Filter sources…" aria-label="Search sources" /></label><button type="button" className="news-add-action" disabled={!ready || saving} onClick={() => openDialog("feed")}><Plus size={15} /> Source</button></> : <button type="button" className="news-add-action" disabled={saving || !watchReady} onClick={() => openDialog("tag")}><Plus size={15} /> Tag</button>}
       </div>}</header>
-      {error && <p className="news-error" role="alert">{error}</p>}
-      {notice && <p className="news-success" role="status">{notice}</p>}
       {panel === "sources" ? <><div className="news-table-scroll"><table className="news-table"><thead><tr><th>Source</th><th>Tags</th><th>In All items</th><th>Actions</th></tr></thead><tbody>{filteredFeeds.map((feed) => <tr key={feed.id}><td><button type="button" className="news-link-button" onClick={() => chooseFeed(feed.id)}>{feed.title}</button></td><td><div className="news-tag-list">{watchboards.tags.filter((tag) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).map((tag) => <span key={tag.id} className="news-tag-choice">{tag.name}</span>)}{!(watchboards.sourceTags[feed.id] || []).length && <span className="news-muted">No tags</span>}</div></td><td><input type="checkbox" disabled={saving} checked={selected.includes(feed.id)} onChange={() => void toggleSource(feed.id)} aria-label={`Include ${feed.title} in All items`} /></td><td><span className="news-inline-actions"><button type="button" disabled={saving} title={`Edit ${feed.title}`} aria-label={`Edit ${feed.title}`} onClick={() => openDialog("feed", feed.id)}><Pencil size={12} /></button><button type="button" disabled={saving} title={`Delete ${feed.title}`} aria-label={`Delete ${feed.title}`} onClick={() => void removeFeed(feed)}><Trash2 size={12} /></button></span></td></tr>)}</tbody></table></div>{!filteredFeeds.length && <p className="news-empty">No matching sources.</p>}</> : panel === "tags" ? <><p className="news-muted">Tags are assigned to sources. A watchboard shows items from sources matching all of its tags.</p><div className="news-settings-list">{watchboards.tags.map((tag) => <div key={tag.id} className="news-settings-row"><span>{tag.name} <small>({feeds.filter((feed) => (watchboards.sourceTags[feed.id] || []).includes(tag.id)).length} sources)</small></span><span className="news-inline-actions"><button type="button" disabled={saving} title={`Rename ${tag.name}`} aria-label={`Rename ${tag.name}`} onClick={() => openDialog("tag", tag.id)}><Pencil size={12} /></button><button type="button" disabled={saving} title={`Delete ${tag.name}`} aria-label={`Delete ${tag.name}`} onClick={() => { if (window.confirm(`Delete tag “${tag.name}” from all sources and watchboards?`)) void mutateWatchboard({ action: "deleteTag", id: tag.id }); }}><Trash2 size={12} /></button></span></div>)}{!watchboards.tags.length && <p className="news-empty">No tags yet. Add one to start grouping your sources.</p>}</div></> : <>
         {!ready && !error && <p className="news-empty">Loading your subscriptions…</p>}
         {ready && activeBoard && !matches(activeBoard) && <p className="news-empty">No sources match this watchboard. Assign its tags to sources under Settings → Sources.</p>}
