@@ -11,7 +11,7 @@
 .drive-storage strong { color: var(--text); font-size: 11px; }
 .plasma-desktop[data-sidebar-collapsed="true"] .drive-workspace { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .drive-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
-.drive-browser { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) 24px; min-height: 0; min-width: 0; }
+.drive-browser { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); min-height: 0; min-width: 0; }
 .drive-toolbar { align-items: center; background: var(--window); border-bottom: 1px solid var(--separator); display: flex; gap: 7px; min-height: 47px; padding: 6px 9px; }
 .drive-nav-buttons, .drive-toolbar-actions { align-items: center; display: flex; flex: none; gap: 3px; }
 .drive-toolbar button, .drive-selection-bar button, .drive-info button, .drive-dialog button, .drive-public-card button, .drive-download-dialog footer :is(button, a) { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; font: inherit; font-size: 11px; gap: 6px; justify-content: center; min-height: 31px; padding: 5px 9px; text-decoration: none; }
@@ -97,7 +97,6 @@
 .drive-info-actions { border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-top: 10px; }
 .drive-info-actions button { background: transparent; border-color: transparent; justify-content: flex-start; width: 100%; }
 .drive-info-actions button:hover { background: var(--accent-soft); border-color: transparent; }
-.drive-local-status { align-items: center; background: var(--window); border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; font-size: 9px; height: 24px; justify-content: space-between; padding: 0 9px; }
 .drive-access-state { padding: 32px; }
 .drive-access-state > p { color: var(--text-muted); font-size: 12px; }
 .drive-dialog > footer, .drive-download-dialog > footer { border-top: 1px solid var(--separator); display: flex; gap: 7px; justify-content: flex-end; padding: 10px 14px; }
