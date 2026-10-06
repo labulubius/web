@@ -57,6 +57,10 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(manager, /<HomeAccess/);
   assert.match(manager, /Session expired/);
   assert.match(manager, /method: "DELETE"/);
+  assert.match(server, /data\.tasks\.splice\(index, 1\)/);
+  assert.doesNotMatch(manager, /task-message|setMessage|Task added to project|Task completed and removed|Permanently delete/);
+  assert.doesNotMatch(styles, /\.task-message/);
+  assert.match(manager, /Delete project .*Its tasks will become Uncategorized and lose their dates/);
   assert.match(manager, /site-tasks-location-v1/);
   assert.ok(manager.indexOf("<span>All tasks</span>") < manager.indexOf("<span>Gantt</span>"));
   assert.match(manager, /String\(value\.view\) === "inbox" \? "all"/);
@@ -310,6 +314,10 @@ test("owner-only destinations remain visible and show access guidance", async ()
 test("Feeds replaces the retired News page while preserving News APIs", async () => {
   const page = await readFile(new URL("../app/feeds/page.tsx", import.meta.url), "utf8");
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
+  const newsTypes = await readFile(new URL("../app/lib/news-server-types.ts", import.meta.url), "utf8");
+  const newsServer = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
+  const newsApi = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
 
@@ -322,7 +330,15 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(sidebar, /href="\/feeds"><Rss size=\{16\} \/> Feeds/);
   assert.doesNotMatch(sidebar, /href="\/news"|> News</);
   assert.match(reader, /aria-label="Feeds navigation"/);
-  assert.match(reader, /<span>All items<\/span>/);
+  assert.doesNotMatch(reader, /<span>All items<\/span>|board\.name} \(\{matches\(board\)\}\)/);
+  assert.match(reader, /site-news-location/);
+  assert.match(reader, /source:\$\{id\}/);
+  assert.match(reader, /showFallbackSidebar/);
+  assert.match(reader, /title=\{article\.source\}>\{article\.source\}/);
+  assert.match(styles, /-webkit-line-clamp: 2/);
+  assert.match(newsTypes, /summary: string; source: string/);
+  assert.match(newsServer, /'sourceId', e\.id_feed/);
+  assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
   assert.match(reader, /Items are temporarily unavailable\./);
   assert.match(reader, /No items here yet\./);
   assert.match(reader, /<th>In All items<\/th>/);

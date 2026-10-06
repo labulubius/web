@@ -50,9 +50,7 @@
 .task-quick-add input::placeholder { color: var(--text-muted); }
 .task-quick-add button { background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; color: white; cursor: pointer; font-size: 11px; padding: 6px 10px; }
 .task-quick-add button:disabled { cursor: wait; opacity: .55; }
-.task-message, .task-error { border-radius: 4px; flex: none; font-size: 11px; margin: 9px 0 0; padding: 7px 9px; }
-.task-message { background: color-mix(in srgb, var(--positive) 10%, var(--view)); border: 1px solid color-mix(in srgb, var(--positive) 60%, var(--separator)); }
-.task-error { background: color-mix(in srgb, var(--negative) 10%, var(--view)); border: 1px solid color-mix(in srgb, var(--negative) 60%, var(--separator)); }
+.task-error { background: color-mix(in srgb, var(--negative) 10%, var(--view)); border: 1px solid color-mix(in srgb, var(--negative) 60%, var(--separator)); border-radius: 4px; flex: none; font-size: 11px; margin: 9px 0 0; padding: 7px 9px; }
 .task-loading { align-items: center; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px; justify-content: center; min-height: 60vh; padding: 30px; }
 .task-loading button { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); padding: 7px 12px; }
 

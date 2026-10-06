@@ -118,7 +118,7 @@ export function validNewsCursor(cursor: string) {
 }
 
 type DatabaseArticle = {
-  id: string; title: string; url: string; published: number; summary: string;
+  id: string; title: string; url: string; published: number; summary: string; sourceId: number;
 };
 
 function queryFreshDatabase(sql: string): Promise<string> {
@@ -131,7 +131,11 @@ function queryFreshDatabase(sql: string): Promise<string> {
   });
 }
 
-export async function newsArticles(selected: string[], cursor: string | null) {
+export async function newsArticles(selected: string[], cursor: string | null, feeds: NewsFeed[]) {
+  const sourceTitles = new Map(feeds.flatMap((feed) => {
+    const match = feed.id.match(/^feed\/(\d{1,10})$/);
+    return match ? [[Number(match[1]), feed.title === feed.id ? "Untitled source" : feed.title] as const] : [];
+  }));
   const feedIds = [...new Set(selected.flatMap((id) => {
     const match = id.match(/^feed\/(\d{1,10})$/);
     return match ? [Number(match[1])] : [];
@@ -148,6 +152,7 @@ SELECT json_build_object(
   'title', e.title,
   'url', e.link,
   'published', e.date,
+  'sourceId', e.id_feed,
   'summary', left(regexp_replace(regexp_replace(coalesce(e.content, ''), '<[^>]*>', ' ', 'g'), '\\s+', ' ', 'g'), 1000)
 )::text
 FROM public.freshrss_labulubius_entry e
@@ -165,7 +170,7 @@ LIMIT 51;`;
     const summary = await articleSummary(url, plainText(item.summary || ""));
     return {
       id: item.id, title: plainText(item.title || "Untitled"), url,
-      published: Number(item.published) || 0, summary,
+      published: Number(item.published) || 0, summary, source: sourceTitles.get(Number(item.sourceId)) || "Unknown source",
     };
   }));
   const last = articles.at(-1);

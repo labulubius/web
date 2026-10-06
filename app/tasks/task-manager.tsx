@@ -91,7 +91,6 @@ export function TaskManager() {
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const requestGeneration = useRef(0);
   const locationRestored = useRef(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }));
@@ -138,22 +137,22 @@ export function TaskManager() {
     catch { /* Task navigation still works when browser storage is unavailable. */ }
   }, [locationReady, projectId, timelineEnd, timelineStart, view]);
 
-  async function mutate(url: string, options: RequestInit, success: string) {
-    setSaving(true); setError(""); setMessage("");
-    try { setData(await api(url, options)); setMessage(success); return true; }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Task operation failed."); return false; }
+  async function mutate(url: string, options: RequestInit) {
+    setSaving(true); setError("");
+    try { setData(await api(url, options)); return true; }
+    catch { return false; }
     finally { setSaving(false); }
   }
 
   async function createTask(draft: TaskDraft) {
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) }, "Task created.");
+    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
     if (ok) setTaskDialog(null);
   }
 
-  async function patchTask(task: PersonalTask, patch: Partial<TaskDraft>, success = "Task updated.") {
+  async function patchTask(task: PersonalTask, patch: Partial<TaskDraft>) {
     const before = data;
     if (data) setData({ ...data, tasks: data.tasks.map((item) => item.id === task.id ? { ...item, ...patch, updatedAt: new Date().toISOString() } : item) });
-    const ok = await mutate(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }, success);
+    const ok = await mutate(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
     if (!ok && before) setData(before);
     return ok;
   }
@@ -164,26 +163,25 @@ export function TaskManager() {
   }
 
   async function completeTask(task: PersonalTask) {
-    const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" }, "Task completed and removed.");
+    const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" });
     if (ok) setTaskDialog(null);
   }
 
   async function deleteTask(task: PersonalTask) {
-    if (!window.confirm(`Permanently delete “${task.title}”? This cannot be undone.`)) return;
-    const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" }, "Task deleted.");
+    const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" });
     if (ok) setTaskDialog(null);
   }
 
   async function saveProject(name: string) {
     const editing = projectDialog !== "new" && projectDialog;
     const url = editing ? `/api/tasks/projects/${editing.id}` : "/api/tasks/projects";
-    const ok = await mutate(url, { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, editing ? "Project renamed." : "Project created.");
+    const ok = await mutate(url, { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     if (ok) setProjectDialog(null);
   }
 
   async function deleteProject(project: TaskProject) {
     if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and lose their dates.`)) return;
-    const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" }, "Project deleted. Its tasks are now Uncategorized.");
+    const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" });
     if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("all"); } }
   }
 
@@ -193,11 +191,11 @@ export function TaskManager() {
     const title = String(new FormData(form).get("title") ?? "").trim();
     if (!title) return;
     const selectedProject = view === "project" ? projectId : null;
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) }, selectedProject ? "Task added to project." : "Task added.");
+    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) });
     if (ok) form.reset();
   }
 
-  function select(next: View, selectedProject: string | null = null) { setView(next); setProjectId(selectedProject); setError(""); setMessage(""); }
+  function select(next: View, selectedProject: string | null = null) { setView(next); setProjectId(selectedProject); setError(""); }
 
   function applyRange(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -205,7 +203,7 @@ export function TaskManager() {
     const startDate = String(form.get("timelineStart") ?? "");
     const endDate = String(form.get("timelineEnd") ?? "");
     if (!validTimelineRange(startDate, endDate)) { setError("Choose an ordered date range of no more than two months."); return; }
-    setTimelineStart(startDate); setTimelineEnd(endDate); setError(""); setMessage("");
+    setTimelineStart(startDate); setTimelineEnd(endDate); setError("");
   }
 
   async function projectDragEnd(event: DragEndEvent) {
@@ -216,7 +214,7 @@ export function TaskManager() {
     const before = data;
     const projects = arrayMove(data.projects, sourceIndex, targetIndex);
     setData({ ...data, projects });
-    const ok = await mutate("/api/tasks/projects", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectIds: projects.map((project) => project.id) }) }, "Projects reordered.");
+    const ok = await mutate("/api/tasks/projects", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectIds: projects.map((project) => project.id) }) });
     if (!ok) setData(before);
   }
 
@@ -228,7 +226,7 @@ export function TaskManager() {
     const match = String(event.over.id).match(/(\d{4}-\d{2}-\d{2})$/);
     if (!match) return;
     const length = task.startDate && task.endDate ? daysBetween(task.startDate, task.endDate) : 0;
-    void patchTask(task, { startDate: match[1], endDate: addDays(match[1], length) }, "Task dates updated.");
+    void patchTask(task, { startDate: match[1], endDate: addDays(match[1], length) });
   }
 
   const allTasks = useMemo(() => data?.tasks ?? [], [data]);
@@ -265,9 +263,8 @@ export function TaskManager() {
           {view === "gantt" && <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>}
         </header>
         <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
-        {message && <p className="task-message" role="status">{message}</p>}
         {error && <p className="task-error" role="alert">{error}</p>}
-        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={data.tasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate }, "Task dates updated.")} /> : <TaskList tasks={view === "all" ? allTasks : projectTasks} empty={view === "all" ? "There are no tasks yet." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onDelete={(task) => void deleteTask(task)} />}
+        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={data.tasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={view === "all" ? allTasks : projectTasks} empty={view === "all" ? "There are no tasks yet." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} onClose={() => setTaskDialog(null)} onSave={saveTask} />}

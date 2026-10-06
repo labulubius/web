@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
       const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
       const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
-      return Response.json(await newsArticles(selected, cursor), { headers: privateNewsHeaders });
+      return Response.json(await newsArticles(selected, cursor, feeds), { headers: privateNewsHeaders });
     }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
       if (!board) return Response.json({ error: "Unknown watchboard." }, { status: 400, headers: privateNewsHeaders });
       articleFeeds = board.tagIds.length ? feeds.filter((source) => board.tagIds.every((tag) => (state.sourceTags[source.id] || []).includes(tag))).map((source) => source.id) : [];
     }
-    return Response.json(await newsArticles(articleFeeds, cursor), { headers: privateNewsHeaders });
+    return Response.json(await newsArticles(articleFeeds, cursor, feeds), { headers: privateNewsHeaders });
   } catch {
     console.error("News request failed (details withheld).");
     return errorResponse();
