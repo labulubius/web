@@ -3,7 +3,7 @@
 .plasma-desktop[data-sidebar-collapsed="true"] .tasks-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
 .tasks-sidebar { height: 100%; }
 .tasks-sidebar button { font: inherit; }
-.tasks-sidebar-heading, .tasks-project-heading { align-items: center; display: flex; justify-content: space-between; margin: 8px 5px 5px 9px; }
+.tasks-sidebar-heading, .tasks-project-heading { align-items: center; display: flex; justify-content: space-between; margin: 8px 4px 5px 9px; }
 .tasks-sidebar-heading h2, .tasks-project-heading h2 { color: var(--text-muted); font-size: 11px; font-weight: 500; margin: 0; }
 .tasks-sidebar-heading button, .tasks-project-heading button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--link); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
 .tasks-sidebar-heading button:hover, .tasks-project-heading button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
@@ -16,7 +16,7 @@
 .tasks-project-heading { border-top: 1px solid var(--separator); margin-top: 16px; padding-top: 12px; }
 .tasks-project-list { display: flex; flex-direction: column; gap: 1px; }
 .tasks-project-list > p { color: var(--text-muted); font-size: 10px; margin: 8px 9px; }
-.tasks-project-list > div { align-items: center; display: flex; min-width: 204px; position: relative; }
+.tasks-project-list > div { align-items: center; display: flex; min-width: 0; position: relative; }
 .tasks-project-list > div.reorderable > button:first-child { cursor: grab; touch-action: none; }
 .tasks-project-list > div.reorderable > button:first-child:active { cursor: grabbing; }
 .tasks-project-list > div.dragging { box-shadow: 0 5px 14px rgba(0, 0, 0, .18); opacity: .78; }

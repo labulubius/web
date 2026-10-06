@@ -20,7 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Compass,
-  GripVertical,
+  Folder,
   Globe2,
   LayoutGrid,
   Pencil,
@@ -85,7 +85,7 @@ function SortableCategoryRow({
         {...(isAdmin ? attributes : {})}
         {...(isAdmin ? listeners : {})}
       >
-        {isAdmin ? <GripVertical size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
+        {isAdmin ? <Folder size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
       </button>
       <span className="category-actions" onPointerDown={(event) => event.stopPropagation()}>
         <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>

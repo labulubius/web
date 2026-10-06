@@ -326,3 +326,17 @@ test("sidebar controls render for the configured workspace pages", async () => {
   assert.match(drive, /title="Private Drive" hasSidebar/);
   assert.match(share, /redirect\("\/drive"\)/);
 });
+
+test("sidebar create and delete actions share a trailing axis", async () => {
+  const tasks = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
+  const navigator = await readFile(new URL("../app/nav/nav.css", import.meta.url), "utf8");
+  const news = await readFile(new URL("../app/news/news.css", import.meta.url), "utf8");
+  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+
+  for (const stylesheet of [tasks, navigator, news]) assert.match(stylesheet, /margin: 8px 4px 5px 9px/);
+  assert.match(tasks, /\.tasks-project-list > div \{[^}]*min-width: 0/);
+  assert.match(navigator, /\.category-row \{[^}]*min-width: 0/);
+  assert.match(news, /\.news-category-row \{[^}]*min-width: 0/);
+  assert.match(directory, /isAdmin \? <Folder size=\{16\}/);
+  assert.doesNotMatch(directory, /GripVertical/);
+});
