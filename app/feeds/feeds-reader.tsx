@@ -39,12 +39,14 @@ function saveSidebarLocation(location: string) {
 
 function NewsArticleItem({ article }: { article: NewsArticle }) {
   const content = <div className="news-article-content">
-    <h2>{article.title}</h2>
+    <div className="news-article-copy">
+      <h2>{article.title}</h2>
+      {article.summary && <p>{article.summary}</p>}
+    </div>
     <div className="news-article-meta">
       <span title={article.source}>{article.source}</span>
       {article.published > 0 && <time dateTime={new Date(article.published * 1000).toISOString()}>{new Date(article.published * 1000).toLocaleDateString()}</time>}
     </div>
-    {article.summary && <p>{article.summary}</p>}
   </div>;
 
   return <article className="news-article">

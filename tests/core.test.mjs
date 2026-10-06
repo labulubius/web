@@ -335,6 +335,13 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(reader, /source:\$\{id\}/);
   assert.match(reader, /showFallbackSidebar/);
   assert.match(reader, /title=\{article\.source\}>\{article\.source\}/);
+  assert.ok(reader.indexOf("title={article.source}") < reader.indexOf("<time dateTime="), "source must precede the published date");
+  assert.match(reader, /className="news-article-copy"/);
+  assert.match(styles, /\.news-article-content \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(90px, 24%\)/);
+  assert.match(styles, /\.news-article-meta \{[^}]*flex-direction: column[^}]*text-align: right/);
+  assert.match(styles, /\.news-article-meta span \{[^}]*max-width: 100%[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
+  assert.match(styles, /@media \(max-width: 760px\)/);
+  assert.match(styles, /\.news-article-content \{ gap: 10px; grid-template-columns: minmax\(0, 1fr\) clamp\(78px, 24vw, 108px\)/);
   assert.match(styles, /-webkit-line-clamp: 2/);
   assert.match(newsTypes, /summary: string; source: string/);
   assert.match(newsServer, /'sourceId', e\.id_feed/);
