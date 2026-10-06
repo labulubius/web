@@ -39,7 +39,7 @@ Back up these independent data sets together at a documented point in time:
 - a consistent FreshRSS PostgreSQL dump;
 - Supabase data using the provider's supported export/backup mechanism.
 
-Pause new uploads or let pending sessions complete before taking a consistency-sensitive snapshot. Generate and retain checksums with the backup. Article-bearing FreshRSS backups must follow the same five-day retention policy as the live News database.
+Pause new uploads or let pending sessions complete before taking a consistency-sensitive snapshot. Generate and retain checksums with the backup. Article-bearing FreshRSS backups must follow the same five-day retention policy as the live FreshRSS database.
 
 Perform periodic restores into isolated directories, never over live data. Before starting an isolated service, run:
 

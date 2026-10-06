@@ -10,7 +10,7 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | --- | --- | --- |
 | `/` | All tasks, project tasks and cross-month date-range Gantt chart | Administrator only; signed-out visitors see a generic Home screen |
 | `/nav` | Website directory, search, favorites and categories | Published entries are public; administrators edit entries and icons in the UI (Supabase) |
-| `/news` | FreshRSS-backed reader for websites, feeds and community forums | Visitors can read the owner's selected, non-expired articles; administrators manage sources, tags and Watchboards |
+| `/feeds` | FreshRSS-backed feed reader for websites, feeds and community forums | Visitors can read the owner's selected, non-expired items; administrators manage sources, tags and Watchboards |
 | `/drive` | Private file manager and public-link manager | Administrator only; files live on the `web` server |
 | `/share/<id>` | Public file or folder link | Anyone holding an active opaque link |
 | `/about` | Project overview | Public |
@@ -20,7 +20,7 @@ The navigator's canonical URL is `https://labulubius.com/nav`. The Drive subdoma
 ## Architecture
 
 - Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data and icons use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
-- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel sends `labulubius.com`, `drive.labulubius.com` and `feeds.labulubius.com` to services on that VM. The main UI and same-origin News APIs run in the same Next.js process.
+- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel sends `labulubius.com`, `drive.labulubius.com` and `feeds.labulubius.com` to services on that VM. The Feeds UI and same-origin News APIs run in the same Next.js process.
 - Personal task data, Drive files and their share-link metadata, News preferences live **outside Git** on `web`. FreshRSS and its PostgreSQL database run in Docker there. GitHub stores source history and CI results, not production data.
 
 ## Verification on VM100

@@ -26,11 +26,11 @@ Reference pages are read-only examples unless the task explicitly includes them.
 | Categories, search, cards, favorites, drag sorting and edit dialogs | `/nav` | Sidebar category rows, search field, card density, action placement and `AccessibleDialog` forms |
 | Private file browsing and owner-only access | `/drive` | Page header, action buttons, breadcrumbs, tabular rows, empty state, progress, error and destructive confirmation |
 | Public-link file and folder management | `/share` | The `/drive` family plus link actions, notices and public-file semantics |
-| Source navigation, article streams, filters and dense settings | `/news` | Sidebar hierarchy, selected rows, article list, settings tables, automatic loading and partial-error handling |
+| Source navigation, item streams, filters and dense settings | `/feeds` | Sidebar hierarchy, selected rows, article list, settings tables, automatic loading and partial-error handling |
 | Accessible modal behavior | `AccessibleDialog` | Focus entry and restoration, focus trapping, Escape/backdrop handling, busy state and labelled dialogs |
 | Signed-out owner-only page | `OwnerAccess` | Consistent explanation and sign-in guidance |
 
-Example: a `/news` redesign may inspect `/nav` and `/drive`, but the approved file scope remains `/news` unless shared or reference-page changes are separately approved.
+Example: a `/feeds` redesign may inspect `/nav` and `/drive`, but the approved file scope remains `/feeds` unless shared or reference-page changes are separately approved.
 
 ## 3. Required scope contract
 
@@ -55,7 +55,7 @@ Default scope rules:
 - Report unrelated problems instead of fixing them.
 - Treat every file outside the declared allowlist as out of scope.
 
-For a route such as `/news`, the normal allowlist is `app/news/**`, route-specific tests, and the task's documentation. Files such as `app/nav/**`, `app/drive/**`, `app/globals.css`, `app/site-shell.tsx`, `app/site-auth.tsx`, and server/API modules are excluded unless explicitly approved.
+For a route such as `/feeds`, the normal allowlist is `app/feeds/**`, route-specific tests, and the task's documentation. Files such as `app/nav/**`, `app/drive/**`, `app/globals.css`, `app/site-shell.tsx`, `app/site-auth.tsx`, and server/API modules are excluded unless explicitly approved.
 
 ## 4. Shared-change approval gate
 
@@ -95,7 +95,7 @@ Workspace routes use `SiteShell` rather than inventing another application frame
 
 Routes with category, source, folder, or filter navigation should use `hasSidebar` and provide an `aside` with `id="page-sidebar"` and an accurate accessible label.
 
-The shared skeleton may be reused. Functional content may differ: cards for a directory, rows for files, and articles for News are all valid when their surrounding hierarchy remains consistent.
+The shared skeleton may be reused. Functional content may differ: cards for a directory, rows for files, and items for Feeds are all valid when their surrounding hierarchy remains consistent.
 
 ## 6. Existing visual foundation
 
@@ -129,7 +129,7 @@ Follow existing values before creating new ones:
 - standard bordered action buttons use `var(--button)`, `var(--frame)`, a 4 px radius, and approximately `7px 10px` padding;
 - category/source sidebars use the shared `--sidebar-width` of 220 px and approximately `13px 8px` padding;
 - sidebar/content layouts use `minmax(0, 1fr)` to prevent overflow;
-- directory/news content commonly uses 22 px padding;
+- directory/feed content commonly uses 22 px padding;
 - centered file-management views use a maximum width around 1080 px and `36px 28px` desktop padding;
 - separators use `1px solid var(--separator)`.
 
@@ -139,7 +139,7 @@ These are current alignment targets, not permission to change shared CSS. A glob
 
 ### Sidebars
 
-- Keep heading, category, source, checkbox, selected, collapsed, and row-action behavior consistent with `/nav` and `/news`.
+- Keep heading, category, source, checkbox, selected, collapsed, and row-action behavior consistent with `/nav` and `/feeds`.
 - Do not expose administrator mutation controls to non-admin users.
 - Truncate long labels without making the full value inaccessible; use a title or equivalent when needed.
 - Preserve the shared collapsed and mobile overlay behavior.

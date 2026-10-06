@@ -307,6 +307,28 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.doesNotMatch(shell, /href: "\/(?:share|note)"/);
 });
 
+test("Feeds replaces the retired News page while preserving News APIs", async () => {
+  const page = await readFile(new URL("../app/feeds/page.tsx", import.meta.url), "utf8");
+  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
+  const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
+
+  await assert.rejects(access(new URL("../app/news/page.tsx", import.meta.url)), { code: "ENOENT" });
+  await access(new URL("../app/api/news/route.ts", import.meta.url));
+  assert.match(page, /title: "Feeds"/);
+  assert.match(page, /active="\/feeds" title="Feeds"/);
+  assert.match(shell, /href: "\/feeds", label: "Feeds", icon: Rss/);
+  assert.doesNotMatch(shell, /href: "\/news"|label: "News"|Newspaper/);
+  assert.match(sidebar, /href="\/feeds"><Rss size=\{16\} \/> Feeds/);
+  assert.doesNotMatch(sidebar, /href="\/news"|> News</);
+  assert.match(reader, /aria-label="Feeds navigation"/);
+  assert.match(reader, /<span>All items<\/span>/);
+  assert.match(reader, /Items are temporarily unavailable\./);
+  assert.match(reader, /No items here yet\./);
+  assert.match(reader, /<th>In All items<\/th>/);
+  assert.doesNotMatch(reader, /News navigation|<span>All articles<\/span>|Articles are temporarily unavailable|No articles here yet|<th>In Articles<\/th>/);
+});
+
 test("retired Note route and navigation stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -331,7 +353,7 @@ test("sidebar controls render for the configured workspace pages", async () => {
 test("sidebar create and delete actions share a trailing axis", async () => {
   const tasks = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
   const navigator = await readFile(new URL("../app/nav/nav.css", import.meta.url), "utf8");
-  const news = await readFile(new URL("../app/news/news.css", import.meta.url), "utf8");
+  const news = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
   const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
 
   for (const stylesheet of [tasks, navigator, news]) assert.match(stylesheet, /margin: 8px 4px 5px 9px/);
@@ -342,7 +364,7 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.doesNotMatch(directory, /GripVertical/);
 });
 
-test("News resolves Discourse homepages to latest-topic feeds", async () => {
+test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   const html = '<meta name="generator" content="Discourse 3.4.0 - https://github.com/discourse/discourse">';
   assert.equal(discourseLatestFeed(html, "https://forum.obsidian.md/"), "https://forum.obsidian.md/latest.rss");
   assert.equal(discourseLatestFeed(html, "https://example.com/community/"), "https://example.com/community/latest.rss");
@@ -351,7 +373,7 @@ test("News resolves Discourse homepages to latest-topic feeds", async () => {
   const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
-  const reader = await readFile(new URL("../app/news/news-reader.tsx", import.meta.url), "utf8");
+  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
   assert.match(proxy, /fetchPinnedNewsResource\(discourse\)/);
   assert.match(management, /Source already exists\./);
   assert.match(api, /selected, \.\.\.result/);
