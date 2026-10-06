@@ -178,7 +178,7 @@ export function FeedsReader() {
     setPublicArticlesBusy(true); setPublicArticlesError(false);
     if (!nextCursor) { setPublicArticles([]); setPublicCursor(null); }
     try {
-      const response = await fetch(`/api/news?view=publicArticles${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`, { cache: "no-store" });
+      const response = await fetch(`/api/news?view=publicArticles${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`);
       if (!response.ok) throw new Error("Items unavailable.");
       const data = await response.json() as { articles: NewsArticle[]; continuation: string | null };
       if (!Array.isArray(data.articles)) throw new Error("Invalid items.");

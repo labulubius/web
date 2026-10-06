@@ -10,6 +10,14 @@ Run `scripts/health-check.sh` to check the main Next.js service, Drive API host,
 
 Cloudflare Tunnel sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000`, `feeds.labulubius.com` to FreshRSS on `127.0.0.1:8080`, and `agent.labulubius.com` to Agent. The custom workspace reader remains at `https://labulubius.com/feeds`; the FreshRSS application is at `https://feeds.labulubius.com`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
 
+## Cloudflare performance and cache boundaries
+
+Cloudflare may edge-cache ordinary HTML document requests for the exact public paths `/`, `/about`, `/nav`, and `/feeds` for one hour. The rule must require `GET` or `HEAD`, an empty query string, and an `Accept` header containing `text/html`; it must not match React Server Component requests. A separate rule may cache successful `GET /api/news` requests only when the query is exactly `view=sidebar`, exactly `view=publicArticles`, or starts with `view=publicArticles&cursor=`. That rule respects the route's 30-second shared-cache header.
+
+Never cache `/api/**` outside those two public News views, `/drive/file/**`, authenticated requests, FreshRSS pages, Agent responses, WebDAV, errors, mutations, or capability URLs. Preserve the full query string in the cache key. After every deployment, purge the four cached HTML URLs so clients cannot receive an old Next.js asset manifest. Verify one cold request (`MISS` or `EXPIRED`) followed by `HIT`, and verify excluded routes remain `DYNAMIC` or `BYPASS`.
+
+HTTP/3, TLS 1.3, Brotli/Zstandard compression, 0-RTT, Early Hints and Smart Tiered Cache are safe free-plan performance options for this deployment. Always Online remains disabled because the workspace includes owner-only and time-sensitive surfaces.
+
 ## Production deployment
 
 VM100 is the only web production host and the only Web code workspace. The checkout is `/home/debian/labulubius`, and `labulubius-web.service` runs its production build on `127.0.0.1:3000`. Do not clone or maintain the Web repository on the Mac mini. The Mac mini Agent must reach the VM with `ssh web` and edit the VM100 checkout directly. Before committing or restarting production, require a clean review of `git diff` and run:

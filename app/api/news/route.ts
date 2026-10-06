@@ -7,6 +7,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const publicNewsHeaders = {
+  "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60",
+  "X-Content-Type-Options": "nosniff",
+};
+
 async function loadSidebarData() {
   const [feeds, categories] = await Promise.all([newsFeeds(), newsCategories()]);
   return { feeds, categories };
@@ -39,14 +44,14 @@ export async function GET(request: Request) {
         categories: categories.map(({ name }) => ({ name })),
         // Keep feed IDs/URLs private; checked state reflects the owner's selection.
         feeds: feeds.map(({ id, title, category }, key) => ({ key, title: title === id ? "Untitled source" : title, category, checked: selected.has(id) })),
-      }, { headers: privateNewsHeaders });
+      }, { headers: publicNewsHeaders });
     }
     if (url.searchParams.get("view") === "publicArticles") {
       const cursor = url.searchParams.get("cursor");
       if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
       const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
       const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
-      return Response.json(await newsArticles(selected, cursor, feeds), { headers: privateNewsHeaders });
+      return Response.json(await newsArticles(selected, cursor, feeds), { headers: publicNewsHeaders });
     }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });

@@ -377,6 +377,11 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(newsTypes, /summary: string; source: string/);
   assert.match(newsServer, /'sourceId', e\.id_feed/);
   assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
+  assert.match(newsApi, /const publicNewsHeaders = \{/);
+  assert.match(newsApi, /public, max-age=0, s-maxage=30, stale-while-revalidate=60/);
+  assert.equal((newsApi.match(/headers: publicNewsHeaders/g) || []).length, 2);
+  assert.match(newsApi, /headers: privateNewsHeaders/);
+  assert.doesNotMatch(reader, /publicArticles.*cache: "no-store"/);
   assert.doesNotMatch(reader, /className=\"news-(?:error|success)\"/);
   assert.doesNotMatch(styles, /\.news-error|\.news-success/);
   assert.match(reader, /className=\"form-error\" role=\"alert\"/);
