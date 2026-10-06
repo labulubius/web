@@ -6,6 +6,7 @@ import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Readable } from "node:stream";
+import { discourseLatestFeed, type NewsFeedDiscoveryMethod } from "./news-feed-discovery";
 
 const MAX_REDIRECTS = 4;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -126,11 +127,13 @@ function xmlFeed(body: Uint8Array) {
   return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
 
-export async function discoverPinnedNewsFeed(value: string) {
+export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "rsshub"> };
+
+export async function discoverPinnedNewsFeedDetails(value: string): Promise<NewsFeedDiscovery> {
   const first = await fetchPinnedNewsResource(value);
   if (!first.response.ok) { await first.response.body?.cancel(); throw new Error("Website unavailable."); }
   const body = await readLimited(first.response);
-  if (xmlFeed(body)) return first.finalUrl;
+  if (xmlFeed(body)) return { url: first.finalUrl, method: "direct" };
   const html = new TextDecoder().decode(body);
   const tags = html.match(/<link\b[^>]*>/gi) || [];
   for (const tag of tags) {
@@ -142,9 +145,21 @@ export async function discoverPinnedNewsFeed(value: string) {
     const checked = await fetchPinnedNewsResource(candidate);
     if (!checked.response.ok) { await checked.response.body?.cancel(); continue; }
     const feed = await readLimited(checked.response);
-    if (xmlFeed(feed)) return checked.finalUrl;
+    if (xmlFeed(feed)) return { url: checked.finalUrl, method: "html" };
+  }
+  const discourse = discourseLatestFeed(html, first.finalUrl);
+  if (discourse) {
+    const checked = await fetchPinnedNewsResource(discourse);
+    if (checked.response.ok) {
+      const feed = await readLimited(checked.response);
+      if (xmlFeed(feed)) return { url: checked.finalUrl, method: "discourse" };
+    } else await checked.response.body?.cancel();
   }
   throw new Error("No RSS or Atom feed was discovered.");
+}
+
+export async function discoverPinnedNewsFeed(value: string) {
+  return (await discoverPinnedNewsFeedDetails(value)).url;
 }
 
 export async function proxyNewsFeed(token: string) {

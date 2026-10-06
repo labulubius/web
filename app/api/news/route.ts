@@ -85,8 +85,9 @@ export async function POST(request: Request) {
     try { body = JSON.parse(raw); } catch { return Response.json({ error: "Invalid JSON." }, { status: 400, headers: privateNewsHeaders }); }
     const deleting = body !== null && typeof body === "object" && !Array.isArray(body) &&
       ["deleteFeed", "deleteCategory"].includes((body as { action?: string }).action || "");
+    let result;
     try {
-      await manageNews(body);
+      result = await manageNews(body);
     } finally {
       invalidateSidebarData();
       // Also reconcile after a partially completed category deletion.
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
     }
     const feeds = await newsFeeds();
     const selected = (await loadNewsSelection(auth.user.id)).filter((id) => feeds.some((feed) => feed.id === id));
-    return Response.json({ feeds, categories: await newsCategories(), selected }, { headers: privateNewsHeaders });
+    return Response.json({ feeds, categories: await newsCategories(), selected, ...result }, { headers: privateNewsHeaders });
   } catch (error) {
     if (error instanceof InvalidNewsInput) return Response.json({ error: error.message }, { status: 400, headers: privateNewsHeaders });
     console.error("News management failed (details withheld).");

@@ -45,7 +45,6 @@ node scripts/verify-backup.mjs \
   --tasks /restore/tasks \
   --drive /restore/drive \
   --news /restore/news \
-  --forums /restore/forums \
   --freshrss-dump /restore/freshrss.dump
 ```
 

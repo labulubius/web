@@ -36,7 +36,6 @@ Back up these independent data sets together at a documented point in time:
 - `${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}`, including `tasks.json` when tasks have been created;
 - the complete `DRIVE_DATA_DIR`, including `.upload-sessions`;
 - `${NEWS_DATA_DIR}` preferences and Watchboards;
-- `${FORUMS_DATA_DIR}/directory.json`;
 - a consistent FreshRSS PostgreSQL dump;
 - Supabase data using the provider's supported export/backup mechanism.
 
@@ -49,7 +48,6 @@ node scripts/verify-backup.mjs \
   --tasks /restore/tasks \
   --drive /restore/drive \
   --news /restore/news \
-  --forums /restore/forums \
   --freshrss-dump /restore/freshrss.dump
 ```
 

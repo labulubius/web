@@ -5,7 +5,8 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { freshEditToken, freshPost, newsCategories, newsFeeds } from "./news-server";
 import { discoverRssHub } from "./news-discovery";
-import { discoverPinnedNewsFeed, newsFeedProxyUrl } from "./news-feed-proxy";
+import { discoverPinnedNewsFeedDetails, newsFeedProxyUrl } from "./news-feed-proxy";
+import type { NewsFeedDiscoveryMethod } from "./news-feed-discovery";
 
 const labelPrefix = "user/-/label/";
 const blocked = new BlockList();
@@ -110,7 +111,9 @@ async function categoryCli(action: "create" | "delete", name: string) {
   });
 }
 
-export async function manageNews(input: unknown): Promise<void> {
+export type NewsManagementResult = { discovery?: { url: string; method: NewsFeedDiscoveryMethod } };
+
+export async function manageNews(input: unknown): Promise<NewsManagementResult | void> {
   const body = object(input);
   const action = text(body.action, "action", 40);
   switch (action) {
@@ -139,24 +142,40 @@ export async function manageNews(input: unknown): Promise<void> {
       // allows the first subscription before any user-created folders exist.
       const dest = body.categoryId === undefined && body.category === undefined ? undefined : await category(body.categoryId ?? body.category);
       const title = optionalText(body.title, "title");
-      // RSSHub Radar runs on our own container. Only its validated route can
-      // point to the private RSSHub network; user-supplied private URLs stay blocked.
+      // Prefer a direct feed or the website's declared feed. RSSHub Radar is a
+      // fallback only when native discovery fails. Its private container URL is
+      // used server-side but is never returned to the browser.
       let source: string | null = null;
-      if (!/\.(?:rss|xml|atom)(?:$|\?)/i.test(new URL(url).pathname)) {
-        try { source = await discoverRssHub(url); }
-        catch { /* Fall through to pinned native feed discovery. */ }
+      let resolved: string | null = null;
+      let discovery: NonNullable<NewsManagementResult["discovery"]> | null = null;
+      try {
+        const found = await discoverPinnedNewsFeedDetails(url);
+        source = newsFeedProxyUrl(found.url);
+        resolved = found.url;
+        discovery = found;
+      } catch {
+        if (!/\.(?:rss|xml|atom)$/i.test(new URL(url).pathname)) {
+          try {
+            source = await discoverRssHub(url);
+            if (source) {
+              resolved = source;
+              discovery = { url, method: "rsshub" };
+            }
+          } catch { /* Report the common discovery error below. */ }
+        }
       }
-      if (!source) {
-        try { source = newsFeedProxyUrl(await discoverPinnedNewsFeed(url)); }
-        catch { return invalid("No usable RSS feed found at this URL."); }
-      }
+      if (!source || !resolved) return invalid("No usable RSS feed found at this URL.");
+      if ((await newsFeeds()).some((item) => {
+        try { return new URL(item.url).href === new URL(resolved).href; }
+        catch { return item.url === resolved; }
+      })) return invalid("Source already exists.");
       try {
         await freshPost("reader/api/0/subscription/edit", { s: `feed/${source}`, ac: "subscribe", ...(dest ? { a: dest.id } : {}), ...(title ? { t: title } : {}) });
       } catch {
         if (source.startsWith("http://rsshub:1200/")) return invalid("RSSHub could not subscribe to this page. Try its RSS URL directly.");
         return invalid("No usable RSS feed found at this URL.");
       }
-      return;
+      return discovery ? { discovery } : undefined;
     }
     case "editFeed": {
       const source = await feed(body.feedId ?? body.id);

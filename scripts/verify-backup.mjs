@@ -4,8 +4,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const args = Object.fromEntries(process.argv.slice(2).flatMap((value, index, all) => value.startsWith("--") ? [[value.slice(2), all[index + 1]]] : []));
-if (!args.tasks || !args.drive || !args.news || !args.forums) {
-  console.error("Usage: verify-backup.mjs --tasks DIR --drive DIR --news DIR --forums DIR [--freshrss-dump FILE]");
+if (!args.tasks || !args.drive || !args.news) {
+  console.error("Usage: verify-backup.mjs --tasks DIR --drive DIR --news DIR [--freshrss-dump FILE]");
   process.exit(2);
 }
 
@@ -31,8 +31,7 @@ try {
   const tasks = await directory(args.tasks, "Tasks backup");
   const drive = await directory(args.drive, "Drive backup");
   const news = await directory(args.news, "News backup");
-  const forums = await directory(args.forums, "Forums backup");
-  await Promise.all([rejectSymlinks(tasks), rejectSymlinks(drive), rejectSymlinks(news), rejectSymlinks(forums)]);
+  await Promise.all([rejectSymlinks(tasks), rejectSymlinks(drive), rejectSymlinks(news)]);
   try {
     const taskData = await json(path.join(tasks, "tasks.json"));
     if (![1, 2, 3].includes(taskData?.version) || !Array.isArray(taskData.tasks) || !Array.isArray(taskData.projects)) throw new Error("Tasks backup has an invalid data structure.");
@@ -41,7 +40,6 @@ try {
   try { await jsonDirectory(driveShares); }
   catch (error) { if ((error).code !== "ENOENT") throw error; }
   await jsonDirectory(news);
-  await json(path.join(forums, "directory.json"));
 
   if (args["freshrss-dump"]) {
     const result = spawnSync("pg_restore", ["--list", args["freshrss-dump"]], { stdio: "ignore" });

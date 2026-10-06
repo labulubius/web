@@ -4,6 +4,8 @@ import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
+import { discourseLatestFeed } from "../app/lib/news-feed-discovery.ts";
+import { forumSourceUrl } from "../scripts/migrate-forums-to-news.mjs";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
@@ -305,7 +307,6 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.doesNotMatch(shell, /href: "\/(?:share|note)"/);
 });
 
-
 test("retired Note route and navigation stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -339,4 +340,44 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.match(news, /\.news-category-row \{[^}]*min-width: 0/);
   assert.match(directory, /isAdmin \? <Folder size=\{16\}/);
   assert.doesNotMatch(directory, /GripVertical/);
+});
+
+test("News resolves Discourse homepages to latest-topic feeds", async () => {
+  const html = '<meta name="generator" content="Discourse 3.4.0 - https://github.com/discourse/discourse">';
+  assert.equal(discourseLatestFeed(html, "https://forum.obsidian.md/"), "https://forum.obsidian.md/latest.rss");
+  assert.equal(discourseLatestFeed(html, "https://example.com/community/"), "https://example.com/community/latest.rss");
+  assert.equal(discourseLatestFeed("<title>ordinary site</title>", "https://example.com/"), null);
+
+  const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
+  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
+  const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
+  const reader = await readFile(new URL("../app/news/news-reader.tsx", import.meta.url), "utf8");
+  assert.match(proxy, /fetchPinnedNewsResource\(discourse\)/);
+  assert.match(management, /Source already exists\./);
+  assert.match(api, /selected, \.\.\.result/);
+  assert.match(reader, /Detected a Discourse forum and subscribed to/);
+});
+
+test("legacy forum sources map idempotently to independent News feeds", () => {
+  assert.equal(forumSourceUrl({ kind: "discourse", name: "Obsidian", origin: "https://forum.obsidian.md", latest: "/latest.json" }), "https://forum.obsidian.md/latest.rss");
+  assert.equal(forumSourceUrl({ kind: "discourse", name: "OpenAI", origin: "https://community.openai.com", latest: "/latest.json?status=open" }), "https://community.openai.com/latest.rss?status=open");
+  assert.equal(forumSourceUrl({ kind: "v2ex", name: "V2EX" }), "https://www.v2ex.com/index.xml");
+  assert.equal(forumSourceUrl({ kind: "hackernews", name: "HN", view: "top" }), "https://hnrss.org/frontpage");
+  assert.equal(forumSourceUrl({ kind: "stackexchange", name: "SO", site: "stackoverflow", tags: "" }), "https://stackoverflow.com/feeds");
+  assert.equal(forumSourceUrl({ kind: "rss", name: "Feed", feedUrl: "https://example.com/feed.xml" }), "https://example.com/feed.xml");
+  assert.throws(() => forumSourceUrl({ kind: "hackernews", name: "HN", view: "new" }), /Unsupported/);
+});
+
+test("retired Forums route, API, navigation, and parser stay absent", async () => {
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
+  const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
+  const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const packageJson = await readFile(new URL("../package.json", import.meta.url), "utf8");
+  await assert.rejects(access(new URL("../app/forums/page.tsx", import.meta.url)), { code: "ENOENT" });
+  await assert.rejects(access(new URL("../app/api/forums/route.ts", import.meta.url)), { code: "ENOENT" });
+  await assert.rejects(access(new URL("../app/lib/forums.ts", import.meta.url)), { code: "ENOENT" });
+  assert.doesNotMatch(shell, /\/forums|MessagesSquare/);
+  assert.doesNotMatch(sidebar, /\/forums|MessagesSquare/);
+  assert.doesNotMatch(globals, /forums-/);
+  assert.doesNotMatch(packageJson, /fast-xml-parser/);
 });

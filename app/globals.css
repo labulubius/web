@@ -323,7 +323,7 @@ html[data-theme="dark"] .plasma-desktop {
     width: 100%;
     z-index: 20;
   }
-  .plasma-desktop :is(.places-sidebar, .directory-sidebar, .news-sidebar, .forums-sidebar) {
+  .plasma-desktop :is(.places-sidebar, .directory-sidebar, .news-sidebar) {
     background: var(--window);
     border: 0;
     border-right: 1px solid var(--separator);
@@ -342,20 +342,20 @@ html[data-theme="dark"] .plasma-desktop {
     pointer-events: none;
     z-index: 21;
   }
-  .plasma-desktop[data-mobile-sidebar-open="true"] :is(.places-sidebar, .directory-sidebar, .news-sidebar, .forums-sidebar) {
+  .plasma-desktop[data-mobile-sidebar-open="true"] :is(.places-sidebar, .directory-sidebar, .news-sidebar) {
     display: block;
     transform: translateX(0);
     visibility: visible;
     pointer-events: auto;
   }
-  .plasma-desktop[data-mobile-sidebar-open="true"][data-sidebar-collapsed="true"] :is(.places-sidebar, .directory-sidebar, .news-sidebar, .forums-sidebar) {
+  .plasma-desktop[data-mobile-sidebar-open="true"][data-sidebar-collapsed="true"] :is(.places-sidebar, .directory-sidebar, .news-sidebar) {
     display: block;
     border-right: 1px solid var(--separator);
     padding: 13px 8px;
   }
   .plasma-desktop .directory-sidebar nav { flex-direction: column; width: auto; }
   .plasma-desktop .directory-sidebar .sidebar-heading { display: flex; }
-  .plasma-desktop :is(.news-source-list, .forums-source-list) { max-height: none; }
+  .plasma-desktop .news-source-list { max-height: none; }
   .welcome-view, .about-view { padding: 28px 18px; }
   .view-heading { align-items: flex-start; gap: 14px; }
   .breeze-logo { height: 58px; width: 58px; }

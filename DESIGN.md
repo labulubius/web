@@ -27,11 +27,10 @@ Reference pages are read-only examples unless the task explicitly includes them.
 | Private file browsing and owner-only access | `/drive` | Page header, action buttons, breadcrumbs, tabular rows, empty state, progress, error and destructive confirmation |
 | Public-link file and folder management | `/share` | The `/drive` family plus link actions, notices and public-file semantics |
 | Source navigation, article streams, filters and dense settings | `/news` | Sidebar hierarchy, selected rows, article list, settings tables, automatic loading and partial-error handling |
-| Community source navigation and topic aggregation | `/forums` | `/news` for sidebar/content structure, `/nav` for category management, and `/drive` for action hierarchy and empty/error states |
 | Accessible modal behavior | `AccessibleDialog` | Focus entry and restoration, focus trapping, Escape/backdrop handling, busy state and labelled dialogs |
 | Signed-out owner-only page | `OwnerAccess` | Consistent explanation and sign-in guidance |
 
-Example: a `/forums` redesign may inspect `/nav`, `/drive`, and `/news`, but the approved file scope remains `/forums` unless shared or reference-page changes are separately approved.
+Example: a `/news` redesign may inspect `/nav` and `/drive`, but the approved file scope remains `/news` unless shared or reference-page changes are separately approved.
 
 ## 3. Required scope contract
 
@@ -56,7 +55,7 @@ Default scope rules:
 - Report unrelated problems instead of fixing them.
 - Treat every file outside the declared allowlist as out of scope.
 
-For a route such as `/forums`, the normal allowlist is `app/forums/**`, route-specific tests, and the task's documentation. Files such as `app/nav/**`, `app/drive/**`, `app/globals.css`, `app/site-shell.tsx`, `app/site-auth.tsx`, and server/API modules are excluded unless explicitly approved.
+For a route such as `/news`, the normal allowlist is `app/news/**`, route-specific tests, and the task's documentation. Files such as `app/nav/**`, `app/drive/**`, `app/globals.css`, `app/site-shell.tsx`, `app/site-auth.tsx`, and server/API modules are excluded unless explicitly approved.
 
 ## 4. Shared-change approval gate
 
@@ -96,7 +95,7 @@ Workspace routes use `SiteShell` rather than inventing another application frame
 
 Routes with category, source, folder, or filter navigation should use `hasSidebar` and provide an `aside` with `id="page-sidebar"` and an accurate accessible label.
 
-The shared skeleton may be reused. Functional content may differ: cards for a directory, rows for files, articles for News, and topics for Forums are all valid when their surrounding hierarchy remains consistent.
+The shared skeleton may be reused. Functional content may differ: cards for a directory, rows for files, and articles for News are all valid when their surrounding hierarchy remains consistent.
 
 ## 6. Existing visual foundation
 
@@ -140,7 +139,7 @@ These are current alignment targets, not permission to change shared CSS. A glob
 
 ### Sidebars
 
-- Keep heading, category, source, checkbox, selected, collapsed, and row-action behavior consistent with `/nav`, `/news`, and `/forums`.
+- Keep heading, category, source, checkbox, selected, collapsed, and row-action behavior consistent with `/nav` and `/news`.
 - Do not expose administrator mutation controls to non-admin users.
 - Truncate long labels without making the full value inaccessible; use a title or equivalent when needed.
 - Preserve the shared collapsed and mobile overlay behavior.
