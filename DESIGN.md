@@ -25,7 +25,7 @@ Reference pages are read-only examples unless the task explicitly includes them.
 | Global navigation, theme, window frame and status bar | `SiteShell` | Toolbar navigation, active state, sidebar controls, theme control, application viewport and status bar |
 | Categories, search, cards, favorites, drag sorting and edit dialogs | `/nav` | Sidebar category rows, search field, card density, action placement and `AccessibleDialog` forms |
 | Private file browsing and owner-only access | `/drive` | Page header, action buttons, breadcrumbs, tabular rows, empty state, progress, error and destructive confirmation |
-| Public-link file and folder management | `/share` | The `/drive` family plus link actions, notices and public-file semantics |
+| Public-link file management | `/drive` | Drive link actions, file-only capability semantics and direct public downloads |
 | Source navigation, item streams, filters and dense settings | `/feeds` | Sidebar hierarchy, selected rows, article list, settings tables, automatic loading and partial-error handling |
 | Accessible modal behavior | `AccessibleDialog` | Focus entry and restoration, focus trapping, Escape/backdrop handling, busy state and labelled dialogs |
 | Signed-out owner-only page | `OwnerAccess` | Consistent explanation and sign-in guidance |

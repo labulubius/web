@@ -252,6 +252,14 @@ test("health response is minimal and not cached", async () => {
   assert.deepEqual(await response.json(), { status: "ok" });
 });
 
+test("production health checks distinguish FreshRSS from Next.js", async () => {
+  const script = await readFile(new URL("../scripts/health-check.sh", import.meta.url), "utf8");
+  assert.match(script, /FEEDS_ORIGIN:-https:\/\/feeds\.labulubius\.com/);
+  assert.match(script, /grep -q "FreshRSS"/);
+  assert.match(script, /feeds_body=.*--location/);
+  assert.doesNotMatch(script, /\$feeds_origin\/api\/health/);
+});
+
 test("global headers include baseline browser protections", async () => {
   const rules = await nextConfig.headers();
   const headers = new Map(rules[0].headers.map(({ key, value }) => [key.toLowerCase(), value]));

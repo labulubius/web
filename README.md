@@ -12,7 +12,7 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | `/nav` | Website directory, search, favorites and categories | Published entries are public; administrators edit entries and icons in the UI (Supabase) |
 | `/feeds` | FreshRSS-backed feed reader for websites, feeds and community forums | Visitors can read the owner's selected, non-expired items; administrators manage sources, tags and Watchboards |
 | `/drive` | Private file manager and public-link manager | Administrator only; files live on the `web` server |
-| `/share/<id>` | Public file or folder link | Anyone holding an active opaque link |
+| `/drive/file/<id>` | Direct public download for one Drive file | Anyone holding an active opaque link |
 | `/about` | Project overview | Public |
 
 The navigator's canonical URL is `https://labulubius.com/nav`. The Drive subdomain redirects its page to the main-site UI, while its API remains on the dedicated Drive hostname.
@@ -20,8 +20,8 @@ The navigator's canonical URL is `https://labulubius.com/nav`. The Drive subdoma
 ## Architecture
 
 - Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data and icons use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
-- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel sends `labulubius.com`, `drive.labulubius.com` and `feeds.labulubius.com` to services on that VM. The Feeds UI and same-origin News APIs run in the same Next.js process.
-- Personal task data, Drive files and their share-link metadata, News preferences live **outside Git** on `web`. FreshRSS and its PostgreSQL database run in Docker there. GitHub stores source history and CI results, not production data.
+- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel sends `labulubius.com` and `drive.labulubius.com` to Next.js, `feeds.labulubius.com` to the FreshRSS container, and `agent.labulubius.com` to Agent. The custom `/feeds` UI and same-origin News APIs remain in Next.js. The former `rss.labulubius.com` and `share.labulubius.com` DNS names are retired.
+- Personal task data, Drive files and their public-link metadata, News preferences live **outside Git** on `web`. FreshRSS and its PostgreSQL database run in Docker there. GitHub stores source history and CI results, not production data.
 
 ## Verification on VM100
 
@@ -46,7 +46,7 @@ More details: [TASKS.md](TASKS.md), [DRIVE.md](DRIVE.md), [SHARE.md](SHARE.md), 
 
 - `app/`: pages, API routes, shared UI and server helpers. The task UI is under `app/tasks/` and its API under `app/api/tasks/`.
 - `app/nav/`: navigator UI and TypeScript types; actual entries are stored in Supabase.
-- `app/lib/`: authorization, Drive/share-link persistence, FreshRSS integration.
+- `app/lib/`: authorization, Drive public-link persistence, FreshRSS integration.
 - `proxy.ts`: hostname-based Drive-page redirect.
 - `supabase/migrations/`: database and storage policy migrations.
 - `scripts/`: News retention SQL and hourly job.

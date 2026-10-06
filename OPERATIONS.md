@@ -4,7 +4,11 @@
 
 `GET /api/health` is an unauthenticated liveness check. It returns only `{"status":"ok"}` with `Cache-Control: no-store`; it intentionally does not disclose dependency, disk, version, path, or credential details.
 
-Run `scripts/health-check.sh` to check the main, Drive, Feeds and Agent hostnames. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `FEEDS_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+Run `scripts/health-check.sh` to check the main Next.js service, Drive API host, FreshRSS UI and Agent hostname. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `FEEDS_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. The FreshRSS check follows its login redirect and verifies the returned application marker instead of calling the Next.js `/api/health` route. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+
+## Production host routing
+
+Cloudflare Tunnel sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000`, `feeds.labulubius.com` to FreshRSS on `127.0.0.1:8080`, and `agent.labulubius.com` to Agent. The custom workspace reader remains at `https://labulubius.com/feeds`; the FreshRSS application is at `https://feeds.labulubius.com`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
 
 ## Production deployment
 
