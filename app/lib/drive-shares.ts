@@ -4,24 +4,22 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { driveRoot, isDriveInternalName, resolveDrivePath, segments } from "./drive-server";
+import { driveRoot, resolveDrivePath, segments } from "./drive-server";
 import { locked } from "./upload-sessions";
 
 const SHARE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHARE_DIRECTORY = ".drive-shares";
+const SHARE_VERSION = 2;
+const SHARE_SCOPE = "file-download";
 
 export type DriveShare = {
+  version: typeof SHARE_VERSION;
+  scope: typeof SHARE_SCOPE;
   id: string;
   path: string;
-  type: "file" | "folder";
+  type: "file";
   name: string;
   created: string;
-};
-
-export type PublicDriveEntry = {
-  name: string;
-  type: "file" | "folder";
-  size: number;
 };
 
 function metadataDirectory(root: string) { return path.join(root, SHARE_DIRECTORY); }
@@ -42,13 +40,14 @@ async function loadFromRoot(root: string, id: string): Promise<DriveShare | null
   try {
     const handle = await open(metadataPath(root, id), constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
-      const value = JSON.parse(await handle.readFile({ encoding: "utf8" })) as DriveShare;
+      const value = JSON.parse(await handle.readFile({ encoding: "utf8" })) as Partial<DriveShare>;
       const parts = segments(value.path);
-      if (value.id !== id || !parts.length || parts.join("/") !== value.path ||
+      if (value.version !== SHARE_VERSION || value.scope !== SHARE_SCOPE ||
+          value.id !== id || !parts.length || parts.join("/") !== value.path ||
           typeof value.name !== "string" || value.name !== parts.at(-1) ||
-          (value.type !== "file" && value.type !== "folder") ||
-          typeof value.created !== "string" || !Number.isFinite(Date.parse(value.created))) return null;
-      return value;
+          value.type !== "file" || typeof value.created !== "string" ||
+          !Number.isFinite(Date.parse(value.created))) return null;
+      return value as DriveShare;
     } finally { await handle.close(); }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -82,15 +81,22 @@ export async function createDriveShare(value: unknown) {
     const target = await resolveDrivePath(parts);
     const stat = await lstat(target);
     if (stat.isSymbolicLink()) throw new Error("Invalid drive path.");
-    const type = stat.isDirectory() ? "folder" : stat.isFile() ? "file" : null;
-    if (!type) throw new Error("Only files and folders can be shared.");
+    if (!stat.isFile()) throw new Error("Only files can have public links.");
     const canonicalPath = parts.join("/");
     const existing = (await scanDriveShares(root)).find((share) => share.path === canonicalPath);
     if (existing) return existing;
 
     const directory = await ensureMetadataDirectory(root);
     const id = randomUUID();
-    const share: DriveShare = { id, path: canonicalPath, type, name: parts.at(-1)!, created: new Date().toISOString() };
+    const share: DriveShare = {
+      version: SHARE_VERSION,
+      scope: SHARE_SCOPE,
+      id,
+      path: canonicalPath,
+      type: "file",
+      name: parts.at(-1)!,
+      created: new Date().toISOString(),
+    };
     const temporary = path.join(directory, `.${id}.tmp`);
     const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     let committed = false;
@@ -130,34 +136,16 @@ export async function revokeDriveSharesForPath(value: unknown) {
   });
 }
 
-export async function resolvePublicDriveTarget(id: string, relativeValue: unknown = "") {
+export async function resolvePublicDriveFile(id: string) {
   const share = await loadDriveShare(id);
   if (!share) return null;
-  let relative: string[];
-  try { relative = segments(relativeValue); } catch { return null; }
-  if (share.type === "file" && relative.length) return null;
   try {
-    const target = await resolveDrivePath([...segments(share.path), ...relative]);
+    const target = await resolveDrivePath(segments(share.path));
     const stat = await lstat(target);
-    if (stat.isSymbolicLink()) return null;
-    return { share, relative, target, stat };
+    if (!stat.isFile() || stat.isSymbolicLink()) return null;
+    return { share, target, stat };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
-}
-
-export async function publicDriveFolder(id: string, relativeValue: unknown = "") {
-  const resolved = await resolvePublicDriveTarget(id, relativeValue);
-  if (!resolved?.stat.isDirectory()) return null;
-  const names = await readdir(resolved.target, { withFileTypes: true });
-  const entries = (await Promise.all(names
-    .filter((entry) => !isDriveInternalName(entry.name) && (entry.isFile() || entry.isDirectory()))
-    .map(async (entry): Promise<PublicDriveEntry | null> => {
-      const stat = await lstat(path.join(resolved.target, entry.name));
-      if (stat.isSymbolicLink()) return null;
-      return { name: entry.name, type: stat.isDirectory() ? "folder" : "file", size: stat.size };
-    }))).filter((entry): entry is PublicDriveEntry => entry !== null);
-  entries.sort((a, b) => a.type === b.type ? a.name.localeCompare(b.name) : a.type === "folder" ? -1 : 1);
-  return { share: resolved.share, relative: resolved.relative, entries };
 }

@@ -1,4 +1,4 @@
-import { createDriveShare, listDriveShares } from "../../../lib/drive-shares";
+import { createDriveShare, listDriveShares, resolvePublicDriveFile } from "../../../lib/drive-shares";
 import { driveError, drivePreflight, privateHeaders, requireDriveAdmin, withDriveCors } from "../../../lib/drive-server";
 import { smallJson } from "../../../lib/upload-sessions";
 
@@ -15,13 +15,20 @@ async function respond(request: Request, task: () => Promise<Response>) {
 }
 
 export function GET(request: Request) {
-  return respond(request, async () => Response.json({ shares: await listDriveShares() }, { headers: privateHeaders }));
+  return respond(request, async () => {
+    const shares = (await Promise.all((await listDriveShares()).map(async (share) => {
+      const resolved = await resolvePublicDriveFile(share.id);
+      if (!resolved) return null;
+      return { name: share.name, type: "file" as const, size: resolved.stat.size, modified: resolved.stat.mtime.toISOString(), shareId: share.id, path: share.path };
+    }))).filter((share) => share !== null);
+    return Response.json({ shares }, { headers: privateHeaders });
+  });
 }
 
 export function POST(request: Request) {
   return respond(request, async () => {
     const body = await smallJson(request);
     const share = await createDriveShare(body.path);
-    return Response.json({ share, url: `/share/${share.id}` }, { headers: privateHeaders });
+    return Response.json({ share, url: `/drive/file/${share.id}` }, { headers: privateHeaders });
   });
 }
