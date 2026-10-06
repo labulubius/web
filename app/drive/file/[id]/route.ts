@@ -1,9 +1,9 @@
-import { servePublicDriveFile } from "../download-response";
+import { servePublicDriveFile } from "./download-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function serve(request: Request, context: RouteContext<"/drive/file/[id]/download">) {
+async function serve(request: Request, context: RouteContext<"/drive/file/[id]">) {
   const { id } = await context.params;
   return servePublicDriveFile(request, id);
 }

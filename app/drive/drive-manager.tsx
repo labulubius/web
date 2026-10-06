@@ -244,7 +244,6 @@ export function DriveManager() {
       <button className={mode === "files" && parts.length === 0 ? "selected" : ""} type="button" onClick={() => navigate([])} aria-current={mode === "files" && parts.length === 0 ? "page" : undefined}><HardDrive size={16} /><span>My Drive</span></button>
       <button className={mode === "links" ? "selected" : ""} type="button" onClick={() => { setMode("links"); setSearch(""); }} aria-current={mode === "links" ? "page" : undefined}><Link2 size={16} /><span>Public links</span></button>
       {rootFolders.length > 0 && <><h2>Folders</h2>{rootFolders.map((folder) => <button key={folder} className={mode === "files" && parts[0] === folder ? "selected" : ""} type="button" onClick={() => navigate([folder])} title={folder}><ChevronRight size={15} /><span>{folder}</span></button>)}</>}
-      <div className="drive-storage"><strong>Storage</strong><span>5 GB total</span></div>
     </aside>
 
     <section className={`drive-browser${selectedEntry && infoOpen ? " has-info" : ""}`}>

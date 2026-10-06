@@ -28,9 +28,9 @@ test("PDF handoff carries a private structured reference into Agent", () => {
 
 test("Drive public links are opaque, file-only, versioned, and protected", async () => {
   const shares = await readFile(new URL("../app/lib/drive-shares.ts", import.meta.url), "utf8");
-  const publicRoute = await readFile(new URL("../app/drive/file/[id]/download/route.ts", import.meta.url), "utf8");
-  const publicPage = await readFile(new URL("../app/drive/file/[id]/page.tsx", import.meta.url), "utf8");
-  const publicDialog = await readFile(new URL("../app/drive/file/[id]/public-download.tsx", import.meta.url), "utf8");
+  const publicRoute = await readFile(new URL("../app/drive/file/[id]/route.ts", import.meta.url), "utf8");
+  const legacyDownloadRoute = await readFile(new URL("../app/drive/file/[id]/download/route.ts", import.meta.url), "utf8");
+  const downloadResponse = await readFile(new URL("../app/drive/file/[id]/download-response.ts", import.meta.url), "utf8");
   const shareApi = await readFile(new URL("../app/api/drive/shares/route.ts", import.meta.url), "utf8");
   assert.match(shares, /const SHARE_DIRECTORY = "\.drive-shares"/);
   assert.match(shares, /const SHARE_VERSION = 2/);
@@ -42,16 +42,19 @@ test("Drive public links are opaque, file-only, versioned, and protected", async
   assert.match(shares, /if \(!stat\.isFile\(\)\) throw new Error\("Only files can have public links\."\)/);
   assert.match(shareApi, /url: `\/drive\/file\/\$\{share\.id\}`/);
   assert.doesNotMatch(shareApi, /`\/share\//);
-  assert.match(publicPage, /resolvePublicDriveFile/);
-  assert.match(publicPage, /robots: \{ index: false, follow: false, nocache: true \}/);
-  assert.match(publicDialog, /<AccessibleDialog/);
-  assert.match(publicDialog, /The download will begin after you confirm/);
-  assert.match(publicRoute, /Content-Disposition/);
-  assert.match(publicRoute, /Cache-Control": "no-store"/);
-  assert.match(publicRoute, /Referrer-Policy": "no-referrer"/);
-  assert.match(publicRoute, /X-Content-Type-Options": "nosniff"/);
-  assert.match(publicRoute, /request\.method === "HEAD"/);
-  assert.match(publicRoute, /status: 416/);
+  assert.match(publicRoute, /servePublicDriveFile\(request, id\)/);
+  assert.match(publicRoute, /export const GET = serve/);
+  assert.match(publicRoute, /export const HEAD = serve/);
+  assert.match(legacyDownloadRoute, /servePublicDriveFile\(request, id\)/);
+  assert.match(downloadResponse, /resolvePublicDriveFile/);
+  assert.match(downloadResponse, /Content-Disposition/);
+  assert.match(downloadResponse, /Cache-Control": "no-store"/);
+  assert.match(downloadResponse, /Referrer-Policy": "no-referrer"/);
+  assert.match(downloadResponse, /X-Content-Type-Options": "nosniff"/);
+  assert.match(downloadResponse, /request\.method === "HEAD"/);
+  assert.match(downloadResponse, /status: 416/);
+  await assert.rejects(access(new URL("../app/drive/file/[id]/page.tsx", import.meta.url)), { code: "ENOENT" });
+  await assert.rejects(access(new URL("../app/drive/file/[id]/public-download.tsx", import.meta.url)), { code: "ENOENT" });
   await assert.rejects(access(new URL("../app/api/share/[id]/route.ts", import.meta.url)), { code: "ENOENT" });
   await assert.rejects(access(new URL("../app/share/[id]/page.tsx", import.meta.url)), { code: "ENOENT" });
   await assert.rejects(access(new URL("../app/share/page.tsx", import.meta.url)), { code: "ENOENT" });
@@ -369,6 +372,10 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(reader, /Items are temporarily unavailable\./);
   assert.match(reader, /No items here yet\./);
   assert.match(reader, /<th>In All items<\/th>/);
+  assert.ok(reader.indexOf('className="news-heading-search"') < reader.indexOf('className="news-add-action"'), "source search must precede the add button");
+  assert.match(reader, /aria-label="Search sources"/);
+  assert.doesNotMatch(reader, /<label>Search sources|news-table-controls/);
+  assert.match(styles, /\.news-heading-search/);
   assert.doesNotMatch(reader, /News navigation|<span>All articles<\/span>|Articles are temporarily unavailable|No articles here yet|<th>In Articles<\/th>/);
 });
 
@@ -388,6 +395,8 @@ test("Drive uses a responsive Dolphin-style browser without broadening owner acc
   assert.match(manager, /<AccessibleDialog/);
   assert.match(manager, /Create public link/);
   assert.match(manager, /Revoke public link/);
+  assert.doesNotMatch(manager, /drive-storage|5 GB total/);
+  assert.doesNotMatch(styles, /\.drive-storage|drive-public-card|drive-download-dialog/);
   assert.doesNotMatch(manager, /new URL\(`\/share|href=[{`"']\/share/);
   assert.match(styles, /grid-template-columns: var\(--sidebar-width\) minmax\(0, 1fr\)/);
   assert.match(styles, /\.drive-browser\.has-info \.drive-content/);
@@ -429,7 +438,10 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.match(navigator, /\.category-row \{[^}]*min-width: 0/);
   assert.match(news, /\.news-category-row \{[^}]*min-width: 0/);
   assert.match(directory, /isAdmin \? <Folder size=\{16\}/);
-  assert.doesNotMatch(directory, /GripVertical/);
+  assert.match(directory, /onDragStart=\{\(\) => \{ blockSiteOpen\.current = true; \}\}/);
+  assert.match(directory, /onPointerInteraction=\{\(\) => \{ blockSiteOpen\.current = false; \}\}/);
+  assert.match(directory, /if \(didDrag\.current \|\| globallyBlocked\) event\.preventDefault\(\)/);
+  assert.doesNotMatch(directory, /blockSiteOpenUntil|GripVertical/);
 });
 
 test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {

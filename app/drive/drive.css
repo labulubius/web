@@ -7,15 +7,13 @@
 .drive-sidebar > button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .drive-sidebar > button.selected { background: var(--accent); color: white; }
 .drive-sidebar > button.selected svg { color: white; }
-.drive-storage { border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; flex-direction: column; font-size: 10px; gap: 3px; margin: 18px 8px 0; padding-top: 12px; }
-.drive-storage strong { color: var(--text); font-size: 11px; }
 .plasma-desktop[data-sidebar-collapsed="true"] .drive-workspace { grid-template-columns: 0 minmax(0, 1fr); }
 .plasma-desktop[data-sidebar-collapsed="true"] .drive-sidebar { border-color: transparent; padding-left: 0; padding-right: 0; }
 .drive-browser { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; min-width: 0; }
 .drive-toolbar { align-items: center; background: var(--window); border-bottom: 1px solid var(--separator); display: flex; gap: 7px; min-height: 47px; padding: 6px 9px; }
 .drive-nav-buttons, .drive-toolbar-actions { align-items: center; display: flex; flex: none; gap: 3px; }
-.drive-toolbar button, .drive-selection-bar button, .drive-info button, .drive-dialog button, .drive-public-card button, .drive-download-dialog footer :is(button, a) { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; font: inherit; font-size: 11px; gap: 6px; justify-content: center; min-height: 31px; padding: 5px 9px; text-decoration: none; }
-.drive-toolbar button:hover, .drive-selection-bar button:hover, .drive-info button:hover, .drive-dialog button:hover, .drive-public-card button:hover, .drive-download-dialog footer :is(button, a):hover { border-color: var(--accent); }
+.drive-toolbar button, .drive-selection-bar button, .drive-info button, .drive-dialog button { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: inline-flex; font: inherit; font-size: 11px; gap: 6px; justify-content: center; min-height: 31px; padding: 5px 9px; text-decoration: none; }
+.drive-toolbar button:hover, .drive-selection-bar button:hover, .drive-info button:hover, .drive-dialog button:hover { border-color: var(--accent); }
 .drive-toolbar button:disabled, .drive-selection-bar button:disabled, .drive-info button:disabled, .drive-dialog button:disabled { cursor: default; opacity: .45; }
 .drive-nav-buttons button, .drive-toolbar-actions button:has(svg:only-child), .drive-more { padding: 5px; width: 31px; }
 .drive-toolbar-actions button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--link); }
@@ -94,23 +92,12 @@
 .drive-info-actions button:hover { background: var(--accent-soft); border-color: transparent; }
 .drive-access-state { padding: 32px; }
 .drive-access-state > p { color: var(--text-muted); font-size: 12px; }
-.drive-dialog > footer, .drive-download-dialog > footer { border-top: 1px solid var(--separator); display: flex; gap: 7px; justify-content: flex-end; padding: 10px 14px; }
+.drive-dialog > footer { border-top: 1px solid var(--separator); display: flex; gap: 7px; justify-content: flex-end; padding: 10px 14px; }
 .drive-dialog form input { resize: none; }
 .drive-confirm-copy { font-size: 12px; line-height: 1.55; padding: 18px; }
 .drive-confirm-copy p { margin: 0; }
 .drive-primary-action { background: var(--accent) !important; border-color: var(--accent) !important; color: white !important; }
 .drive-destructive-button { background: var(--negative) !important; border-color: var(--negative) !important; color: white !important; }
-.drive-public-page { align-items: center; display: flex; justify-content: center; min-height: 100%; padding: 24px; }
-.drive-public-card { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 6px; display: flex; flex-direction: column; max-width: 540px; padding: 32px; text-align: center; width: 100%; }
-.drive-public-card > svg { color: var(--link); }
-.drive-public-eyebrow { color: var(--link) !important; font-size: 10px !important; font-weight: 600; letter-spacing: .08em; margin: 15px 0 5px !important; }
-.drive-public-card h1 { font-size: 20px; font-weight: 500; margin: 0; max-width: 100%; overflow-wrap: anywhere; }
-.drive-public-card p { color: var(--text-muted); font-size: 11px; }
-.drive-public-card button { margin-top: 12px; }
-.drive-download-body { display: grid; gap: 14px; grid-template-columns: 58px minmax(0, 1fr); padding: 22px; }
-.drive-download-icon { align-items: center; background: var(--accent-soft); border-radius: 5px; color: var(--link); display: flex; height: 58px; justify-content: center; }
-.drive-download-body strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
-.drive-download-body p { color: var(--text-muted); font-size: 11px; line-height: 1.5; margin: 5px 0 0; }
 @media (max-width: 1000px) {
   .drive-browser.has-info .drive-content { grid-template-columns: minmax(0, 1fr) 270px; }
   .drive-search { flex-basis: 160px; }
@@ -146,10 +133,8 @@
   .drive-grid { gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 9px; }
   .drive-grid label { min-height: 125px; padding: 10px; }
   .drive-menu { bottom: 31px; position: fixed; right: 8px; top: auto; }
-  .drive-dialog, .drive-download-dialog { max-height: calc(100dvh - 24px); }
+  .drive-dialog { max-height: calc(100dvh - 24px); }
 }
 @media (max-width: 420px) {
   .drive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .drive-download-body { grid-template-columns: 48px minmax(0, 1fr); padding: 18px; }
-  .drive-download-icon { height: 48px; }
 }

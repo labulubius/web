@@ -103,6 +103,7 @@ function SiteCard({
   onEdit,
   onDelete,
   onFavorite,
+  onPointerInteraction,
   shouldBlockOpen,
 }: {
   site: Site;
@@ -112,6 +113,7 @@ function SiteCard({
   onEdit: () => void;
   onDelete: () => void;
   onFavorite: () => void;
+  onPointerInteraction: () => void;
   shouldBlockOpen: () => boolean;
 }) {
   const icon = site.icon_url;
@@ -130,7 +132,7 @@ function SiteCard({
       className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
-      onPointerDownCapture={() => { didDrag.current = false; }}
+      onPointerDownCapture={() => { didDrag.current = false; onPointerInteraction(); }}
       {...(canReorder ? listeners : {})}
     >
       <a
@@ -140,10 +142,9 @@ function SiteCard({
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => {
-          if (didDrag.current || shouldBlockOpen()) {
-            event.preventDefault();
-            didDrag.current = false;
-          }
+          const globallyBlocked = shouldBlockOpen();
+          if (didDrag.current || globallyBlocked) event.preventDefault();
+          didDrag.current = false;
         }}
       >
         <div className="site-card-body">
@@ -189,7 +190,7 @@ export function NavDirectory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const blockSiteOpenUntil = useRef(0);
+  const blockSiteOpen = useRef(false);
   const hasLoadedCategories = useRef(false);
   // Keep taps and scrolling separate from sorting on touch screens.
   const categorySensors = useSensors(
@@ -505,11 +506,11 @@ export function NavDirectory() {
             sensors={siteSensors}
             collisionDetection={closestCenter}
             modifiers={[restrictToViewport]}
-            onDragStart={() => { blockSiteOpenUntil.current = Number.POSITIVE_INFINITY; }}
-            onDragCancel={() => { blockSiteOpenUntil.current = Date.now() + 500; }}
+            onDragStart={() => { blockSiteOpen.current = true; }}
+            onDragCancel={() => { blockSiteOpen.current = true; }}
             onDragEnd={(event) => {
               void handleSiteDragEnd(event);
-              blockSiteOpenUntil.current = Date.now() + 500;
+              blockSiteOpen.current = true;
             }}
           >
             <SortableContext items={filteredSites.map((site) => site.id)} strategy={rectSortingStrategy}>
@@ -524,7 +525,12 @@ export function NavDirectory() {
                     onEdit={() => { setEditingSite(site); setMessage(""); setDialog("site"); }}
                     onDelete={() => void deleteSite(site)}
                     onFavorite={() => void toggleFavorite(site)}
-                    shouldBlockOpen={() => Date.now() < blockSiteOpenUntil.current}
+                    onPointerInteraction={() => { blockSiteOpen.current = false; }}
+                    shouldBlockOpen={() => {
+                      const blocked = blockSiteOpen.current;
+                      blockSiteOpen.current = false;
+                      return blocked;
+                    }}
                   />
                 ))}
               </div>
