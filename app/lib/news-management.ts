@@ -1,15 +1,14 @@
 import "server-only";
 
-import { execFile } from "node:child_process";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
-import { freshEditToken, freshPost, newsCategories, newsFeeds } from "./news-server";
+import { newsCategories, newsFeeds } from "./news-server";
+import { newsReaderBackend } from "./news-reader-backend";
 import { discoverRssHub } from "./news-discovery";
 import { discoverPinnedNewsFeedDetails, newsFeedProxyUrl } from "./news-feed-proxy";
 import type { NewsFeedDiscoveryMethod } from "./news-feed-discovery";
 import { createWebSource, deleteWebSource, DuplicateWebSource, probeWebSource, UnsupportedWebSource, type WebSourceProbe } from "./news-web-sources";
 
-const labelPrefix = "user/-/label/";
 const blocked = new BlockList();
 for (const [network, bits] of [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
@@ -99,19 +98,6 @@ async function feed(value: unknown) {
   return found;
 }
 
-// FreshRSS GReader does not create empty folders. Run only constant PHP code and read
-// the validated name from stdin: no user input or credentials are passed as argv.
-async function categoryCli(action: "create" | "delete", name: string) {
-  const php = `require '/var/www/FreshRSS/cli/_cli.php'; cliInitUser('labulubius'); $name = htmlspecialchars(trim(stream_get_contents(STDIN)), ENT_COMPAT, 'UTF-8'); $dao = FreshRSS_Factory::createCategoryDao(); $cat = $dao->searchByName($name); if ('${action}' === 'create') { if ($cat !== null || !$dao->addCategory(['name' => $name])) exit(1); } else { if ($cat === null || $cat->id() <= 1) exit(1); $feeds = FreshRSS_Factory::createFeedDao()->listFeeds(); foreach ($feeds as $feed) { if ($feed->categoryId() === $cat->id() && !FreshRSS_feed_Controller::deleteFeed($feed->id())) exit(1); } if (!$dao->deleteCategory($cat->id())) exit(1); }`;
-  // Only a constant, locally constructed PHP program runs in the existing container.
-  // The category name travels over stdin, never as a shell argument.
-  await new Promise<void>((resolve, reject) => {
-    const child = execFile("docker", ["exec", "-i", "freshrss", "php", "-r", php], { timeout: 30000, maxBuffer: 1024 }, (error) => error ? reject(new Error("FreshRSS category update failed.")) : resolve());
-    child.stdin?.on("error", () => { /* handled by process exit */ });
-    child.stdin?.end(name);
-  });
-}
-
 export type NewsManagementResult = {
   discovery?: { url: string; method: NewsFeedDiscoveryMethod };
   probe?: WebSourceProbe | { kind: "feed"; method: Exclude<NewsFeedDiscoveryMethod, "web">; url: string };
@@ -142,20 +128,20 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
     case "createCategory": {
       const name = categoryName(body.name);
       if ((await newsCategories()).some((item) => item.name.toLowerCase() === name.toLowerCase())) return invalid("Category already exists.");
-      await categoryCli("create", name);
+      await newsReaderBackend().createCategory(name);
       return;
     }
     case "renameCategory": {
       const old = await category(body.categoryId ?? body.category ?? body.id, false);
       const name = categoryName(body.name);
       if ((await newsCategories()).some((item) => item.name.toLowerCase() === name.toLowerCase())) return invalid("Category already exists.");
-      await freshPost("reader/api/0/rename-tag", { T: await freshEditToken(), s: old.id, dest: labelPrefix + name });
+      await newsReaderBackend().renameCategory(old, name);
       return;
     }
     case "deleteCategory": {
       const old = await category(body.categoryId ?? body.category ?? body.id, false);
       // Includes hidden FreshRSS feeds (not returned by GReader subscription/list).
-      await categoryCli("delete", old.name);
+      await newsReaderBackend().deleteCategory(old);
       return;
     }
     case "addFeed": {
@@ -208,7 +194,7 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
         return invalid("Source already exists.");
       }
       try {
-        await freshPost("reader/api/0/subscription/edit", { s: `feed/${source}`, ac: "subscribe", ...(dest ? { a: dest.id } : {}), ...(title ? { t: title } : {}) });
+        await newsReaderBackend().subscribe(source, dest, title);
       } catch {
         if (webSourceCreated) await deleteWebSource(userId, resolved);
         if (source.startsWith("http://rsshub:1200/")) return invalid("RSSHub could not subscribe to this page. Try its RSS URL directly.");
@@ -221,12 +207,12 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
       const title = optionalText(body.title, "title");
       const dest = body.categoryId === undefined && body.category === undefined ? undefined : await category(body.categoryId ?? body.category);
       if (!title && !dest) return invalid("No changes provided.");
-      await freshPost("reader/api/0/subscription/edit", { s: source.id, ac: "edit", ...(title ? { t: title } : {}), ...(dest ? { a: dest.id } : {}) });
+      await newsReaderBackend().editFeed(source, title, dest);
       return;
     }
     case "deleteFeed": {
       const source = await feed(body.feedId ?? body.id);
-      await freshPost("reader/api/0/subscription/edit", { s: source.id, ac: "unsubscribe" });
+      await newsReaderBackend().unsubscribe(source);
       await deleteWebSource(userId, source.url);
       return;
     }

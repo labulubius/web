@@ -351,7 +351,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
   const newsTypes = await readFile(new URL("../app/lib/news-server-types.ts", import.meta.url), "utf8");
-  const newsServer = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
+  const freshBackend = await readFile(new URL("../app/lib/news-freshrss-backend.ts", import.meta.url), "utf8");
   const newsApi = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -379,7 +379,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(styles, /\.news-article-content \{ gap: 10px; grid-template-columns: minmax\(0, 1fr\) clamp\(78px, 24vw, 108px\)/);
   assert.match(styles, /-webkit-line-clamp: 2/);
   assert.match(newsTypes, /summary: string; source: string/);
-  assert.match(newsServer, /'sourceId', e\.id_feed/);
+  assert.match(freshBackend, /'sourceId', e\.id_feed/);
   assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
   assert.match(newsApi, /const publicNewsHeaders = \{/);
   assert.match(newsApi, /public, max-age=0, s-maxage=30, stale-while-revalidate=60/);
@@ -619,11 +619,12 @@ test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", a
   const token = await readFile(new URL("../app/lib/news-web-source-token.ts", import.meta.url), "utf8");
   const route = await readFile(new URL("../app/api/news/generated/[token]/route.ts", import.meta.url), "utf8");
   const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
+  const freshBackend = await readFile(new URL("../app/lib/news-freshrss-backend.ts", import.meta.url), "utf8");
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
 
   assert.match(management, /case "probeFeed"/);
   assert.match(management, /createWebSource\(userId, url\)/);
-  assert.match(management, /feed\/\$\{source\}/);
+  assert.match(freshBackend, /feed\/\$\{url\}/);
   assert.match(management, /deleteWebSource\(userId, source\.url\)/);
   assert.match(sources, /fetchPinnedNewsResource\(url\)/);
   assert.match(sources, /CACHE_TTL = 29 \* 60 \* 1000/);
@@ -632,7 +633,8 @@ test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", a
   assert.match(token, /createHmac\("sha256"/);
   assert.match(token, /timingSafeEqual/);
   assert.match(route, /Cache-Control": "private, no-store"/);
-  assert.match(server, /originalWebSourceUrl\(originalNewsFeedUrl/);
+  assert.match(server, /newsReaderBackend\(\)\.feeds/);
+  assert.match(freshBackend, /originalWebSourceUrl\(originalNewsFeedUrl/);
   assert.match(reader, /Check source/);
   assert.match(reader, /Supported webpage/);
   assert.match(reader, /sourceProbe\.items\.map/);
@@ -683,4 +685,18 @@ test("Feeds keeps html2rss private and behind higher-precision discovery", async
   assert.match(sources, /adapter: "csis-topic-v1" \| "html2rss-v1"/);
   assert.ok(sources.indexOf("canonicalCsisTopicUrl(value)") < sources.indexOf("canonicalHtml2rssSourceUrl(value)"));
   assert.match(sources, /abnormally small batch/);
+});
+
+test("Feeds routes reader operations through a backend boundary", async () => {
+  const boundary = await readFile(new URL("../app/lib/news-reader-backend.ts", import.meta.url), "utf8");
+  const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
+  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
+  assert.match(boundary, /interface NewsReaderBackend/);
+  for (const operation of ["categories", "feeds", "articles", "createCategory", "renameCategory", "deleteCategory", "subscribe", "editFeed", "unsubscribe"]) {
+    assert.match(boundary, new RegExp(`${operation}\\(`));
+  }
+  assert.match(server, /newsReaderBackend\(\)\.articles/);
+  assert.match(management, /newsReaderBackend\(\)\.subscribe/);
+  assert.doesNotMatch(management, /freshPost|freshEditToken|freshrss-postgres/);
+  assert.match(boundary, /NEWS_READER_BACKEND \|\| "freshrss"/);
 });
