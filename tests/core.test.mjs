@@ -4,7 +4,14 @@ import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
-import { bbcNewsFeed, discourseLatestFeed } from "../app/lib/news-feed-discovery.ts";
+import {
+  bbcNewsFeed,
+  discoverNewsFeedDetails,
+  discourseLatestFeed,
+  nativeCommunityFeed,
+  NewsFeedDiscoveryError,
+  withNewsFeedFallback,
+} from "../app/lib/news-feed-discovery.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
@@ -533,9 +540,127 @@ test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
-  assert.match(proxy, /fetchPinnedNewsResource\(discourse\)/);
+  assert.match(proxy, /discoverNewsFeedDetails\(value, fetchPinnedNewsResource, readLimitedNewsResource\)/);
   assert.match(management, /Source already exists\./);
   assert.match(api, /selected, \.\.\.result/);
+});
+
+const testFeedBody = '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Feed</title></feed>';
+const testResourceReader = async (response) => new Uint8Array(await response.arrayBuffer());
+const testResource = (body, finalUrl, status = 200) => ({ response: new Response(body, { status }), finalUrl });
+
+test("Feeds maps only explicit native community pages", () => {
+  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/"), "https://www.reddit.com/r/German/.rss");
+  assert.equal(nativeCommunityFeed("https://reddit.com/r/German/new"), "https://www.reddit.com/r/German/new/.rss");
+  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/top/?t=week"), "https://www.reddit.com/r/German/top/.rss?t=week");
+  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/controversial?t=month"), "https://www.reddit.com/r/German/controversial/.rss?t=month");
+  assert.equal(nativeCommunityFeed("https://www.v2ex.com/"), "https://www.v2ex.com/index.xml");
+  assert.equal(nativeCommunityFeed("https://www.v2ex.com/?tab=tech"), "https://www.v2ex.com/feed/tab/tech.xml");
+  assert.equal(nativeCommunityFeed("https://www.v2ex.com/go/python"), "https://www.v2ex.com/feed/python.xml");
+  assert.equal(nativeCommunityFeed("https://linux.do/"), "https://linux.do/latest.rss");
+  assert.equal(nativeCommunityFeed("https://linux.do/latest/"), "https://linux.do/latest.rss");
+  assert.equal(nativeCommunityFeed("https://linux.do/c/develop/4"), "https://linux.do/c/develop/4.rss");
+  assert.equal(nativeCommunityFeed("https://linux.do/t/example-topic/123"), "https://linux.do/t/example-topic/123.rss");
+
+  for (const value of [
+    "https://www.reddit.com/r/German/.rss",
+    "https://www.v2ex.com/index.xml",
+    "https://www.v2ex.com/feed/tab/tech.xml",
+    "https://linux.do/latest.rss",
+    "https://www.reddit.com/r/German/comments/123/post",
+    "https://www.reddit.com/search?q=German",
+    "https://www.reddit.com/r/German?sort=new",
+    "https://www.reddit.com/r/German/top?t=week&after=token",
+    "https://www.v2ex.com/t/123",
+    "https://www.v2ex.com/?q=python",
+    "https://linux.do/latest?order=created",
+    "https://old.reddit.com/r/German/",
+    "https://community.linux.do/",
+    "http://www.v2ex.com/",
+    "https://user:pass@www.v2ex.com/",
+    "https://www.v2ex.com:444/",
+  ]) assert.equal(nativeCommunityFeed(value), null, value);
+});
+
+test("Feeds tries native mappings before an unavailable community page", async () => {
+  const calls = [];
+  const found = await discoverNewsFeedDetails("https://www.reddit.com/r/German/", async (url) => {
+    calls.push(url);
+    if (url.endsWith("/.rss")) return testResource(testFeedBody, url);
+    return testResource("blocked", url, 403);
+  }, testResourceReader);
+  assert.deepEqual(found, { url: "https://www.reddit.com/r/German/.rss", method: "native" });
+  assert.deepEqual(calls, ["https://www.reddit.com/r/German/.rss"]);
+});
+
+test("Feeds leaves already-feed URLs direct", async () => {
+  const url = "https://www.reddit.com/r/German/.rss";
+  const calls = [];
+  const found = await discoverNewsFeedDetails(url, async (value) => {
+    calls.push(value);
+    return testResource(testFeedBody, value);
+  }, testResourceReader);
+  assert.deepEqual(found, { url, method: "direct" });
+  assert.deepEqual(calls, [url]);
+});
+
+test("Feeds continues past malformed and failed declared feed candidates", async () => {
+  const page = "https://example.org/news";
+  const html = [
+    '<link rel="alternate" type="application/rss+xml" href="http://[invalid">',
+    '<link rel="alternate" type="application/rss+xml" href="/failed.xml">',
+    '<link rel="alternate" type="application/atom+xml" href="/valid.xml">',
+  ].join("");
+  const calls = [];
+  const found = await discoverNewsFeedDetails(page, async (url) => {
+    calls.push(url);
+    if (url === page) return testResource(html, url);
+    if (url.endsWith("failed.xml")) return testResource("unavailable", url, 500);
+    return testResource(testFeedBody, url);
+  }, testResourceReader);
+  assert.deepEqual(found, { url: "https://example.org/valid.xml", method: "html" });
+  assert.deepEqual(calls, [page, "https://example.org/failed.xml", "https://example.org/valid.xml"]);
+});
+
+test("Feeds deduplicates and caps declared feed candidates", async () => {
+  const page = "https://example.org/news";
+  const links = ["/feed-0.xml", "/feed-0.xml", ...Array.from({ length: 20 }, (_, index) => `/feed-${index + 1}.xml`)];
+  const html = links.map((href) => `<link rel="alternate" type="application/rss+xml" href="${href}">`).join("");
+  const calls = [];
+  await assert.rejects(() => discoverNewsFeedDetails(page, async (url) => {
+    calls.push(url);
+    return testResource(url === page ? html : "not a feed", url);
+  }, testResourceReader), /No RSS or Atom feed/);
+  assert.equal(calls.filter((url) => url.endsWith("feed-0.xml")).length, 1);
+  assert.equal(calls.length, 17, "one page plus at most sixteen candidates");
+});
+
+test("Feeds preserves safe protected-source errors and skips webpage fallback", async () => {
+  for (const [status, message] of [
+    [403, "This source does not allow feed access."],
+    [429, "This source is rate limiting feed requests. Try again later."],
+  ]) {
+    let fallbackCalled = false;
+    await assert.rejects(
+      () => withNewsFeedFallback(
+        () => discoverNewsFeedDetails("https://linux.do/", async (url) => testResource("blocked", url, status), testResourceReader),
+        async () => { fallbackCalled = true; return null; },
+      ),
+      (error) => error instanceof NewsFeedDiscoveryError && error.status === status && error.message === message,
+    );
+    assert.equal(fallbackCalled, false);
+  }
+
+  let fallbackCalled = false;
+  await assert.rejects(
+    () => withNewsFeedFallback(
+      () => discoverNewsFeedDetails("https://www.v2ex.com/", async (url) => testResource("unavailable", url, 500), testResourceReader),
+      async () => { fallbackCalled = true; return null; },
+    ),
+    (error) => error instanceof NewsFeedDiscoveryError && error.message === "This community's native feed is unavailable.",
+  );
+  assert.equal(fallbackCalled, false);
+  assert.equal(await withNewsFeedFallback(async () => { throw new Error("ordinary discovery failure"); }, async () => "fallback"), "fallback");
 });
 
 

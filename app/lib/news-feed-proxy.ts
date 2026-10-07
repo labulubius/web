@@ -6,7 +6,7 @@ import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Readable } from "node:stream";
-import { bbcNewsFeed, discourseLatestFeed, type NewsFeedDiscoveryMethod } from "./news-feed-discovery";
+import { discoverNewsFeedDetails, type NewsFeedDiscovery } from "./news-feed-discovery";
 
 const MAX_REDIRECTS = 4;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -127,43 +127,8 @@ function xmlFeed(body: Uint8Array) {
   return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
 
-export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "web"> };
-
 export async function discoverPinnedNewsFeedDetails(value: string): Promise<NewsFeedDiscovery> {
-  const first = await fetchPinnedNewsResource(value);
-  if (!first.response.ok) { await first.response.body?.cancel(); throw new Error("Website unavailable."); }
-  const body = await readLimitedNewsResource(first.response);
-  if (xmlFeed(body)) return { url: first.finalUrl, method: "direct" };
-  const html = new TextDecoder().decode(body);
-  const tags = html.match(/<link\b[^>]*>/gi) || [];
-  for (const tag of tags) {
-    const rel = tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] || "";
-    const type = tag.match(/\btype\s*=\s*["']([^"']+)["']/i)?.[1] || "";
-    const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]?.replace(/&amp;/gi, "&");
-    if (!href || !/(?:^|\s)alternate(?:\s|$)/i.test(rel) || !/(?:rss|atom|xml)/i.test(type)) continue;
-    const candidate = new URL(href, first.finalUrl).href;
-    const checked = await fetchPinnedNewsResource(candidate);
-    if (!checked.response.ok) { await checked.response.body?.cancel(); continue; }
-    const feed = await readLimitedNewsResource(checked.response);
-    if (xmlFeed(feed)) return { url: checked.finalUrl, method: "html" };
-  }
-  const bbc = bbcNewsFeed(first.finalUrl);
-  if (bbc) {
-    const checked = await fetchPinnedNewsResource(bbc);
-    if (checked.response.ok) {
-      const feed = await readLimitedNewsResource(checked.response);
-      if (xmlFeed(feed)) return { url: checked.finalUrl, method: "bbc" };
-    } else await checked.response.body?.cancel();
-  }
-  const discourse = discourseLatestFeed(html, first.finalUrl);
-  if (discourse) {
-    const checked = await fetchPinnedNewsResource(discourse);
-    if (checked.response.ok) {
-      const feed = await readLimitedNewsResource(checked.response);
-      if (xmlFeed(feed)) return { url: checked.finalUrl, method: "discourse" };
-    } else await checked.response.body?.cancel();
-  }
-  throw new Error("No RSS or Atom feed was discovered.");
+  return discoverNewsFeedDetails(value, fetchPinnedNewsResource, readLimitedNewsResource);
 }
 
 export async function discoverPinnedNewsFeed(value: string) {
