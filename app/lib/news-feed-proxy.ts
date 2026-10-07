@@ -6,7 +6,8 @@ import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Readable } from "node:stream";
-import { discoverNewsFeedDetails, type NewsFeedDiscovery } from "./news-feed-discovery";
+import { cachedNewsFeedResource } from "./news-feed-cache";
+import { discoverNewsFeedDetails, xmlFeed, type NewsFeedDiscovery } from "./news-feed-discovery";
 
 const MAX_REDIRECTS = 4;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -109,6 +110,10 @@ export async function readLimitedNewsResource(response: Response) {
 }
 
 export async function fetchPinnedNewsResource(value: string) {
+  return cachedNewsFeedResource(value, fetchUncachedPinnedNewsResource, readLimitedNewsResource);
+}
+
+async function fetchUncachedPinnedNewsResource(value: string) {
   let current = value;
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
     const { url, address } = await target(current);
@@ -120,11 +125,6 @@ export async function fetchPinnedNewsResource(value: string) {
     return { response, finalUrl: url.href };
   }
   throw new Error("Too many redirects.");
-}
-
-function xmlFeed(body: Uint8Array) {
-  const prefix = new TextDecoder().decode(body.slice(0, 4096));
-  return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
 
 export async function discoverPinnedNewsFeedDetails(value: string): Promise<NewsFeedDiscovery> {
@@ -143,6 +143,13 @@ export async function proxyNewsFeed(token: string) {
   let current: string;
   try { current = Buffer.from(encoded, "base64url").toString("utf8"); new URL(current); } catch { return new Response("Not found", { status: 404 }); }
   const result = await fetchPinnedNewsResource(current);
+  if (result.response.status === 429) {
+    await result.response.body?.cancel();
+    return new Response("Feed rate limited", { status: 429, headers: {
+      "Retry-After": result.response.headers.get("retry-after") || "30",
+      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    } });
+  }
   if (!result.response.ok) { await result.response.body?.cancel(); return new Response("Feed unavailable", { status: 502 }); }
   const body = await readLimitedNewsResource(result.response);
   if (!xmlFeed(body)) return new Response("Invalid feed", { status: 502 });

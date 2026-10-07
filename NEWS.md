@@ -31,3 +31,29 @@ After native RSS/Atom and registered high-precision adapters fail, `/feeds` may 
 - Signed in as admin, create, edit and delete a source and category; create tags and a Watchboard; verify Miniflux receives the changes and existing subscriptions remain intact.
 - Confirm `labulubius-cau-news-refresh.timer` and `labulubius-ciee-news-refresh.timer` are active.
 - Confirm Miniflux is reachable only at `127.0.0.1:8083` and no standalone reader hostname is published.
+
+## Short-lived verified feed reuse
+
+Probe, save and the signed feed proxy share a versioned `globalThis` server-process
+cache: successful RSS/Atom/RDF bytes recognized by the existing XML feed-root check
+live for 60 seconds. This is not full XML schema validation; Miniflux still validates
+subscriptions. HTML and failed responses are never stored as successful feeds.
+Original and final redirect URLs are aliases; each counts toward the 64-entry and
+16 MiB limits. Each consumer gets a fresh Response. At most 16 distinct fetches run
+through this helper concurrently; excess requests fail temporarily rather than
+starting untracked work. Rejections always clear in-flight entries.
+
+HTTP 429 stores only cooldown metadata (never the upstream error body), honoring
+integer/date Retry-After values within 1–300 seconds, defaulting to 30 seconds.
+The signed proxy preserves 429 and emits the remaining Retry-After. Expired entries
+are removed on access; bounded FIFO eviction may shorten reuse/cooldowns under load.
+The cache is volatile, process-local (not shared across workers/hosts), and does not
+change edge caching, owner authorization, capability checks or persistent storage.
+Every cache miss still uses public DNS pinning and per-redirect validation. An HTML
+landing page may be fetched again; its discovered feed bytes can still be reused.
+
+A failed source creation clears the successful probe preview but keeps the URL,
+name and tags. A source already created with incomplete setup keeps the existing
+close-and-edit recovery behavior. Automated regressions exercise actual management,
+discovery and proxy wiring with mocked network/backend boundaries, separate module
+bundles sharing a process global, and the actual UI submit handler without a browser.

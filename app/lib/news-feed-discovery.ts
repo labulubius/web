@@ -96,7 +96,7 @@ export function discourseLatestFeed(html: string, pageUrl: string): string | nul
   return url.href;
 }
 
-function xmlFeed(body: Uint8Array) {
+export function xmlFeed(body: Uint8Array) {
   const prefix = new TextDecoder().decode(body.slice(0, 4096));
   return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
