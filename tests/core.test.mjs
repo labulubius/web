@@ -473,6 +473,9 @@ test("Feeds watchboards persist only exact drag orders", async () => {
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
   const watchboards = await readFile(new URL("../app/lib/news-watchboards.ts", import.meta.url), "utf8");
   assert.match(reader, /KeyboardSensor/);
+  assert.match(reader, /PointerSensor/);
+  assert.match(reader, /setActivatorNodeRef/);
+  assert.match(reader, /news-watchboard-drag/);
   assert.match(reader, /SortableWatchboardRow/);
   assert.match(reader, /action: "reorderWatchboards"/);
   assert.match(watchboards, /case "reorderWatchboards"/);

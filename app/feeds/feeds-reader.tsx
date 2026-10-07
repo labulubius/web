@@ -5,8 +5,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
+  PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -18,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, LayoutGrid, Pencil, Plus, Rss, Search, Tags, Trash2, X } from "lucide-react";
+import { ChevronDown, GripVertical, LayoutGrid, Pencil, Plus, Rss, Search, Tags, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
 import { useSiteAuth } from "../site-auth";
@@ -60,13 +59,23 @@ function SortableWatchboardRow({ board, active, disabled, onSelect, onEdit, onDe
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled });
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled });
   return <div
     className={`news-category-row reorderable${isDragging ? " dragging" : ""}`}
     ref={setNodeRef}
     style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
   >
-    <button type="button" className={active ? "active" : ""} onClick={onSelect} {...attributes} {...listeners}>
+    <button
+      type="button"
+      className="news-watchboard-drag"
+      disabled={disabled}
+      ref={setActivatorNodeRef}
+      title={`Drag to reorder ${board.name}`}
+      aria-label={`Drag to reorder ${board.name}`}
+      {...attributes}
+      {...listeners}
+    ><GripVertical size={14} /></button>
+    <button type="button" className={`news-watchboard-select${active ? " active" : ""}`} onClick={onSelect}>
       <LayoutGrid size={16} /><span title={board.name}>{board.name}</span>
     </button>
     <span className="news-category-actions" onPointerDown={(event) => event.stopPropagation()}>
@@ -130,8 +139,7 @@ export function FeedsReader() {
   const sourceUrlInputRef = useRef<HTMLInputElement>(null);
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
   const watchboardSensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 3 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
