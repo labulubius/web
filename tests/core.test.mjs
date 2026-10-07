@@ -4,7 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
-import { discourseLatestFeed } from "../app/lib/news-feed-discovery.ts";
+import { discourseLatestFeed, normalizeRssHubRoute } from "../app/lib/news-feed-discovery.ts";
 import { forumSourceUrl } from "../scripts/migrate-forums-to-news.mjs";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
@@ -467,6 +467,10 @@ test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   assert.equal(discourseLatestFeed(html, "https://forum.obsidian.md/"), "https://forum.obsidian.md/latest.rss");
   assert.equal(discourseLatestFeed(html, "https://example.com/community/"), "https://example.com/community/latest.rss");
   assert.equal(discourseLatestFeed("<title>ordinary site</title>", "https://example.com/"), null);
+
+  assert.equal(normalizeRssHubRoute("/reuters/world/"), "/reuters/world");
+  assert.equal(normalizeRssHubRoute("/reuters/world"), "/reuters/world");
+  assert.equal(normalizeRssHubRoute("/"), "/");
 
   const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");

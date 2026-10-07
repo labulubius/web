@@ -3,6 +3,8 @@ import "server-only";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { normalizeRssHubRoute } from "./news-feed-discovery";
+
 const exec = promisify(execFile);
 const rssHubFeed = "http://rsshub:1200";
 let rulesCache: { until: number; rules: Record<string, unknown> } | undefined;
@@ -55,7 +57,7 @@ function candidate(url: URL, rules: Record<string, unknown>): string | null {
         for (const [index, name] of names.entries()) route = route.replace(new RegExp(`:${name}\\??`), found[index + 1] === "_" && index === names.length - 1 && optionalLast ? "" : encodeURIComponent(found[index + 1]));
         route = route.replace(/\/:[a-zA-Z]\w*\?/g, "");
         if (/:[a-zA-Z]/.test(route) || !/^\/[a-zA-Z0-9/._%~-]+$/.test(route) || route.includes("..") || route.includes("//")) continue;
-        return route;
+        return normalizeRssHubRoute(route);
       }
     }
   }
