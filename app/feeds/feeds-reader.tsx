@@ -1,5 +1,23 @@
 "use client";
 
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  sortableKeyboardCoordinates,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, LayoutGrid, Pencil, Plus, Rss, Search, Tags, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
@@ -8,7 +26,8 @@ import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
 import "./feeds.css";
 
 type Dialog = { kind: "feed" | "tag" | "board"; id?: string } | null;
-type WatchboardState = { tags: { id: string; name: string }[]; watchboards: { id: string; name: string; tagIds: string[] }[]; sourceTags: Record<string, string[]> };
+type Watchboard = { id: string; name: string; tagIds: string[] };
+type WatchboardState = { tags: { id: string; name: string }[]; watchboards: Watchboard[]; sourceTags: Record<string, string[]> };
 type Directory = { feeds: NewsFeed[]; selected: string[] };
 function mergeArticles<T extends { id: string; published: number }>(previous: T[], incoming: T[]) {
   const merged = new Map(previous.map((article) => [article.id, article]));
@@ -31,6 +50,30 @@ function saveSidebarLocation(location: string) {
   } catch {
     // Sidebar selection still works when browser storage is unavailable.
   }
+}
+
+function SortableWatchboardRow({ board, active, disabled, onSelect, onEdit, onDelete }: {
+  board: Watchboard;
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled });
+  return <div
+    className={`news-category-row reorderable${isDragging ? " dragging" : ""}`}
+    ref={setNodeRef}
+    style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
+  >
+    <button type="button" className={active ? "active" : ""} onClick={onSelect} {...attributes} {...listeners}>
+      <LayoutGrid size={16} /><span title={board.name}>{board.name}</span>
+    </button>
+    <span className="news-category-actions" onPointerDown={(event) => event.stopPropagation()}>
+      <button type="button" disabled={disabled} title={`Edit ${board.name}`} aria-label={`Edit ${board.name}`} onClick={onEdit}><Pencil size={12} /></button>
+      <button type="button" disabled={disabled} title={`Delete ${board.name}`} aria-label={`Delete ${board.name}`} onClick={onDelete}><Trash2 size={12} /></button>
+    </span>
+  </div>;
 }
 
 function NewsArticleItem({ article }: { article: NewsArticle }) {
@@ -86,6 +129,11 @@ export function FeedsReader() {
   const publicArticleLoaderRef = useRef<HTMLDivElement>(null);
   const sourceUrlInputRef = useRef<HTMLInputElement>(null);
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
+  const watchboardSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -247,6 +295,26 @@ export function FeedsReader() {
     finally { setSaving(false); }
   }
 
+  async function handleWatchboardDragEnd(event: DragEndEvent) {
+    if (saving || !event.over || event.active.id === event.over.id) return;
+    const sourceIndex = watchboards.watchboards.findIndex((board) => board.id === event.active.id);
+    const targetIndex = watchboards.watchboards.findIndex((board) => board.id === event.over?.id);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const previous = watchboards;
+    const ordered = arrayMove(previous.watchboards, sourceIndex, targetIndex);
+    setWatchboards({ ...previous, watchboards: ordered });
+    setSaving(true); setError("");
+    try {
+      const data = await api("/watchboards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        action: "reorderWatchboards", ids: ordered.map((board) => board.id),
+      }) }) as WatchboardState;
+      setWatchboards(data);
+    } catch (failure) {
+      setWatchboards(previous);
+      setError(failure instanceof Error ? failure.message : "Could not reorder watchboards.");
+    } finally { setSaving(false); }
+  }
+
   function closeDialog() {
     const trigger = dialogTriggerRef.current;
     dialogTriggerRef.current = null;
@@ -376,10 +444,19 @@ export function FeedsReader() {
   return <div className="news-layout">
     <aside className="news-sidebar" id="page-sidebar" aria-label="Feeds navigation">
       <div className="news-sidebar-heading"><h2>Watchboards</h2><button type="button" title="Create watchboard" aria-label="Create watchboard" disabled={!watchReady || saving} onClick={() => openDialog("board")}><Plus size={14} /></button></div>
-      {watchboards.watchboards.map((board) => <div className="news-category-row" key={board.id}>
-        <button type="button" className={boardFilter === board.id && panel === "articles" ? "active" : ""} onClick={() => chooseBoard(board.id)}><LayoutGrid size={16} /><span title={board.name}>{board.name}</span></button>
-        <span className="news-category-actions"><button type="button" disabled={saving} title={`Edit ${board.name}`} aria-label={`Edit ${board.name}`} onClick={() => openDialog("board", board.id)}><Pencil size={12} /></button><button type="button" disabled={saving} title={`Delete ${board.name}`} aria-label={`Delete ${board.name}`} onClick={() => { if (window.confirm(`Delete watchboard “${board.name}”?`)) void mutateWatchboard({ action: "deleteWatchboard", id: board.id }); }}><Trash2 size={12} /></button></span>
-      </div>)}
+      <DndContext sensors={watchboardSensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleWatchboardDragEnd(event)}>
+        <SortableContext items={watchboards.watchboards.map((board) => board.id)} strategy={verticalListSortingStrategy}>
+          {watchboards.watchboards.map((board) => <SortableWatchboardRow
+            board={board}
+            active={boardFilter === board.id && panel === "articles"}
+            disabled={saving}
+            key={board.id}
+            onSelect={() => chooseBoard(board.id)}
+            onEdit={() => openDialog("board", board.id)}
+            onDelete={() => { if (window.confirm(`Delete watchboard “${board.name}”?`)) void mutateWatchboard({ action: "deleteWatchboard", id: board.id }); }}
+          />)}
+        </SortableContext>
+      </DndContext>
       <div className="news-sidebar-heading"><h2>Settings</h2></div>
       <div className="news-category-row"><button type="button" className={panel === "sources" ? "active" : ""} onClick={() => choosePanel("sources")}><Rss size={16} /><span>Sources</span></button></div>
       <div className="news-category-row"><button type="button" className={panel === "tags" ? "active" : ""} onClick={() => choosePanel("tags")}><Tags size={16} /><span>Tags</span></button></div>

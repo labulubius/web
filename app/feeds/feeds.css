@@ -7,6 +7,9 @@
 .news-sidebar-heading button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--link); cursor: pointer; display: flex; height: 23px; justify-content: center; padding: 0; width: 23px; }
 .news-sidebar-heading button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .news-category-row { align-items: center; display: flex; min-width: 0; position: relative; }
+.news-category-row.reorderable > button { cursor: grab; }
+.news-category-row.reorderable > button:active { cursor: grabbing; }
+.news-category-row.dragging { box-shadow: 0 5px 14px rgba(0, 0, 0, .18); opacity: .78; }
 .news-category-row > button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text); cursor: pointer; display: grid; flex: 1; font-size: 12px; gap: 8px; grid-template-columns: auto minmax(0, 1fr); min-height: 33px; min-width: 0; padding: 6px 9px; text-align: left; }
 .news-category-row > button svg, .news-source-name svg { color: var(--link); flex: none; }
 .news-category-row > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

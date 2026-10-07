@@ -12,6 +12,7 @@ import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeLis
 import { GET as health } from "../app/api/health/route.ts";
 import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, validTimelineRange } from "../app/tasks/task-calendar.ts";
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
+import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -460,6 +461,21 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.match(directory, /event\.target\.closest\(\"\.site-card-link\"\)/);
   assert.match(directory, /event\.preventDefault\(\);/);
   assert.doesNotMatch(directory, /blockSiteOpenUntil|didDrag|onPointerInteraction|shouldBlockOpen|GripVertical/);
+});
+
+test("Feeds watchboards persist only exact drag orders", async () => {
+  const boards = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }];
+  assert.deepEqual(reorderByExactIds(boards, ["c", "a", "b"]), [boards[2], boards[0], boards[1]]);
+  assert.equal(reorderByExactIds(boards, ["a", "a", "b"]), null);
+  assert.equal(reorderByExactIds(boards, ["a", "b"]), null);
+  assert.equal(reorderByExactIds(boards, ["a", "b", "unknown"]), null);
+
+  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
+  const watchboards = await readFile(new URL("../app/lib/news-watchboards.ts", import.meta.url), "utf8");
+  assert.match(reader, /KeyboardSensor/);
+  assert.match(reader, /SortableWatchboardRow/);
+  assert.match(reader, /action: "reorderWatchboards"/);
+  assert.match(watchboards, /case "reorderWatchboards"/);
 });
 
 test("Feeds resolves BBC News pages to their published feeds", () => {

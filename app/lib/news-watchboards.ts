@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { reorderByExactIds } from "./watchboard-order";
 
 export type SourceTag = { id: string; name: string };
 export type Watchboard = { id: string; name: string; tagIds: string[] };
@@ -104,6 +105,11 @@ export async function updateWatchboards(userId: string, input: unknown, feedIds:
         const name = label(body.name);
         uniqueName(name, state.watchboards);
         state.watchboards.push({ id: randomUUID(), name, tagIds: ids(body.tagIds, tags) });
+        break;
+      }
+      case "reorderWatchboards": {
+        const ordered = reorderByExactIds(state.watchboards, body.ids);
+        state.watchboards = ordered ?? invalid("Invalid watchboard order.");
         break;
       }
       case "updateWatchboard": {
