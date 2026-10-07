@@ -52,7 +52,7 @@ function readSidebarLocation() {
   }
 }
 
-function saveSidebarLocation(location: string) {
+function persistSidebarLocation(location: string) {
   try {
     window.localStorage.setItem("site-news-location", location);
   } catch {
@@ -122,6 +122,13 @@ export function FeedsReader() {
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [initialSidebarLocation] = useState(readSidebarLocation);
+  const sidebarLocationRef = useRef(initialSidebarLocation);
+  const saveSidebarLocation = useCallback((location: string) => {
+    // Auth rechecks and pending directory loads must respect the latest choice,
+    // even when localStorage is unavailable.
+    sidebarLocationRef.current = location;
+    persistSidebarLocation(location);
+  }, []);
   const [feedFilter, setFeedFilter] = useState<string | null>(() =>
     initialSidebarLocation?.startsWith("source:") ? initialSidebarLocation.slice("source:".length) : null
   );
@@ -190,14 +197,15 @@ export function FeedsReader() {
           if (cancelled) return;
           setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected); setReady(true);
           setWatchboards(boards); setWatchReady(true);
-          const savedBoard = initialSidebarLocation?.startsWith("board:") ? initialSidebarLocation.slice("board:".length) : null;
-          const savedSource = initialSidebarLocation?.startsWith("source:") ? initialSidebarLocation.slice("source:".length) : null;
+          const location = sidebarLocationRef.current;
+          const savedBoard = location?.startsWith("board:") ? location.slice("board:".length) : null;
+          const savedSource = location?.startsWith("source:") ? location.slice("source:".length) : null;
           if (savedBoard && boards.watchboards.some((board) => board.id === savedBoard)) {
             setBoardFilter(savedBoard); setFeedFilter(null); setPanel("articles");
           } else if (savedSource && data.feeds.some((feed) => feed.id === savedSource)) {
             setBoardFilter(null); setFeedFilter(savedSource); setPanel("articles");
-          } else if (initialSidebarLocation === "sources" || initialSidebarLocation === "tags") {
-            setBoardFilter(null); setFeedFilter(null); setPanel(initialSidebarLocation);
+          } else if (location === "sources" || location === "tags") {
+            setBoardFilter(null); setFeedFilter(null); setPanel(location);
           } else {
             const firstBoard = boards.watchboards[0];
             setBoardFilter(firstBoard?.id ?? null); setFeedFilter(null); setPanel(firstBoard ? "articles" : "sources");
@@ -209,7 +217,7 @@ export function FeedsReader() {
       })();
     }, 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [api, initialSidebarLocation, loading, isAdmin]);
+  }, [api, loading, isAdmin, saveSidebarLocation]);
 
   useEffect(() => {
     if (!ready || !isAdmin) return;
