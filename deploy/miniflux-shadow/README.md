@@ -16,3 +16,15 @@ The app joins `freshrss_backend` so imported `http://rsshub:1200/...` subscripti
 FreshRSS OPML does not include feed-level HTTP Basic credentials. Migrate the single authenticated generated source separately through `PUT /v1/feeds/{id}` without logging or committing the decoded credential.
 
 Miniflux cleanup settings are defense in depth. The `/feeds` backend must still enforce its own five-day query window and UTC future-date exclusion rather than exposing Miniflux read/unread or archive semantics.
+
+## Cutover and rollback
+
+Before setting `NEWS_READER_BACKEND=miniflux`, create a root-only timestamped backup of every Source-selection and Watchboard JSON file, then remap all current `feed/{FreshRSS ID}` values to `feed/{Miniflux ID}` by exact raw feed URL. Drop stale unmapped tag keys so reused Miniflux IDs cannot inherit old tags.
+
+Keep FreshRSS running but application-read-only for two to four weeks after cutover. To roll back to the cutover snapshot:
+
+```sh
+sudo deploy/miniflux-shadow/rollback-reader.sh /opt/miniflux-shadow/cutover-backup-<timestamp>
+```
+
+This restores the saved selections and tag bindings, switches the application backend to FreshRSS, and restarts the web service. Changes made after the cutover snapshot are not dual-written and must be reconciled manually before a late rollback.
