@@ -6,7 +6,7 @@ import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Readable } from "node:stream";
-import { discourseLatestFeed, type NewsFeedDiscoveryMethod } from "./news-feed-discovery";
+import { bbcNewsFeed, discourseLatestFeed, type NewsFeedDiscoveryMethod } from "./news-feed-discovery";
 
 const MAX_REDIRECTS = 4;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -146,6 +146,14 @@ export async function discoverPinnedNewsFeedDetails(value: string): Promise<News
     if (!checked.response.ok) { await checked.response.body?.cancel(); continue; }
     const feed = await readLimited(checked.response);
     if (xmlFeed(feed)) return { url: checked.finalUrl, method: "html" };
+  }
+  const bbc = bbcNewsFeed(first.finalUrl);
+  if (bbc) {
+    const checked = await fetchPinnedNewsResource(bbc);
+    if (checked.response.ok) {
+      const feed = await readLimited(checked.response);
+      if (xmlFeed(feed)) return { url: checked.finalUrl, method: "bbc" };
+    } else await checked.response.body?.cancel();
   }
   const discourse = discourseLatestFeed(html, first.finalUrl);
   if (discourse) {

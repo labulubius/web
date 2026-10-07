@@ -4,7 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
-import { discourseLatestFeed, normalizeRssHubRoute } from "../app/lib/news-feed-discovery.ts";
+import { bbcNewsFeed, discourseLatestFeed, normalizeRssHubRoute } from "../app/lib/news-feed-discovery.ts";
 import { forumSourceUrl } from "../scripts/migrate-forums-to-news.mjs";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
@@ -460,6 +460,14 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.match(directory, /event\.target\.closest\(\"\.site-card-link\"\)/);
   assert.match(directory, /event\.preventDefault\(\);/);
   assert.doesNotMatch(directory, /blockSiteOpenUntil|didDrag|onPointerInteraction|shouldBlockOpen|GripVertical/);
+});
+
+test("Feeds resolves BBC News pages to their published feeds", () => {
+  assert.equal(bbcNewsFeed("https://www.bbc.com/news/us-canada"), "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml");
+  assert.equal(bbcNewsFeed("https://bbc.co.uk/news/us-canada/?ref=nav"), "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml");
+  assert.equal(bbcNewsFeed("https://www.bbc.com/news"), "https://feeds.bbci.co.uk/news/rss.xml");
+  assert.equal(bbcNewsFeed("https://example.com/news/us-canada"), null);
+  assert.equal(bbcNewsFeed("https://www.bbc.com/news/europe"), null);
 });
 
 test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
