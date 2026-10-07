@@ -58,3 +58,7 @@ After native RSS/Atom discovery, RSSHub, and registered high-precision adapters 
 ## Miniflux shadow
 
 A private Miniflux shadow deployment is documented under `deploy/miniflux-shadow/`. It mirrors all FreshRSS subscriptions on `127.0.0.1:8083` while production reads and writes remain on FreshRSS. RSSHub remains attached as an internal provider. The shadow exists only for API and article-parity validation; it must not alter `/feeds`, expose read/unread state, or become public before the reader-backend boundary and migration checks are complete.
+
+## Reader backend boundary
+
+`/feeds` accesses reader storage through `NewsReaderBackend`. FreshRSS remains the default unless `NEWS_READER_BACKEND=miniflux` is set. The Miniflux implementation uses only the private loopback API, filters entries to the latest five days and before the next UTC midnight, and deliberately exposes no read/unread, favorites, notifications, or archive behavior. A cutover from FreshRSS must remap persisted Source selections and Watchboard tag bindings from FreshRSS feed IDs to Miniflux feed IDs by exact stored feed URL before enabling the environment switch.

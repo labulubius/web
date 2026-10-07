@@ -2,6 +2,7 @@ import "server-only";
 
 import type { NewsArticle, NewsCategory, NewsFeed } from "./news-server-types";
 import { freshRssReaderBackend } from "./news-freshrss-backend";
+import { minifluxReaderBackend } from "./news-miniflux-backend";
 
 export type NewsArticlePage = { articles: NewsArticle[]; continuation: string | null };
 
@@ -21,5 +22,6 @@ export interface NewsReaderBackend {
 export function newsReaderBackend(): NewsReaderBackend {
   const configured = process.env.NEWS_READER_BACKEND || "freshrss";
   if (configured === "freshrss") return freshRssReaderBackend;
+  if (configured === "miniflux") return minifluxReaderBackend;
   throw new Error(`Unsupported news reader backend: ${configured}`);
 }

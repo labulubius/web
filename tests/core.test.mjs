@@ -700,3 +700,13 @@ test("Feeds routes reader operations through a backend boundary", async () => {
   assert.doesNotMatch(management, /freshPost|freshEditToken|freshrss-postgres/);
   assert.match(boundary, /NEWS_READER_BACKEND \|\| "freshrss"/);
 });
+
+test("Miniflux backend keeps the five-day dashboard contract", async () => {
+  const backend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
+  assert.match(backend, /api\.hostname !== "127\.0\.0\.1"/);
+  assert.match(backend, /published_after=\$\{cutoff\}/);
+  assert.match(backend, /published_before=\$\{tomorrow\}/);
+  assert.match(backend, /X-Auth-Token/);
+  assert.doesNotMatch(backend, /is_read|starred|notification/);
+  assert.match(backend, /id: `feed\/\$\{feed\.id\}`/);
+});
