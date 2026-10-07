@@ -14,7 +14,7 @@ import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart,
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
 import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
-import { canonicalCsisTopicUrl, parseCsisTopicPage, renderWebSourceRss } from "../app/lib/news-web-source-feed.ts";
+import { canonicalCsisTopicUrl, filterFutureWebSourceItems, parseCsisTopicPage, renderWebSourceRss } from "../app/lib/news-web-source-feed.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -584,10 +584,31 @@ test("Feeds converts supported CSIS topic pages into stable RSS items", async ()
   assert.equal(source.items[0].summary, "A concise & useful summary.");
   assert.equal(source.items[0].published, Date.parse("October 7, 2026 12:00:00 UTC"));
 
-  const rss = renderWebSourceRss(url, source, Date.parse("October 8, 2026 12:00:00 UTC"));
+  const rss = renderWebSourceRss(
+    url, source, Date.parse("October 8, 2026 12:00:00 UTC"), Date.parse("October 7, 2026 23:59:59 UTC"),
+  );
   assert.match(rss, /<rss version="2.0">/);
   assert.match(rss, /Artificial Intelligence &amp; Policy/);
   assert.match(rss, /<guid isPermaLink="true">https:\/\/www\.csis\.org\/analysis\/example-ai-report<\/guid>/);
+  assert.equal((rss.match(/<item>/g) || []).length, 2);
+});
+
+test("Feeds excludes future web-source items after the current UTC day", () => {
+  const now = Date.parse("October 7, 2026 10:30:00 UTC");
+  const item = (id, published) => ({ id, title: id, url: `https://example.com/${id}`, published, summary: "Summary" });
+  const source = {
+    title: "Example",
+    description: "Example articles",
+    items: [
+      item("tomorrow", Date.parse("October 8, 2026 00:00:00 UTC")),
+      item("today-end", Date.parse("October 7, 2026 23:59:59.999 UTC")),
+      item("today-start", Date.parse("October 7, 2026 00:00:00 UTC")),
+    ],
+  };
+
+  assert.deepEqual(filterFutureWebSourceItems(source, now).items.map(({ id }) => id), ["today-end", "today-start"]);
+  const rss = renderWebSourceRss("https://example.com/articles", source, now, now);
+  assert.doesNotMatch(rss, /tomorrow/);
   assert.equal((rss.match(/<item>/g) || []).length, 2);
 });
 

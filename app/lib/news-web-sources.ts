@@ -7,6 +7,7 @@ import path from "node:path";
 import { fetchPinnedNewsResource, readLimitedNewsResource } from "./news-feed-proxy";
 import {
   canonicalCsisTopicUrl,
+  filterFutureWebSourceItems,
   parseCsisTopicPage,
   renderWebSourceRss,
   type ParsedWebSource,
@@ -127,8 +128,8 @@ function adapterFor(value: string): WebSourceTokenData | null {
   return url ? { adapter: "csis-topic-v1", url } : null;
 }
 
-async function fetchSource(data: WebSourceTokenData) {
-  if (data.adapter === "csis-topic-v1") return fetchCsisTopic(data.url);
+async function fetchSource(data: WebSourceTokenData, now = Date.now()) {
+  if (data.adapter === "csis-topic-v1") return filterFutureWebSourceItems(await fetchCsisTopic(data.url), now);
   throw new UnsupportedWebSource("This website does not have a supported article adapter.");
 }
 
@@ -193,7 +194,8 @@ export async function deleteWebSource(ownerId: string, value: string) {
 const refreshPending = new Map<string, Promise<WebSourceCache>>();
 
 async function currentCache(record: WebSourceRecord, now: number) {
-  const cached = await loadCache(record.id);
+  const loaded = await loadCache(record.id);
+  const cached = { ...loaded, source: filterFutureWebSourceItems(loaded.source, now) };
   if (cached.updatedAt + CACHE_TTL > now && cached.source.items.length) return { cache: cached, stale: false };
   let pending = refreshPending.get(record.id);
   if (!pending) {
@@ -221,7 +223,7 @@ export async function webSourceFeed(token: string) {
   const now = Date.now();
   const { cache, stale } = await currentCache(record, now);
   return {
-    body: renderWebSourceRss(record.url, cache.source, cache.updatedAt || now),
+    body: renderWebSourceRss(record.url, cache.source, cache.updatedAt || now, now),
     stale,
     count: cache.source.items.length,
   };

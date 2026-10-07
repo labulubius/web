@@ -111,12 +111,18 @@ export function parseCsisTopicPage(html: string, sourceUrl: string): ParsedWebSo
   return { title, description, items: ordered.slice(0, 50) };
 }
 
+export function filterFutureWebSourceItems(source: ParsedWebSource, now = Date.now()): ParsedWebSource {
+  const date = new Date(now);
+  const tomorrowUtc = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+  return { ...source, items: source.items.filter((item) => item.published < tomorrowUtc) };
+}
+
 function xml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
-export function renderWebSourceRss(sourceUrl: string, source: ParsedWebSource, generatedAt = Date.now()) {
-  const items = source.items.map((item) => `    <item>
+export function renderWebSourceRss(sourceUrl: string, source: ParsedWebSource, generatedAt = Date.now(), now = Date.now()) {
+  const items = filterFutureWebSourceItems(source, now).items.map((item) => `    <item>
       <title>${xml(item.title)}</title>
       <link>${xml(item.url)}</link>
       <guid isPermaLink="true">${xml(item.id)}</guid>
