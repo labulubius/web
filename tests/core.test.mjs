@@ -13,6 +13,7 @@ import { GET as health } from "../app/api/health/route.ts";
 import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, validTimelineRange } from "../app/tasks/task-calendar.ts";
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
+import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -474,11 +475,44 @@ test("Feeds watchboards persist only exact drag orders", async () => {
   const watchboards = await readFile(new URL("../app/lib/news-watchboards.ts", import.meta.url), "utf8");
   assert.match(reader, /KeyboardSensor/);
   assert.match(reader, /PointerSensor/);
-  assert.match(reader, /setActivatorNodeRef/);
-  assert.match(reader, /news-watchboard-drag/);
+  assert.match(reader, /TouchSensor/);
+  assert.match(reader, /<Folder size=\{16\}/);
   assert.match(reader, /SortableWatchboardRow/);
+  assert.match(reader, /className=\{`news-watchboard-select/);
+  assert.doesNotMatch(reader, /news-watchboard-drag|GripVertical|setActivatorNodeRef/);
   assert.match(reader, /action: "reorderWatchboards"/);
   assert.match(watchboards, /case "reorderWatchboards"/);
+});
+
+test("Feeds Sources rank by matching Watchboards then subscription creation order", () => {
+  const boards = [{ tagIds: ["news"] }, { tagIds: ["news", "world"] }, { tagIds: ["tech"] }, { tagIds: [] }];
+  const sourceTags = {
+    "feed/10": ["news", "world"],
+    "feed/11": ["news"],
+    "feed/12": ["news", "news"],
+    "feed/13": [],
+  };
+  const sources = ["feed/10", "feed/11", "feed/12", "feed/13"].map((id) => ({ id }));
+
+  assert.equal(sourceWatchboardCount("feed/10", boards, sourceTags), 2);
+  assert.equal(sourceWatchboardCount("feed/13", boards, sourceTags), 0);
+  assert.deepEqual(orderSourcesByWatchboards(sources, boards, sourceTags).map(({ id }) => id), [
+    "feed/10", "feed/12", "feed/11", "feed/13",
+  ]);
+  assert.deepEqual(orderSourcesByWatchboards([sources[1], sources[2]], boards, sourceTags).map(({ id }) => id), ["feed/12", "feed/11"]);
+});
+
+test("Feeds Tags rank by distinct Source count then creation order", () => {
+  const tags = ["old", "middle", "new"].map((id) => ({ id }));
+  const ranked = orderTagsBySourceCount(tags, {
+    first: ["old", "middle", "middle"],
+    second: ["old", "new"],
+  });
+
+  assert.deepEqual(ranked.map(({ tag, count }) => [tag.id, count]), [
+    ["old", 2], ["new", 1], ["middle", 1],
+  ]);
+  assert.deepEqual(orderTagsBySourceCount(tags, {}).map(({ tag }) => tag.id), ["new", "middle", "old"]);
 });
 
 test("Feeds resolves BBC News pages to their published feeds", () => {
