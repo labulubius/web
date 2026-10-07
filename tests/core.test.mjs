@@ -710,3 +710,10 @@ test("Miniflux backend keeps the five-day dashboard contract", async () => {
   assert.doesNotMatch(backend, /is_read|starred|notification/);
   assert.match(backend, /id: `feed\/\$\{feed\.id\}`/);
 });
+
+test("Miniflux rollback restores the FreshRSS backend selector", async () => {
+  const script = await readFile(new URL("../deploy/miniflux-shadow/rollback-reader.sh", import.meta.url), "utf8");
+  assert.match(script, /grep -v "\^NEWS_READER_BACKEND="/);
+  assert.match(script, /printf "%s\\n" "NEWS_READER_BACKEND=freshrss"/);
+  assert.match(script, /systemctl restart labulubius-web\.service/);
+});

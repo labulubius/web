@@ -11,8 +11,8 @@ for source in "$backup"/*.json; do
   install -m 0600 -o debian -g debian "$source" "$destination"
 done
 tmp=$(mktemp)
-grep -v ^NEWS_READER_BACKEND= /etc/labulubius/news.env > "$tmp"
-printf NEWS_READER_BACKEND=freshrssn >> "$tmp"
+grep -v "^NEWS_READER_BACKEND=" /etc/labulubius/news.env > "$tmp"
+printf "%s\n" "NEWS_READER_BACKEND=freshrss" >> "$tmp"
 chown --reference=/etc/labulubius/news.env "$tmp"
 chmod --reference=/etc/labulubius/news.env "$tmp"
 mv "$tmp" /etc/labulubius/news.env
