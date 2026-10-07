@@ -54,3 +54,7 @@ Per-admin metadata is stored only on web at `${NEWS_DATA_DIR:-~/.local/share/lab
 ## Generic static webpage fallback
 
 After native RSS/Atom discovery, RSSHub, and registered high-precision adapters have failed, `/feeds` may ask the private html2rss service to extract a server-rendered article listing. The pinned deployment is documented under `deploy/html2rss/`; it listens only on `127.0.0.1`, uses a private bearer token, and does not run a browser renderer. The application stores only the per-source feed capability in its private web-source registry, normalizes item URLs into stable GUIDs, preserves first-seen times when a page has no dates, excludes future UTC dates, emits only the latest five days, rejects abnormal batch shrinkage, and falls back to the last successful cache. Existing CSIS handling remains ahead of html2rss because it extracts publication dates more accurately.
+
+## Miniflux shadow
+
+A private Miniflux shadow deployment is documented under `deploy/miniflux-shadow/`. It mirrors all FreshRSS subscriptions on `127.0.0.1:8083` while production reads and writes remain on FreshRSS. RSSHub remains attached as an internal provider. The shadow exists only for API and article-parity validation; it must not alter `/feeds`, expose read/unread state, or become public before the reader-backend boundary and migration checks are complete.
