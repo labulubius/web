@@ -1,4 +1,4 @@
-export type NewsFeedDiscoveryMethod = "direct" | "html" | "bbc" | "discourse" | "rsshub" | "web";
+export type NewsFeedDiscoveryMethod = "direct" | "html" | "bbc" | "discourse" | "web";
 
 const BBC_NEWS_FEEDS: Record<string, string> = {
   "/news": "/news/rss.xml",
@@ -14,9 +14,6 @@ export function bbcNewsFeed(pageUrl: string): string | null {
   return feedPath ? `https://feeds.bbci.co.uk${feedPath}` : null;
 }
 
-export function normalizeRssHubRoute(path: string): string {
-  return path === "/" ? path : path.replace(/\/+$/, "");
-}
 
 export function discourseLatestFeed(html: string, pageUrl: string): string | null {
   if (!/<meta\b[^>]*\bname\s*=\s*["\']generator["\'][^>]*\bcontent\s*=\s*["\'][^"\']*\bDiscourse\b/i.test(html) &&

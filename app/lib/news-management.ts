@@ -4,7 +4,6 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { newsCategories, newsFeeds } from "./news-server";
 import { newsReaderBackend } from "./news-reader-backend";
-import { discoverRssHub } from "./news-discovery";
 import { discoverPinnedNewsFeedDetails, newsFeedProxyUrl } from "./news-feed-proxy";
 import type { NewsFeedDiscoveryMethod } from "./news-feed-discovery";
 import { createWebSource, deleteWebSource, DuplicateWebSource, probeWebSource, UnsupportedWebSource, type WebSourceProbe } from "./news-web-sources";
@@ -112,13 +111,7 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
       try {
         const found = await discoverPinnedNewsFeedDetails(url);
         return { probe: { kind: "feed", method: found.method, url: found.url } };
-      } catch { /* Try RSSHub and registered webpage adapters below. */ }
-      if (!/\.(?:rss|xml|atom)$/i.test(new URL(url).pathname)) {
-        try {
-          const source = await discoverRssHub(url);
-          if (source) return { probe: { kind: "feed", method: "rsshub", url } };
-        } catch { /* Try a registered webpage adapter below. */ }
-      }
+      } catch { /* Try a registered webpage adapter below. */ }
       try { return { probe: await probeWebSource(url) }; }
       catch (error) {
         if (error instanceof UnsupportedWebSource) return invalid(error.message);
@@ -140,19 +133,17 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
     }
     case "deleteCategory": {
       const old = await category(body.categoryId ?? body.category ?? body.id, false);
-      // Includes hidden FreshRSS feeds (not returned by GReader subscription/list).
       await newsReaderBackend().deleteCategory(old);
       return;
     }
     case "addFeed": {
       const url = await publicURL(body.url);
-      // FreshRSS assigns its default category when none is specified. This also
-      // allows the first subscription before any user-created folders exist.
+      // The default category allows the first subscription before any
+      // user-created folders exist.
       const dest = body.categoryId === undefined && body.category === undefined ? undefined : await category(body.categoryId ?? body.category);
       const title = optionalText(body.title, "title");
-      // Prefer a direct feed or the website's declared feed. RSSHub Radar is a
-      // fallback only when native discovery fails. Its private container URL is
-      // used server-side but is never returned to the browser.
+      // Prefer a direct feed or the website's declared feed before trying a
+      // registered webpage adapter.
       let source: string | null = null;
       let resolved: string | null = null;
       let discovery: NonNullable<NewsManagementResult["discovery"]> | null = null;
@@ -161,17 +152,7 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
         source = newsFeedProxyUrl(found.url);
         resolved = found.url;
         discovery = found;
-      } catch {
-        if (!/\.(?:rss|xml|atom)$/i.test(new URL(url).pathname)) {
-          try {
-            source = await discoverRssHub(url);
-            if (source) {
-              resolved = source;
-              discovery = { url, method: "rsshub" };
-            }
-          } catch { /* Report the common discovery error below. */ }
-        }
-      }
+      } catch { /* Try a registered webpage adapter below. */ }
       let webSourceCreated = false;
       if (!source || !resolved) {
         try {
@@ -197,7 +178,6 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
         await newsReaderBackend().subscribe(source, dest, title);
       } catch {
         if (webSourceCreated) await deleteWebSource(userId, resolved);
-        if (source.startsWith("http://rsshub:1200/")) return invalid("RSSHub could not subscribe to this page. Try its RSS URL directly.");
         return invalid("No usable RSS feed found at this URL.");
       }
       return discovery ? { discovery } : undefined;

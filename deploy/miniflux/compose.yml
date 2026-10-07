@@ -1,4 +1,4 @@
-name: miniflux-shadow
+name: miniflux
 services:
   db:
     image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
@@ -8,50 +8,39 @@ services:
       POSTGRES_PASSWORD: ${MINIFLUX_DB_PASSWORD}
       POSTGRES_DB: miniflux
     volumes:
-      - /opt/miniflux-shadow/postgres:/var/lib/postgresql/data
+      - /opt/miniflux/postgres:/var/lib/postgresql/data
     healthcheck:
       test: [CMD-SHELL, pg_isready -U miniflux]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - backend
+    networks: [backend]
     mem_limit: 256m
     cpus: 0.5
   app:
     image: miniflux/miniflux@sha256:59e4e31b349f008ecd34b547f23498b1d8abc0c03d5f6d12bdb713ab7f7c04bf
     restart: unless-stopped
-    ports:
-      - 127.0.0.1:8083:8080
+    ports: [127.0.0.1:8083:8080]
     depends_on:
-      db:
-        condition: service_healthy
+      db: { condition: service_healthy }
     environment:
       DATABASE_URL: postgres://miniflux:${MINIFLUX_DB_PASSWORD}@db/miniflux?sslmode=disable
       RUN_MIGRATIONS: "1"
       CREATE_ADMIN: "1"
-      ADMIN_USERNAME: shadow-admin
+      ADMIN_USERNAME: admin
       ADMIN_PASSWORD: ${MINIFLUX_ADMIN_PASSWORD}
       BASE_URL: http://127.0.0.1:8083
       POLLING_FREQUENCY: "30"
-      FETCHER_ALLOW_PRIVATE_NETWORKS: "1"
       CLEANUP_ARCHIVE_READ_DAYS: "5"
       CLEANUP_ARCHIVE_UNREAD_DAYS: "5"
       CLEANUP_FREQUENCY_HOURS: "1"
       WORKER_POOL_SIZE: "4"
-    dns:
-      - 172.30.0.53
-    networks:
-      - backend
-      - freshrss
-      - html2rss
+    dns: [172.30.0.53]
+    networks: [backend, html2rss]
     mem_limit: 256m
     cpus: 0.5
 networks:
   backend:
-  freshrss:
-    external: true
-    name: freshrss_backend
   html2rss:
     external: true
     name: html2rss_backend

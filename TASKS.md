@@ -44,8 +44,7 @@ Back up the entire Tasks directory with the other persistent datasets. An empty 
 node scripts/verify-backup.mjs \
   --tasks /restore/tasks \
   --drive /restore/drive \
-  --news /restore/news \
-  --freshrss-dump /restore/freshrss.dump
+  --news /restore/news
 ```
 
 Restore only while the application is stopped or into an isolated directory. Do not edit `tasks.json` manually. After restoration, verify All tasks and Uncategorized classification, project task scheduling, cross-month Gantt ranges, completion deletion and explicit deletion with the administrator account.

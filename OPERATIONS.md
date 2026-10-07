@@ -4,11 +4,11 @@
 
 `GET /api/health` is an unauthenticated liveness check. It returns only `{"status":"ok"}` with `Cache-Control: no-store`; it intentionally does not disclose dependency, disk, version, path, or credential details.
 
-Run `scripts/health-check.sh` to check the main Next.js service, Drive API host, FreshRSS UI and Agent hostname. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `FEEDS_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. The FreshRSS check follows its login redirect and verifies the returned application marker instead of calling the Next.js `/api/health` route. Monitor dependency-specific failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+Run `scripts/health-check.sh` to check the main Next.js service, Drive API host and Agent hostname. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor Miniflux and other dependency failures through authenticated application checks and systemd/container logs rather than expanding the public response.
 
 ## Production host routing
 
-Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000`, `feeds.labulubius.com` to FreshRSS on `127.0.0.1:8080`, and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The custom workspace reader remains at `https://labulubius.com/feeds`; the FreshRSS application is at `https://feeds.labulubius.com`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
+Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000` and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The workspace reader is at `https://labulubius.com/feeds`; Miniflux remains private on `127.0.0.1:8083`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
 
 The ImmortalWrt gateway's Nikki configuration routes only Cloudflare Tunnel destination port `7844` through Hong Kong `Node-1`; the active Tunnel should register at an HKG edge. This rule must not capture VM100's other outbound traffic or other LAN clients. The route improves the origin-to-Cloudflare leg but cannot control the Anycast edge selected for visitors, so clients in China may still enter Cloudflare through LAX. The 2026-10-06 comparison measured median total times of 2.783 seconds through Hong Kong, 5.219 seconds by direct domestic egress, and 6.899 seconds through the former RackNerd route. Gateway and VM100 rollback material is under `/root/backups/nikki-route-cutover-20261006T132639Z` on the gateway and `/var/backups/labulubius/network-route-cutover-20261006T132639Z` on VM100.
 
@@ -16,7 +16,7 @@ The ImmortalWrt gateway's Nikki configuration routes only Cloudflare Tunnel dest
 
 The active Cloudflare Cache Rules edge-cache ordinary HTML document requests for the exact public paths `/`, `/about`, `/nav`, and `/feeds` for one hour. The HTML rule requires `GET` or `HEAD`, an empty query string, an `Accept` header containing `text/html`, no `Authorization` header, and no React Server Component header. A separate rule caches successful `GET /api/news` responses only when the query is exactly `view=sidebar`, exactly `view=publicArticles`, or starts with `view=publicArticles&cursor=`. The API rule preserves the full query string as part of the default cache key and respects the route's `s-maxage=30, stale-while-revalidate=60` header.
 
-Never broaden these rules to `/api/**`, `/drive/file/**`, authenticated requests, FreshRSS pages, Agent responses, WebDAV, errors, mutations, or capability URLs. Invalid cursors, authorization failures, health checks and private APIs must remain `DYNAMIC` or `BYPASS` with `private, no-store` or `no-store`. After every deployment, purge the four cached HTML URLs so clients cannot receive an old Next.js asset manifest, then verify a cold request (`MISS` or `EXPIRED`) followed by `HIT`. Also repeat the exclusion checks before considering the deployment complete.
+Never broaden these rules to `/api/**`, `/drive/file/**`, authenticated requests, Agent responses, WebDAV, errors, mutations, or capability URLs. Invalid cursors, authorization failures, health checks and private APIs must remain `DYNAMIC` or `BYPASS` with `private, no-store` or `no-store`. After every deployment, purge the four cached HTML URLs so clients cannot receive an old Next.js asset manifest, then verify a cold request (`MISS` or `EXPIRED`) followed by `HIT`. Also repeat the exclusion checks before considering the deployment complete.
 
 HTTP/3, TLS 1.3 with 0-RTT, Brotli/Zstandard compression, Early Hints and Smart Tiered Cache are enabled. Always Online remains disabled because the workspace includes owner-only and time-sensitive surfaces. A same-path seven-request sample on 2026-10-06 measured a 1.002-second median TTFB for cached HTML versus 2.255 seconds for an uncached health request; this is an operational comparison, not a guarantee for every visitor.
 
@@ -52,10 +52,10 @@ Back up these independent data sets together at a documented point in time:
 - `${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}`, including `tasks.json` when tasks have been created;
 - the complete `DRIVE_DATA_DIR`, including `.upload-sessions`;
 - `${NEWS_DATA_DIR}` preferences and Watchboards;
-- a consistent FreshRSS PostgreSQL dump;
+- a consistent Miniflux PostgreSQL backup;
 - Supabase data using the provider's supported export/backup mechanism.
 
-Pause new uploads or let pending sessions complete before taking a consistency-sensitive snapshot. Generate and retain checksums with the backup. Article-bearing FreshRSS backups must follow the same five-day retention policy as the live FreshRSS database.
+Pause new uploads or let pending sessions complete before taking a consistency-sensitive snapshot. Generate and retain checksums with the backup. Article-bearing Miniflux backups must follow the same five-day retention policy as the live Miniflux database.
 
 Perform periodic restores into isolated directories, never over live data. Before starting an isolated service, run:
 
@@ -63,8 +63,7 @@ Perform periodic restores into isolated directories, never over live data. Befor
 node scripts/verify-backup.mjs \
   --tasks /restore/tasks \
   --drive /restore/drive \
-  --news /restore/news \
-  --freshrss-dump /restore/freshrss.dump
+  --news /restore/news
 ```
 
-The verifier is read-only. It rejects symlinks, malformed task or Drive share-link JSON, and unreadable PostgreSQL dump catalogs. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.
+The verifier is read-only. It rejects symlinks and malformed task, Drive share-link or News JSON. Restore and validate the Miniflux database separately with PostgreSQL tooling. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.

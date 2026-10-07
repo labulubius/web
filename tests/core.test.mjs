@@ -4,8 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { conciseSummary } from "../app/lib/concise-summary.ts";
 import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
-import { bbcNewsFeed, discourseLatestFeed, normalizeRssHubRoute } from "../app/lib/news-feed-discovery.ts";
-import { forumSourceUrl } from "../scripts/migrate-forums-to-news.mjs";
+import { bbcNewsFeed, discourseLatestFeed } from "../app/lib/news-feed-discovery.ts";
 import { cauLoginCipher, cauLoginSucceeded, parseCauLoginForm } from "../app/lib/cau-login-encryption.ts";
 import { CAU_RETENTION_MS, normalizeCauNotices, parseCauNoticePage, renderCauRss, retainCauNotices } from "../app/lib/cau-news-feed.ts";
 import { CIEE_RETENTION_MS, normalizeCieeNotices, parseCieeArticle, parseCieeListings, renderCieeRss, retainCieeNotices } from "../app/lib/ciee-news-feed.ts";
@@ -256,12 +255,12 @@ test("health response is minimal and not cached", async () => {
   assert.deepEqual(await response.json(), { status: "ok" });
 });
 
-test("production health checks distinguish FreshRSS from Next.js", async () => {
+test("production health checks exclude the retired reader hostname", async () => {
   const script = await readFile(new URL("../scripts/health-check.sh", import.meta.url), "utf8");
-  assert.match(script, /FEEDS_ORIGIN:-https:\/\/feeds\.labulubius\.com/);
-  assert.match(script, /grep -q "FreshRSS"/);
-  assert.match(script, /feeds_body=.*--location/);
-  assert.doesNotMatch(script, /\$feeds_origin\/api\/health/);
+  assert.match(script, /MAIN_ORIGIN:-https:\/\/labulubius\.com/);
+  assert.match(script, /DRIVE_ORIGIN:-https:\/\/drive\.labulubius\.com/);
+  assert.match(script, /AGENT_ORIGIN:-https:\/\/agent\.labulubius\.com/);
+  assert.doesNotMatch(script, /FEEDS_ORIGIN/);
 });
 
 test("global headers include baseline browser protections", async () => {
@@ -351,7 +350,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
   const newsTypes = await readFile(new URL("../app/lib/news-server-types.ts", import.meta.url), "utf8");
-  const freshBackend = await readFile(new URL("../app/lib/news-freshrss-backend.ts", import.meta.url), "utf8");
+  const minifluxBackend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
   const newsApi = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -379,7 +378,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(styles, /\.news-article-content \{ gap: 10px; grid-template-columns: minmax\(0, 1fr\) clamp\(78px, 24vw, 108px\)/);
   assert.match(styles, /-webkit-line-clamp: 2/);
   assert.match(newsTypes, /summary: string; source: string/);
-  assert.match(freshBackend, /'sourceId', e\.id_feed/);
+  assert.match(minifluxBackend, /entry\.feed_id/);
   assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
   assert.match(newsApi, /const publicNewsHeaders = \{/);
   assert.match(newsApi, /public, max-age=0, s-maxage=30, stale-while-revalidate=60/);
@@ -531,10 +530,6 @@ test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   assert.equal(discourseLatestFeed(html, "https://example.com/community/"), "https://example.com/community/latest.rss");
   assert.equal(discourseLatestFeed("<title>ordinary site</title>", "https://example.com/"), null);
 
-  assert.equal(normalizeRssHubRoute("/reuters/world/"), "/reuters/world");
-  assert.equal(normalizeRssHubRoute("/reuters/world"), "/reuters/world");
-  assert.equal(normalizeRssHubRoute("/"), "/");
-
   const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
@@ -543,15 +538,6 @@ test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
   assert.match(api, /selected, \.\.\.result/);
 });
 
-test("legacy forum sources map idempotently to independent News feeds", () => {
-  assert.equal(forumSourceUrl({ kind: "discourse", name: "Obsidian", origin: "https://forum.obsidian.md", latest: "/latest.json" }), "https://forum.obsidian.md/latest.rss");
-  assert.equal(forumSourceUrl({ kind: "discourse", name: "OpenAI", origin: "https://community.openai.com", latest: "/latest.json?status=open" }), "https://community.openai.com/latest.rss?status=open");
-  assert.equal(forumSourceUrl({ kind: "v2ex", name: "V2EX" }), "https://www.v2ex.com/index.xml");
-  assert.equal(forumSourceUrl({ kind: "hackernews", name: "HN", view: "top" }), "https://hnrss.org/frontpage");
-  assert.equal(forumSourceUrl({ kind: "stackexchange", name: "SO", site: "stackoverflow", tags: "" }), "https://stackoverflow.com/feeds");
-  assert.equal(forumSourceUrl({ kind: "rss", name: "Feed", feedUrl: "https://example.com/feed.xml" }), "https://example.com/feed.xml");
-  assert.throws(() => forumSourceUrl({ kind: "hackernews", name: "HN", view: "new" }), /Unsupported/);
-});
 
 test("retired Forums route, API, navigation, and parser stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
@@ -613,18 +599,18 @@ test("Feeds excludes future web-source items after the current UTC day", () => {
   assert.equal((rss.match(/<item>/g) || []).length, 2);
 });
 
-test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", async () => {
+test("Feeds web sources stay private, cached, revocable, and Miniflux-backed", async () => {
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
   const token = await readFile(new URL("../app/lib/news-web-source-token.ts", import.meta.url), "utf8");
   const route = await readFile(new URL("../app/api/news/generated/[token]/route.ts", import.meta.url), "utf8");
   const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
-  const freshBackend = await readFile(new URL("../app/lib/news-freshrss-backend.ts", import.meta.url), "utf8");
+  const minifluxBackend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
 
   assert.match(management, /case "probeFeed"/);
   assert.match(management, /createWebSource\(userId, url\)/);
-  assert.match(freshBackend, /feed\/\$\{url\}/);
+  assert.match(minifluxBackend, /feed_url:url/);
   assert.match(management, /deleteWebSource\(userId, source\.url\)/);
   assert.match(sources, /fetchPinnedNewsResource\(url\)/);
   assert.match(sources, /CACHE_TTL = 29 \* 60 \* 1000/);
@@ -634,7 +620,7 @@ test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", a
   assert.match(token, /timingSafeEqual/);
   assert.match(route, /Cache-Control": "private, no-store"/);
   assert.match(server, /newsReaderBackend\(\)\.feeds/);
-  assert.match(freshBackend, /originalWebSourceUrl\(originalNewsFeedUrl/);
+  assert.match(minifluxBackend, /originalWebSourceUrl\(originalNewsFeedUrl/);
   assert.match(reader, /Check source/);
   assert.match(reader, /Supported webpage/);
   assert.match(reader, /sourceProbe\.items\.map/);
@@ -697,8 +683,7 @@ test("Feeds routes reader operations through a backend boundary", async () => {
   }
   assert.match(server, /newsReaderBackend\(\)\.articles/);
   assert.match(management, /newsReaderBackend\(\)\.subscribe/);
-  assert.doesNotMatch(management, /freshPost|freshEditToken|freshrss-postgres/);
-  assert.match(boundary, /NEWS_READER_BACKEND \|\| "freshrss"/);
+  assert.match(boundary, /return minifluxReaderBackend/);
 });
 
 test("Miniflux backend keeps the five-day dashboard contract", async () => {
@@ -709,11 +694,4 @@ test("Miniflux backend keeps the five-day dashboard contract", async () => {
   assert.match(backend, /X-Auth-Token/);
   assert.doesNotMatch(backend, /is_read|starred|notification/);
   assert.match(backend, /id: `feed\/\$\{feed\.id\}`/);
-});
-
-test("Miniflux rollback restores the FreshRSS backend selector", async () => {
-  const script = await readFile(new URL("../deploy/miniflux-shadow/rollback-reader.sh", import.meta.url), "utf8");
-  assert.match(script, /grep -v "\^NEWS_READER_BACKEND="/);
-  assert.match(script, /printf "%s\\n" "NEWS_READER_BACKEND=freshrss"/);
-  assert.match(script, /systemctl restart labulubius-web\.service/);
 });

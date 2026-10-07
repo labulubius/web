@@ -127,7 +127,7 @@ function xmlFeed(body: Uint8Array) {
   return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
 
-export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "rsshub" | "web"> };
+export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "web"> };
 
 export async function discoverPinnedNewsFeedDetails(value: string): Promise<NewsFeedDiscovery> {
   const first = await fetchPinnedNewsResource(value);
