@@ -50,3 +50,7 @@ Admin-only `POST /api/news/watchboards` takes a JSON action and returns the upda
 Admin-only `GET /api/news?view=articles&board=<board-id>` reads retained articles from that board's tagged feeds, using existing cursor pagination. `feed` and `board` cannot be combined. Board filtering never changes the owner's source selection or the existing public Feeds view.
 
 Per-admin metadata is stored only on web at `${NEWS_DATA_DIR:-~/.local/share/labulubius/news}/<user-id>.watchboards.json` with private atomic writes, outside Git and separate from the existing selection files. Preserve this directory on future updates. Writes are serialized per user within the server process.
+
+## Generic static webpage fallback
+
+After native RSS/Atom discovery, RSSHub, and registered high-precision adapters have failed, `/feeds` may ask the private html2rss service to extract a server-rendered article listing. The pinned deployment is documented under `deploy/html2rss/`; it listens only on `127.0.0.1`, uses a private bearer token, and does not run a browser renderer. The application stores only the per-source feed capability in its private web-source registry, normalizes item URLs into stable GUIDs, preserves first-seen times when a page has no dates, excludes future UTC dates, emits only the latest five days, rejects abnormal batch shrinkage, and falls back to the last successful cache. Existing CSIS handling remains ahead of html2rss because it extracts publication dates more accurately.

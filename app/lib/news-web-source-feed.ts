@@ -1,3 +1,5 @@
+export const WEB_SOURCE_RETENTION_MS = 5 * 24 * 60 * 60 * 1000;
+
 export type WebSourceItem = {
   id: string;
   title: string;
@@ -117,12 +119,18 @@ export function filterFutureWebSourceItems(source: ParsedWebSource, now = Date.n
   return { ...source, items: source.items.filter((item) => item.published < tomorrowUtc) };
 }
 
+export function retainRecentWebSourceItems(source: ParsedWebSource, now = Date.now()): ParsedWebSource {
+  const earliest = now - WEB_SOURCE_RETENTION_MS;
+  const withoutFuture = filterFutureWebSourceItems(source, now);
+  return { ...withoutFuture, items: withoutFuture.items.filter((item) => item.published >= earliest) };
+}
+
 function xml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
 export function renderWebSourceRss(sourceUrl: string, source: ParsedWebSource, generatedAt = Date.now(), now = Date.now()) {
-  const items = filterFutureWebSourceItems(source, now).items.map((item) => `    <item>
+  const items = retainRecentWebSourceItems(source, now).items.map((item) => `    <item>
       <title>${xml(item.title)}</title>
       <link>${xml(item.url)}</link>
       <guid isPermaLink="true">${xml(item.id)}</guid>

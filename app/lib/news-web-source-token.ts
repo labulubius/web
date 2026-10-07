@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type WebSourceTokenData = { adapter: "csis-topic-v1"; url: string };
+export type WebSourceTokenData = { adapter: "csis-topic-v1" | "html2rss-v1"; url: string };
 
 function secret() {
   const value = process.env.NEWS_FEED_PROXY_SECRET;
@@ -30,7 +30,7 @@ export function decodeWebSourceToken(token: string): WebSourceTokenData | null {
     const parsed: unknown = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     const data = parsed as Partial<WebSourceTokenData>;
-    return data.adapter === "csis-topic-v1" && typeof data.url === "string" ? data as WebSourceTokenData : null;
+    return ["csis-topic-v1", "html2rss-v1"].includes(data.adapter || "") && typeof data.url === "string" ? data as WebSourceTokenData : null;
   } catch { return null; }
 }
 

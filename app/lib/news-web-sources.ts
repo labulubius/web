@@ -6,10 +6,16 @@ import os from "node:os";
 import path from "node:path";
 import { fetchPinnedNewsResource, readLimitedNewsResource } from "./news-feed-proxy";
 import {
+  createHtml2rssSource,
+  Html2RssUnavailable,
+  refreshHtml2rssSource,
+} from "./news-html2rss";
+import { canonicalHtml2rssSourceUrl } from "./news-html2rss-feed";
+import {
   canonicalCsisTopicUrl,
-  filterFutureWebSourceItems,
   parseCsisTopicPage,
   renderWebSourceRss,
+  retainRecentWebSourceItems,
   type ParsedWebSource,
   type WebSourceItem,
 } from "./news-web-source-feed";
@@ -19,14 +25,16 @@ const CACHE_TTL = 29 * 60 * 1000;
 const directory = process.env.NEWS_DATA_DIR || path.join(os.homedir(), ".local", "share", "labulubius", "news");
 const registryPath = path.join(directory, "web-sources.json");
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const html2rssFeedPath = /^\/api\/v1\/feeds\/[A-Za-z0-9_.=-]+\.json$/;
 
 type WebSourceRecord = {
   id: string;
   ownerId: string;
-  adapter: "csis-topic-v1";
+  adapter: "csis-topic-v1" | "html2rss-v1";
   url: string;
   title: string;
   createdAt: number;
+  html2rssFeedPath?: string;
 };
 
 type WebSourceRegistry = { version: 1; sources: WebSourceRecord[] };
@@ -34,7 +42,7 @@ type WebSourceCache = { updatedAt: number; source: ParsedWebSource };
 
 export type WebSourceProbe = {
   kind: "web";
-  adapter: "csis-topic-v1";
+  adapter: "csis-topic-v1" | "html2rss-v1";
   url: string;
   title: string;
   items: Pick<WebSourceItem, "title" | "url" | "published">[];
@@ -65,8 +73,12 @@ function validParsedSource(value: unknown): value is ParsedWebSource {
 function validRecord(value: unknown): value is WebSourceRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const source = value as WebSourceRecord;
-  return uuid.test(source.id) && uuid.test(source.ownerId) && source.adapter === "csis-topic-v1" &&
-    canonicalCsisTopicUrl(source.url) === source.url && typeof source.title === "string" && Number.isFinite(source.createdAt);
+  const validUrl = source.adapter === "csis-topic-v1"
+    ? canonicalCsisTopicUrl(source.url) === source.url
+    : source.adapter === "html2rss-v1" && canonicalHtml2rssSourceUrl(source.url) === source.url &&
+      typeof source.html2rssFeedPath === "string" && html2rssFeedPath.test(source.html2rssFeedPath);
+  return uuid.test(source.id) && uuid.test(source.ownerId) && validUrl &&
+    typeof source.title === "string" && Number.isFinite(source.createdAt);
 }
 
 function cachePath(sourceId: string) {
@@ -124,19 +136,38 @@ async function fetchCsisTopic(url: string) {
 }
 
 function adapterFor(value: string): WebSourceTokenData | null {
-  const url = canonicalCsisTopicUrl(value);
-  return url ? { adapter: "csis-topic-v1", url } : null;
+  const csis = canonicalCsisTopicUrl(value);
+  if (csis) return { adapter: "csis-topic-v1", url: csis };
+  const generic = canonicalHtml2rssSourceUrl(value);
+  return generic ? { adapter: "html2rss-v1", url: generic } : null;
 }
 
-async function fetchSource(data: WebSourceTokenData, now = Date.now()) {
-  if (data.adapter === "csis-topic-v1") return filterFutureWebSourceItems(await fetchCsisTopic(data.url), now);
-  throw new UnsupportedWebSource("This website does not have a supported article adapter.");
+async function initialSource(data: WebSourceTokenData, now = Date.now()): Promise<{ source: ParsedWebSource; feedPath?: string }> {
+  if (data.adapter === "csis-topic-v1") return { source: await fetchCsisTopic(data.url) };
+  try { return await createHtml2rssSource(data.url, now); }
+  catch (error) {
+    if (error instanceof Html2RssUnavailable) throw new UnsupportedWebSource("This page could not be converted into a reliable article feed.");
+    throw error;
+  }
+}
+
+async function refreshedSource(record: WebSourceRecord, previous: ParsedWebSource, now: number) {
+  if (record.adapter === "csis-topic-v1") return fetchCsisTopic(record.url);
+  if (!record.html2rssFeedPath) throw new UnsupportedWebSource("This webpage source is incomplete.");
+  return refreshHtml2rssSource(record.html2rssFeedPath, record.url, previous, now);
+}
+
+function acceptableRefresh(previous: ParsedWebSource, next: ParsedWebSource) {
+  if (previous.items.length >= 8 && next.items.length < Math.ceil(previous.items.length / 4)) {
+    throw new Error("Web source refresh returned an abnormally small batch.");
+  }
+  return next;
 }
 
 export async function probeWebSource(value: string): Promise<WebSourceProbe> {
   const data = adapterFor(value);
   if (!data) throw new UnsupportedWebSource("This page has no discoverable RSS feed and no supported article adapter.");
-  const source = await fetchSource(data);
+  const source = retainRecentWebSourceItems((await initialSource(data)).source);
   return {
     kind: "web",
     adapter: data.adapter,
@@ -152,13 +183,15 @@ export async function createWebSource(ownerId: string, value: string) {
   validUserId(ownerId);
   const data = adapterFor(value);
   if (!data) throw new UnsupportedWebSource("This page has no discoverable RSS feed and no supported article adapter.");
-  const parsed = await fetchSource(data);
+  const initial = await initialSource(data);
+  const parsed = initial.source;
   const operation = registryPending.catch(() => {}).then(async () => {
     const registry = await loadRegistry();
     if (registry.sources.some((source) => source.url === data.url)) throw new DuplicateWebSource("Source already exists.");
     const record: WebSourceRecord = {
       id: randomUUID(), ownerId, adapter: data.adapter, url: data.url,
       title: parsed.title, createdAt: Date.now(),
+      ...(initial.feedPath ? { html2rssFeedPath: initial.feedPath } : {}),
     };
     await atomicWrite(cachePath(record.id), { updatedAt: Date.now(), source: parsed } satisfies WebSourceCache, "web-cache");
     try {
@@ -194,12 +227,11 @@ export async function deleteWebSource(ownerId: string, value: string) {
 const refreshPending = new Map<string, Promise<WebSourceCache>>();
 
 async function currentCache(record: WebSourceRecord, now: number) {
-  const loaded = await loadCache(record.id);
-  const cached = { ...loaded, source: filterFutureWebSourceItems(loaded.source, now) };
+  const cached = await loadCache(record.id);
   if (cached.updatedAt + CACHE_TTL > now && cached.source.items.length) return { cache: cached, stale: false };
   let pending = refreshPending.get(record.id);
   if (!pending) {
-    pending = fetchSource({ adapter: record.adapter, url: record.url }).then(async (source) => {
+    pending = refreshedSource(record, cached.source, now).then((source) => acceptableRefresh(cached.source, source)).then(async (source) => {
       const fresh = { updatedAt: now, source } satisfies WebSourceCache;
       await atomicWrite(cachePath(record.id), fresh, "web-cache");
       return fresh;
@@ -222,9 +254,10 @@ export async function webSourceFeed(token: string) {
   if (!record) return null;
   const now = Date.now();
   const { cache, stale } = await currentCache(record, now);
+  const recent = retainRecentWebSourceItems(cache.source, now);
   return {
-    body: renderWebSourceRss(record.url, cache.source, cache.updatedAt || now, now),
+    body: renderWebSourceRss(record.url, recent, cache.updatedAt || now, now),
     stale,
-    count: cache.source.items.length,
+    count: recent.items.length,
   };
 }

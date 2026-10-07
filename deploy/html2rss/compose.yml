@@ -1,0 +1,42 @@
+name: html2rss
+services:
+  dnsproxy:
+    image: adguard/dnsproxy@sha256:4d65bafbf246b206a1af35d4263a86c35451d957458c7836304199f1cd2c1535
+    restart: unless-stopped
+    command:
+      - --upstream=https://1.1.1.1/dns-query
+      - --upstream=https://1.0.0.1/dns-query
+      - --listen=0.0.0.0
+      - --port=53
+      - --cache
+    networks:
+      backend:
+        ipv4_address: 172.30.0.53
+    mem_limit: 128m
+    cpus: 0.25
+  web:
+    image: html2rss/web@sha256:f603b9e6e045f72165200842939f46c4f0b38825b11c850857bfb39d746ac45f
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:4000:4000
+    env_file:
+      - .env
+    environment:
+      RACK_ENV: production
+      PORT: 4000
+      AUTO_SOURCE_ENABLED: "true"
+      HTML2RSS_TOTAL_TIMEOUT_SECONDS: 20
+      REQUEST_TIMEOUT_SECONDS: 25
+    dns:
+      - 172.30.0.53
+    depends_on:
+      - dnsproxy
+    networks:
+      - backend
+    mem_limit: 512m
+    cpus: 1.0
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

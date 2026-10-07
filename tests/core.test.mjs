@@ -14,7 +14,8 @@ import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart,
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
 import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
-import { canonicalCsisTopicUrl, filterFutureWebSourceItems, parseCsisTopicPage, renderWebSourceRss } from "../app/lib/news-web-source-feed.ts";
+import { canonicalCsisTopicUrl, filterFutureWebSourceItems, parseCsisTopicPage, renderWebSourceRss, retainRecentWebSourceItems } from "../app/lib/news-web-source-feed.ts";
+import { canonicalHtml2rssSourceUrl, normalizeHtml2rssFeed } from "../app/lib/news-html2rss-feed.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -635,4 +636,51 @@ test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", a
   assert.match(reader, /Check source/);
   assert.match(reader, /Supported webpage/);
   assert.match(reader, /sourceProbe\.items\.map/);
+});
+
+test("Feeds normalizes generic html2rss items with stable first-seen dates", () => {
+  const now = Date.parse("October 7, 2026 10:30:00 UTC");
+  const url = "https://example.org/articles/";
+  const payload = {
+    title: "Example &amp; updates",
+    description: "Recent entries",
+    items: [
+      { id: "backend-id", url: "/first#fragment", title: "First <b>entry</b>", summary: "A &amp; B" },
+      { id: "dated", url: "https://example.org/dated", title: "Dated", date_published: "2026-10-06T12:00:00Z" },
+      { id: "unsafe", url: "javascript:alert(1)", title: "Unsafe" },
+    ],
+  };
+  const first = normalizeHtml2rssFeed(payload, url, now);
+  assert.equal(canonicalHtml2rssSourceUrl("https://EXAMPLE.org/articles#x"), null);
+  assert.equal(canonicalHtml2rssSourceUrl("https://EXAMPLE.org/articles"), "https://example.org/articles");
+  assert.deepEqual(first.items.map(({ id, title, published }) => [id, title, published]), [
+    ["https://example.org/first", "First entry", now],
+    ["https://example.org/dated", "Dated", Date.parse("2026-10-06T12:00:00Z")],
+  ]);
+  assert.equal(first.items[0].summary, "A & B");
+  const refreshed = normalizeHtml2rssFeed(payload, url, now + 60_000, first);
+  assert.equal(refreshed.items[0].published, now);
+});
+
+test("Feeds retains generated webpage items for exactly five days and rejects future UTC dates", () => {
+  const now = Date.parse("October 7, 2026 10:30:00 UTC");
+  const item = (id, published) => ({ id, title: id, url: `https://example.com/${id}`, published, summary: "" });
+  const source = { title: "Example", description: "", items: [
+    item("expired", now - 5 * 24 * 60 * 60 * 1000 - 1),
+    item("boundary", now - 5 * 24 * 60 * 60 * 1000),
+    item("today", now),
+    item("tomorrow", Date.parse("October 8, 2026 00:00:00 UTC")),
+  ] };
+  assert.deepEqual(retainRecentWebSourceItems(source, now).items.map(({ id }) => id), ["boundary", "today"]);
+});
+
+test("Feeds keeps html2rss private and behind higher-precision discovery", async () => {
+  const client = await readFile(new URL("../app/lib/news-html2rss.ts", import.meta.url), "utf8");
+  const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
+  assert.match(client, /HTML2RSS_ACCESS_TOKEN/);
+  assert.match(client, /api\.hostname !== "127\.0\.0\.1"/);
+  assert.match(client, /AbortSignal\.timeout\(27_000\)/);
+  assert.match(sources, /adapter: "csis-topic-v1" \| "html2rss-v1"/);
+  assert.ok(sources.indexOf("canonicalCsisTopicUrl(value)") < sources.indexOf("canonicalHtml2rssSourceUrl(value)"));
+  assert.match(sources, /abnormally small batch/);
 });
