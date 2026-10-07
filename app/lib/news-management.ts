@@ -7,6 +7,7 @@ import { freshEditToken, freshPost, newsCategories, newsFeeds } from "./news-ser
 import { discoverRssHub } from "./news-discovery";
 import { discoverPinnedNewsFeedDetails, newsFeedProxyUrl } from "./news-feed-proxy";
 import type { NewsFeedDiscoveryMethod } from "./news-feed-discovery";
+import { createWebSource, deleteWebSource, DuplicateWebSource, probeWebSource, UnsupportedWebSource, type WebSourceProbe } from "./news-web-sources";
 
 const labelPrefix = "user/-/label/";
 const blocked = new BlockList();
@@ -111,12 +112,33 @@ async function categoryCli(action: "create" | "delete", name: string) {
   });
 }
 
-export type NewsManagementResult = { discovery?: { url: string; method: NewsFeedDiscoveryMethod } };
+export type NewsManagementResult = {
+  discovery?: { url: string; method: NewsFeedDiscoveryMethod };
+  probe?: WebSourceProbe | { kind: "feed"; method: Exclude<NewsFeedDiscoveryMethod, "web">; url: string };
+};
 
-export async function manageNews(input: unknown): Promise<NewsManagementResult | void> {
+export async function manageNews(input: unknown, userId: string): Promise<NewsManagementResult | void> {
   const body = object(input);
   const action = text(body.action, "action", 40);
   switch (action) {
+    case "probeFeed": {
+      const url = await publicURL(body.url);
+      try {
+        const found = await discoverPinnedNewsFeedDetails(url);
+        return { probe: { kind: "feed", method: found.method, url: found.url } };
+      } catch { /* Try RSSHub and registered webpage adapters below. */ }
+      if (!/\.(?:rss|xml|atom)$/i.test(new URL(url).pathname)) {
+        try {
+          const source = await discoverRssHub(url);
+          if (source) return { probe: { kind: "feed", method: "rsshub", url } };
+        } catch { /* Try a registered webpage adapter below. */ }
+      }
+      try { return { probe: await probeWebSource(url) }; }
+      catch (error) {
+        if (error instanceof UnsupportedWebSource) return invalid(error.message);
+        return invalid("This page could not be inspected for articles.");
+      }
+    }
     case "createCategory": {
       const name = categoryName(body.name);
       if ((await newsCategories()).some((item) => item.name.toLowerCase() === name.toLowerCase())) return invalid("Category already exists.");
@@ -164,14 +186,31 @@ export async function manageNews(input: unknown): Promise<NewsManagementResult |
           } catch { /* Report the common discovery error below. */ }
         }
       }
-      if (!source || !resolved) return invalid("No usable RSS feed found at this URL.");
+      let webSourceCreated = false;
+      if (!source || !resolved) {
+        try {
+          const web = await createWebSource(userId, url);
+          source = web.feedUrl;
+          resolved = web.record.url;
+          discovery = { url: resolved, method: "web" };
+          webSourceCreated = true;
+        } catch (error) {
+          if (error instanceof DuplicateWebSource) return invalid(error.message);
+          if (error instanceof UnsupportedWebSource) return invalid(error.message);
+          return invalid("This page could not be converted into an article feed.");
+        }
+      }
       if ((await newsFeeds()).some((item) => {
         try { return new URL(item.url).href === new URL(resolved).href; }
         catch { return item.url === resolved; }
-      })) return invalid("Source already exists.");
+      })) {
+        if (webSourceCreated) await deleteWebSource(userId, resolved);
+        return invalid("Source already exists.");
+      }
       try {
         await freshPost("reader/api/0/subscription/edit", { s: `feed/${source}`, ac: "subscribe", ...(dest ? { a: dest.id } : {}), ...(title ? { t: title } : {}) });
       } catch {
+        if (webSourceCreated) await deleteWebSource(userId, resolved);
         if (source.startsWith("http://rsshub:1200/")) return invalid("RSSHub could not subscribe to this page. Try its RSS URL directly.");
         return invalid("No usable RSS feed found at this URL.");
       }
@@ -188,6 +227,7 @@ export async function manageNews(input: unknown): Promise<NewsManagementResult |
     case "deleteFeed": {
       const source = await feed(body.feedId ?? body.id);
       await freshPost("reader/api/0/subscription/edit", { s: source.id, ac: "unsubscribe" });
+      await deleteWebSource(userId, source.url);
       return;
     }
     default: return invalid("Invalid action.");

@@ -95,7 +95,7 @@ function pinnedRequest(url: URL, address: string): Promise<Response> {
   });
 }
 
-async function readLimited(response: Response) {
+export async function readLimitedNewsResource(response: Response) {
   if (Number(response.headers.get("content-length") || 0) > MAX_BYTES || !response.body) { await response.body?.cancel(); throw new Error("Feed response is too large."); }
   const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let length = 0;
   while (true) {
@@ -127,12 +127,12 @@ function xmlFeed(body: Uint8Array) {
   return /^\s*(?:<\?xml[^>]*>\s*)?<(?:rss|feed|rdf:RDF)(?:\s|>)/i.test(prefix);
 }
 
-export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "rsshub"> };
+export type NewsFeedDiscovery = { url: string; method: Exclude<NewsFeedDiscoveryMethod, "rsshub" | "web"> };
 
 export async function discoverPinnedNewsFeedDetails(value: string): Promise<NewsFeedDiscovery> {
   const first = await fetchPinnedNewsResource(value);
   if (!first.response.ok) { await first.response.body?.cancel(); throw new Error("Website unavailable."); }
-  const body = await readLimited(first.response);
+  const body = await readLimitedNewsResource(first.response);
   if (xmlFeed(body)) return { url: first.finalUrl, method: "direct" };
   const html = new TextDecoder().decode(body);
   const tags = html.match(/<link\b[^>]*>/gi) || [];
@@ -144,14 +144,14 @@ export async function discoverPinnedNewsFeedDetails(value: string): Promise<News
     const candidate = new URL(href, first.finalUrl).href;
     const checked = await fetchPinnedNewsResource(candidate);
     if (!checked.response.ok) { await checked.response.body?.cancel(); continue; }
-    const feed = await readLimited(checked.response);
+    const feed = await readLimitedNewsResource(checked.response);
     if (xmlFeed(feed)) return { url: checked.finalUrl, method: "html" };
   }
   const bbc = bbcNewsFeed(first.finalUrl);
   if (bbc) {
     const checked = await fetchPinnedNewsResource(bbc);
     if (checked.response.ok) {
-      const feed = await readLimited(checked.response);
+      const feed = await readLimitedNewsResource(checked.response);
       if (xmlFeed(feed)) return { url: checked.finalUrl, method: "bbc" };
     } else await checked.response.body?.cancel();
   }
@@ -159,7 +159,7 @@ export async function discoverPinnedNewsFeedDetails(value: string): Promise<News
   if (discourse) {
     const checked = await fetchPinnedNewsResource(discourse);
     if (checked.response.ok) {
-      const feed = await readLimited(checked.response);
+      const feed = await readLimitedNewsResource(checked.response);
       if (xmlFeed(feed)) return { url: checked.finalUrl, method: "discourse" };
     } else await checked.response.body?.cancel();
   }
@@ -179,7 +179,7 @@ export async function proxyNewsFeed(token: string) {
   try { current = Buffer.from(encoded, "base64url").toString("utf8"); new URL(current); } catch { return new Response("Not found", { status: 404 }); }
   const result = await fetchPinnedNewsResource(current);
   if (!result.response.ok) { await result.response.body?.cancel(); return new Response("Feed unavailable", { status: 502 }); }
-  const body = await readLimited(result.response);
+  const body = await readLimitedNewsResource(result.response);
   if (!xmlFeed(body)) return new Response("Invalid feed", { status: 502 });
   return new Response(body, { headers: { "Content-Type": result.response.headers.get("content-type") || "application/xml; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }

@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       ["deleteFeed", "deleteCategory"].includes((body as { action?: string }).action || "");
     let result;
     try {
-      result = await manageNews(body);
+      result = await manageNews(body, auth.user.id);
     } finally {
       invalidateSidebarData();
       // Also reconcile after a partially completed category deletion.

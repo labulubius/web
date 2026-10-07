@@ -27,6 +27,13 @@ import { orderSourcesByWatchboards, orderTagsBySourceCount } from "./feed-order"
 import "./feeds.css";
 
 type Dialog = { kind: "feed" | "tag" | "board"; id?: string } | null;
+type SourceProbe = ({ kind: "feed"; method: string; url: string } | {
+  kind: "web";
+  adapter: string;
+  url: string;
+  title: string;
+  items: { title: string; url: string; published: number }[];
+}) & { inputUrl: string };
 type Watchboard = { id: string; name: string; tagIds: string[] };
 type WatchboardState = { tags: { id: string; name: string }[]; watchboards: Watchboard[]; sourceTags: Record<string, string[]> };
 type Directory = { feeds: NewsFeed[]; selected: string[] };
@@ -127,6 +134,8 @@ export function FeedsReader() {
   const [watchboards, setWatchboards] = useState<WatchboardState>({ tags: [], watchboards: [], sourceTags: {} });
   const [watchReady, setWatchReady] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceProbe, setSourceProbe] = useState<SourceProbe | null>(null);
   const [sourceQuery, setSourceQuery] = useState("");
   const [publicArticles, setPublicArticles] = useState<NewsArticle[]>([]);
   const [publicCursor, setPublicCursor] = useState<string | null>(null);
@@ -326,6 +335,8 @@ export function FeedsReader() {
     const trigger = dialogTriggerRef.current;
     dialogTriggerRef.current = null;
     setDialog(null);
+    setSourceProbe(null);
+    setSourceUrl("");
     window.requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus(); });
   }
 
@@ -333,6 +344,9 @@ export function FeedsReader() {
     dialogTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDraftTags(kind === "board" ? [...(watchboards.watchboards.find((board) => board.id === id)?.tagIds || [])]
       : kind === "feed" && id ? [...(watchboards.sourceTags[id] || [])] : []);
+    setSourceUrl(kind === "feed" && id ? feeds.find((feed) => feed.id === id)?.url || "" : "");
+    setSourceProbe(null);
+    setError("");
     setDialog({ kind, id });
   }
 
@@ -383,6 +397,19 @@ export function FeedsReader() {
     } else if (dialog.kind === "board") {
       await mutateWatchboard({ action: dialog.id ? "updateWatchboard" : "createWatchboard", ...(dialog.id ? { id: dialog.id } : {}), name: String(form.get("name") || "").trim(), tagIds: draftTags });
     } else {
+      const requestedUrl = sourceUrl.trim();
+      if (!dialog.id && (!sourceProbe || sourceProbe.inputUrl !== requestedUrl)) {
+        setSaving(true); setError("");
+        try {
+          const data = await api("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+            action: "probeFeed", url: requestedUrl,
+          }) }) as { probe: Omit<SourceProbe, "inputUrl"> };
+          setSourceProbe({ ...data.probe, inputUrl: requestedUrl } as SourceProbe);
+        } catch (failure) {
+          setError(failure instanceof Error ? failure.message : "Could not inspect this source.");
+        } finally { setSaving(false); }
+        return;
+      }
       const title = String(form.get("title") || "").trim();
       const existing = dialog.id ? feeds.find((feed) => feed.id === dialog.id) : undefined;
       const oldTags = dialog.id ? watchboards.sourceTags[dialog.id] || [] : [];
@@ -393,7 +420,7 @@ export function FeedsReader() {
         let feedId = dialog.id;
         if (!dialog.id || (title && title !== existing?.title)) {
           const data = await api("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-            action: dialog.id ? "editFeed" : "addFeed", ...(dialog.id ? { feedId: dialog.id } : { url: String(form.get("url") || "").trim() }),
+            action: dialog.id ? "editFeed" : "addFeed", ...(dialog.id ? { feedId: dialog.id } : { url: requestedUrl }),
             ...(title ? { title } : {}),
           }) }) as Directory;
           setFeeds(data.feeds); setSelected(data.selected); setSaved(data.selected);
@@ -485,10 +512,13 @@ export function FeedsReader() {
       </>}
     </section>
     {dialog && <AccessibleDialog labelledBy="news-dialog-title" busy={saving} onClose={() => closeDialog()}><header><h2 id="news-dialog-title">{dialog.id ? "Edit" : "Add"} {dialog.kind === "feed" ? "source" : dialog.kind === "board" ? "watchboard" : dialog.kind}</h2><button type="button" disabled={saving} onClick={() => closeDialog()} aria-label="Close"><X size={17} /></button></header><form onSubmit={(event) => void submit(event)}>
-      {dialog.kind === "feed" ? <><label>Website or RSS URL{dialog.id ? <input type="url" defaultValue={editedFeed?.url || ""} readOnly /> : <input ref={sourceUrlInputRef} name="url" type="url" placeholder="https://example.com/feed" autoFocus required />}</label><label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} autoFocus={!!dialog.id} /></label></> : <label>{dialog.kind === "tag" ? "Tag" : "Watchboard"} name<input name="name" defaultValue={editedTag?.name || editedBoard?.name || ""} maxLength={80} autoFocus required /></label>}
+      {dialog.kind === "feed" ? <><label>Website or RSS URL<input ref={!dialog.id ? sourceUrlInputRef : undefined} name="url" type="url" placeholder="https://example.com/feed" value={sourceUrl} onChange={(event) => { setSourceUrl(event.target.value); setSourceProbe(null); setError(""); }} autoFocus={!dialog.id} readOnly={!!dialog.id} required /></label><label>Display name (optional)<input name="title" defaultValue={editedFeed?.title || ""} maxLength={200} autoFocus={!!dialog.id} /></label></> : <label>{dialog.kind === "tag" ? "Tag" : "Watchboard"} name<input name="name" defaultValue={editedTag?.name || editedBoard?.name || ""} maxLength={80} autoFocus required /></label>}
+      {dialog.kind === "feed" && !dialog.id && sourceProbe && <div className="news-source-preview" role="status">
+        {sourceProbe.kind === "web" ? <><strong>{sourceProbe.title}</strong><span>Supported webpage · {sourceProbe.items.length} recent items found</span><ul>{sourceProbe.items.map((item) => <li key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a><time dateTime={new Date(item.published).toISOString()}>{new Date(item.published).toLocaleDateString()}</time></li>)}</ul></> : <><strong>RSS/Atom feed found</strong><span>This source is ready to subscribe.</span></>}
+      </div>}
       {dialog.kind === "feed" && <details className="news-source-tags"><summary>Source tags{draftTags.length > 0 && <span>({draftTags.length} selected)</span>}<ChevronDown size={15} aria-hidden="true" /></summary><div className="news-source-tags-options">{popularTags.map(({ tag }) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!popularTags.length && <p>Create tags under Settings → Tags first.</p>}</div></details>}
       {dialog.kind === "board" && <details className="news-source-tags"><summary>Matching tags{draftTags.length > 0 && <span>({draftTags.length} selected)</span>}<ChevronDown size={15} aria-hidden="true" /></summary><div className="news-source-tags-options">{watchboards.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={draftTags.includes(tag.id)} onChange={() => setDraftTags((old) => old.includes(tag.id) ? old.filter((id) => id !== tag.id) : [...old, tag.id])} />{tag.name}</label>)}{!watchboards.tags.length && <p>Create tags under Settings → Tags first.</p>}</div></details>}
-      {error && <p className="form-error" role="alert">{error}</p>}<footer><button type="button" disabled={saving} onClick={() => closeDialog()}>Cancel</button><button type="submit" className="primary" disabled={saving || (dialog.kind === "feed" && !watchReady)}>{saving ? "Saving…" : "Save"}</button></footer>
+      {error && <p className="form-error" role="alert">{error}</p>}<footer><button type="button" disabled={saving} onClick={() => closeDialog()}>Cancel</button><button type="submit" className="primary" disabled={saving || (dialog.kind === "feed" && !watchReady)}>{saving ? (!dialog.id && dialog.kind === "feed" && !sourceProbe ? "Checking…" : "Saving…") : (!dialog.id && dialog.kind === "feed" && !sourceProbe ? "Check source" : "Save")}</button></footer>
     </form></AccessibleDialog>}
   </div>;
 }

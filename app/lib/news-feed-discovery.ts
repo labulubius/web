@@ -1,4 +1,4 @@
-export type NewsFeedDiscoveryMethod = "direct" | "html" | "bbc" | "discourse" | "rsshub";
+export type NewsFeedDiscoveryMethod = "direct" | "html" | "bbc" | "discourse" | "rsshub" | "web";
 
 const BBC_NEWS_FEEDS: Record<string, string> = {
   "/news": "/news/rss.xml",

@@ -14,6 +14,7 @@ import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart,
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
 import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
+import { canonicalCsisTopicUrl, parseCsisTopicPage, renderWebSourceRss } from "../app/lib/news-web-source-feed.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -563,4 +564,54 @@ test("retired Forums route, API, navigation, and parser stay absent", async () =
   assert.doesNotMatch(sidebar, /\/forums|MessagesSquare/);
   assert.doesNotMatch(globals, /forums-/);
   assert.doesNotMatch(packageJson, /fast-xml-parser/);
+});
+
+
+test("Feeds converts supported CSIS topic pages into stable RSS items", async () => {
+  const html = await readFile(new URL("./fixtures/csis-topic.html", import.meta.url), "utf8");
+  const url = "https://www.csis.org/topics/artificial-intelligence";
+  const source = parseCsisTopicPage(html, url);
+
+  assert.equal(canonicalCsisTopicUrl("https://csis.org/topics/artificial-intelligence/"), url);
+  assert.equal(canonicalCsisTopicUrl(`${url}?page=1`), null);
+  assert.equal(canonicalCsisTopicUrl("https://example.com/topics/artificial-intelligence"), null);
+  assert.equal(source.title, "Artificial Intelligence & Policy | CSIS");
+  assert.equal(source.description, "Research & analysis about AI.");
+  assert.deepEqual(source.items.map(({ title, url: itemUrl }) => [title, itemUrl]), [
+    ["AI & Public Policy", "https://www.csis.org/analysis/example-ai-report"],
+    ["Podcast episode", "https://www.csis.org/podcasts/ai-policy-podcast/example-episode"],
+  ]);
+  assert.equal(source.items[0].summary, "A concise & useful summary.");
+  assert.equal(source.items[0].published, Date.parse("October 7, 2026 12:00:00 UTC"));
+
+  const rss = renderWebSourceRss(url, source, Date.parse("October 8, 2026 12:00:00 UTC"));
+  assert.match(rss, /<rss version="2.0">/);
+  assert.match(rss, /Artificial Intelligence &amp; Policy/);
+  assert.match(rss, /<guid isPermaLink="true">https:\/\/www\.csis\.org\/analysis\/example-ai-report<\/guid>/);
+  assert.equal((rss.match(/<item>/g) || []).length, 2);
+});
+
+test("Feeds web sources stay private, cached, revocable, and FreshRSS-backed", async () => {
+  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
+  const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
+  const token = await readFile(new URL("../app/lib/news-web-source-token.ts", import.meta.url), "utf8");
+  const route = await readFile(new URL("../app/api/news/generated/[token]/route.ts", import.meta.url), "utf8");
+  const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
+  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
+
+  assert.match(management, /case "probeFeed"/);
+  assert.match(management, /createWebSource\(userId, url\)/);
+  assert.match(management, /feed\/\$\{source\}/);
+  assert.match(management, /deleteWebSource\(userId, source\.url\)/);
+  assert.match(sources, /fetchPinnedNewsResource\(url\)/);
+  assert.match(sources, /CACHE_TTL = 29 \* 60 \* 1000/);
+  assert.match(sources, /if \(!cached\.updatedAt \|\| !cached\.source\.items\.length\) throw error/);
+  assert.match(sources, /mode: 0o600/);
+  assert.match(token, /createHmac\("sha256"/);
+  assert.match(token, /timingSafeEqual/);
+  assert.match(route, /Cache-Control": "private, no-store"/);
+  assert.match(server, /originalWebSourceUrl\(originalNewsFeedUrl/);
+  assert.match(reader, /Check source/);
+  assert.match(reader, /Supported webpage/);
+  assert.match(reader, /sourceProbe\.items\.map/);
 });

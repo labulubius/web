@@ -6,6 +6,7 @@ import { articleSummary } from "./news-article-summary";
 import { normalizeNewsArticleUrl } from "./news-article-url";
 import type { NewsArticle, NewsFeed } from "./news-server-types";
 import { originalNewsFeedUrl } from "./news-feed-proxy";
+import { originalWebSourceUrl } from "./news-web-source-token";
 
 export const privateNewsHeaders = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -103,7 +104,7 @@ export async function newsFeeds(): Promise<NewsFeed[]> {
   };
   if (!Array.isArray(data.subscriptions)) throw new Error("Invalid FreshRSS subscriptions response.");
   return data.subscriptions.filter((feed) => typeof feed.id === "string").map((feed) => ({
-    id: feed.id!, title: feed.title || feed.id!, category: feed.categories?.[0]?.label || "Uncategorized", url: originalNewsFeedUrl(feed.url || ""),
+    id: feed.id!, title: feed.title || feed.id!, category: feed.categories?.[0]?.label || "Uncategorized", url: originalWebSourceUrl(originalNewsFeedUrl(feed.url || "")),
   })).sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
 }
 

@@ -102,3 +102,10 @@
 .breeze-dialog .news-source-tags-options input[type="checkbox"] { accent-color: var(--accent); flex: none; height: 16px; min-height: 0; margin: 0; padding: 0; width: 16px; }
 .news-source-tags-options p { color: var(--text-muted); font-size: 11px; margin: 0; padding: 6px 7px; }
 .breeze-dialog input[readonly] { color: var(--text-muted); cursor: default; }
+.news-source-preview { background: var(--view-alt); border: 1px solid var(--separator); border-radius: 4px; display: flex; flex-direction: column; gap: 4px; padding: 9px; }
+.news-source-preview strong { font-size: 12px; font-weight: 500; }
+.news-source-preview > span { color: var(--text-muted); font-size: 11px; }
+.news-source-preview ul { border-top: 1px solid var(--separator); list-style: none; margin: 5px 0 0; max-height: 170px; overflow-y: auto; padding: 4px 0 0; }
+.news-source-preview li { align-items: baseline; display: grid; font-size: 11px; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; padding: 4px 0; }
+.news-source-preview a { color: var(--link); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.news-source-preview time { color: var(--text-muted); white-space: nowrap; }
