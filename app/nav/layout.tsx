@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./nav.css";
 
 export const metadata: Metadata = {
-  title: "Nav",
+  title: { absolute: "Navigator" },
   description: "A thoughtfully curated directory of useful websites.",
 };
 

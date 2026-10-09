@@ -13,8 +13,21 @@ function readMetadata(path) {
   return new Function(`return (${declaration.initializer.getText(source)});`)();
 }
 
-test("Nav inherits the site title suffix exactly once", () => {
-  const root = readMetadata("app/layout.tsx");
-  const nav = readMetadata("app/nav/layout.tsx");
-  assert.equal(resolveTitle(nav.title, root.title.template).absolute, "Nav — Labulubius");
-});
+const pages = [
+  ["app/page.tsx", "Home"],
+  ["app/nav/layout.tsx", "Navigator"],
+  ["app/feeds/page.tsx", "Feeds"],
+  ["app/drive/page.tsx", "Drive"],
+  ["app/agent/page.tsx", "Pi Agent"],
+  ["app/about/page.tsx", "About"],
+];
+
+for (const [path, expected] of pages) {
+  test(`${path} uses the requested title without a site suffix`, () => {
+    const root = readMetadata("app/layout.tsx");
+    const metadata = readMetadata(path);
+    // A root page does not inherit a template from its same-segment layout.
+    const template = path === "app/page.tsx" ? null : root.title.template;
+    assert.equal(resolveTitle(metadata.title, template).absolute, expected);
+  });
+}

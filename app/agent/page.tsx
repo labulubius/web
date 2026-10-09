@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pi Agent",
+  title: { absolute: "Pi Agent" },
   description: "Private Pi coding agent running on the Mac mini.",
 };
 

@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { CheckCircle2, Code2, Coffee, Globe2, Heart, Palette } from "lucide-react";
 import { PlacesSidebar } from "../places-sidebar";
 import { SiteShell } from "../site-shell";
+
+export const metadata: Metadata = { title: { absolute: "About" } };
 
 export default function AboutPage() {
   return (

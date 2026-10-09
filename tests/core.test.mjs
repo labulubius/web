@@ -364,7 +364,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
 
   await assert.rejects(access(new URL("../app/news/page.tsx", import.meta.url)), { code: "ENOENT" });
   await access(new URL("../app/api/news/route.ts", import.meta.url));
-  assert.match(page, /title: "Feeds"/);
+  assert.match(page, /title: \{ absolute: "Feeds" \}/);
   assert.match(page, /active="\/feeds" title="Feeds"/);
   assert.match(shell, /href: "\/feeds", label: "Feeds", icon: Rss/);
   assert.doesNotMatch(shell, /href: "\/news"|label: "News"|Newspaper/);
