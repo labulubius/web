@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./nav.css";
 
 export const metadata: Metadata = {
-  title: "Nav — Labulubius",
+  title: "Nav",
   description: "A thoughtfully curated directory of useful websites.",
 };
 
