@@ -38,9 +38,9 @@ function TaskList({ tasks, empty, projects, onOpen, onComplete, onDelete }: {
   if (!tasks.length) return <div className="task-empty"><CheckCircle2 size={30} /><strong>Nothing here</strong><span>{empty}</span></div>;
   return <ul className="task-list">{tasks.map((task) => <li key={task.id}>
     <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={() => onComplete(task)}><Circle size={15} /></button>
-    <button className="task-list-main" type="button" onClick={() => onOpen({ task })}>
+    <div className="task-list-main">
       <strong>{task.title}</strong><span>{task.projectId ? task.startDate && task.endDate ? `${projectNames.get(task.projectId) ?? "Project"} · ${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : `${projectNames.get(task.projectId) ?? "Project"} · Not scheduled` : "Uncategorized"}</span>
-    </button>
+    </div>
     <span className="task-list-actions">
       <button type="button" onClick={() => onOpen({ task })} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
       <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>
@@ -168,6 +168,7 @@ export function TaskManager() {
   }
 
   async function deleteTask(task: PersonalTask) {
+    if (!window.confirm(`Delete “${task.title}”? This cannot be undone.`)) return;
     const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" });
     if (ok) setTaskDialog(null);
   }

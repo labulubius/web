@@ -77,8 +77,9 @@
 .gantt-day-heading.is-today { background: color-mix(in srgb, var(--accent) 16%, var(--window)); color: var(--link); }
 .gantt-row { min-height: 45px; position: relative; }
 .gantt-row + .gantt-row { border-top: 1px solid var(--separator); }
-.gantt-task-label { align-items: flex-start; background: var(--window); border: 0; border-right: 1px solid var(--separator); color: var(--text); cursor: pointer; display: flex; flex-direction: column; grid-column: 1; grid-row: 1; justify-content: center; left: 0; min-width: 0; padding: 6px 10px; position: sticky; text-align: left; z-index: 6; }
-.gantt-task-label:hover { background: color-mix(in srgb, var(--accent) 8%, var(--window)); }
+.gantt-task-label { align-items: flex-start; background: var(--window); border: 0; border-right: 1px solid var(--separator); color: var(--text); display: flex; flex-direction: column; grid-column: 1; grid-row: 1; justify-content: center; left: 0; min-width: 0; padding: 6px 42px 6px 10px; position: sticky; text-align: left; z-index: 6; }
+.gantt-task-edit { align-items: center; background: var(--button); border: 1px solid var(--separator); border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; height: 26px; justify-content: center; padding: 0; position: absolute; right: 8px; top: 9px; width: 26px; }
+.gantt-task-edit:hover { border-color: var(--accent); color: var(--text); }
 .gantt-task-label strong { font-size: 11px; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gantt-task-label span { color: var(--text-muted); font-size: 9px; }
 .gantt-day-cell { background: transparent; border: 0; border-right: 1px solid color-mix(in srgb, var(--separator) 70%, transparent); cursor: crosshair; grid-row: 1; min-width: 0; padding: 0; }
@@ -101,7 +102,7 @@
 .task-list li:hover { background: color-mix(in srgb, var(--accent) 7%, var(--view)); }
 .task-check { align-items: center; background: transparent; border: 0; border-radius: 50%; color: var(--link); cursor: pointer; display: flex; height: 30px; justify-content: center; padding: 0; width: 30px; }
 .task-check:hover { background: color-mix(in srgb, var(--accent) 15%, var(--view)); }
-.task-list-main { align-items: flex-start; background: transparent; border: 0; color: var(--text); cursor: pointer; display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 0; text-align: left; }
+.task-list-main { align-items: flex-start; background: transparent; border: 0; color: var(--text); display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 0; text-align: left; }
 .task-list-main strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 .task-list-main span { color: var(--text-muted); font-size: 10px; }
 .task-list-actions { display: flex; flex: none; gap: 3px; }
