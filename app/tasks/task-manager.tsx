@@ -186,15 +186,14 @@ export function TaskManager() {
     if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("all"); } }
   }
 
-  function quickAdd(event: FormEvent<HTMLFormElement>) {
+  async function quickAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const title = String(new FormData(form).get("title") ?? "").trim();
     if (!title) return;
     const selectedProject = view === "project" ? projectId : null;
-    setError("");
-    setTaskDialog({ defaults: { title, projectId: selectedProject } });
-    form.reset();
+    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) });
+    if (ok) form.reset();
   }
 
   function select(next: View, selectedProject: string | null = null) { setView(next); setProjectId(selectedProject); setError(""); }

@@ -25,7 +25,7 @@ Other routes changed visually or behaviorally: none.
 
 ## Requested behavior
 
-- One `TaskDialog` for new and edited tasks, including the quick-add entry point. Optional three-row, 300-character description, saved and populated on edit.
+- One `TaskDialog` for sidebar-plus creation and edited tasks. Inline quick add saves the title directly without opening a dialog. Optional three-row, 300-character description, saved and populated on edit.
 - Start/end dates always available regardless of Project. Existing single-date normalization remains unchanged.
 - Uncategorized scheduled tasks appear in lists and Gantt and can be moved/resized through the existing paths.
 - Removing a task from a Project or deleting that Project preserves dates and descriptions.
@@ -67,3 +67,15 @@ All executed through `ssh web` in `/home/debian/labulubius`:
 - Isolated Chromium preview: passed; real authentication/API behavior was not mocked for the unauthenticated 401 checks, while owner UI operations used synthetic auth and task API responses. No production task records were created or changed by these checks.
 
 Manual checks not performed: real-account end-to-end mutations, manual pixel/contrast audit, screen-reader testing, touch-device drag/resize, and complete-load/session-expiry simulation. Persistence and Gantt drag dispatch were covered by automated regression tests.
+
+## Quick-add correction (owner screenshot clarification)
+
+Target route: `/`.
+Approved scope / files changed: `app/tasks/task-manager.tsx`, `tests/tasks-interaction.test.mjs`, this record.
+Requested behavior: inline Add task directly saves; sidebar Tasks plus still opens the same description/date form used for editing.
+Reference: owner screenshots and the original quick-add behavior.
+Existing components/tokens reused: existing quick-add form, mutation/error path and unchanged TaskDialog; no style changes.
+Shared files changed: none. Other routes changed: none. Security/data-contract changes: none.
+Verification for this correction is recorded in the follow-up delivery; the earlier 82-test result above is the original feature baseline.
+
+Correction verification: lint, typecheck, 88 tests, production build, and isolated Chromium checks passed. Desktop (1440px) and phone (390px) direct button/Enter creation does not open a dialog, clears input only on success, and retains it on failure. Sidebar-plus and edit dialogs retain description/date fields on both sizes. The previous 5-width/3-theme, keyboard/focus/Escape, error, empty, unauthenticated and mocked permission checks were rerun successfully. Loading, destructive actions and manual-check limitations remain as described above. No production task data was used or changed by browser tests.

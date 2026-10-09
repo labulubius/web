@@ -97,16 +97,31 @@ test("task dialog keeps saving and errors accessible", () => {
   assert.ok(nodes(tree).some((n) => n.props.role === "alert" && n.children.includes("Cannot save")));
 });
 
-test("quick add opens the shared form rather than bypassing description entry", () => {
+for (const view of ["all", "gantt", "project"]) {
+  for (const success of [true, false]) {
+    test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
+      const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
+      const calls = []; const dialogs = [];
+      const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+        class { get() { return "  Report  "; } }, view, "project-1",
+        async (...args) => { calls.push(args); return success; }, (value) => dialogs.push(value),
+      );
+      let reset = false;
+      await handle({ preventDefault() {}, currentTarget: { reset() { reset = true; } } });
+      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : null }) }]]);
+      assert.deepEqual(dialogs, []);
+      assert.equal(reset, success);
+    });
+  }
+}
+
+test("quick add ignores blank titles without opening a dialog", async () => {
   const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
-  const calls = [];
-  const handle = new Function("FormData", "view", "projectId", "setTaskDialog", "setError", `${compile(quickAdd)}; return quickAdd;`)(
-    class { get() { return "  Report  "; } }, "all", null, (value) => calls.push(value), () => {},
+  const unexpected = () => assert.fail("Blank title must not submit, reset, or open a dialog");
+  const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+    class { get() { return "   "; } }, "all", null, unexpected, unexpected,
   );
-  let reset = false;
-  handle({ preventDefault() {}, currentTarget: { reset() { reset = true; } } });
-  assert.deepEqual(calls, [{ defaults: { title: "Report", projectId: null } }]);
-  assert.equal(reset, true);
+  await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
 
 test("uncategorized tasks retain dates in the list and can move on Gantt", () => {
