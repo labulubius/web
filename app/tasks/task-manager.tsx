@@ -39,7 +39,7 @@ function TaskList({ tasks, empty, projects, onOpen, onComplete, onDelete }: {
   return <ul className="task-list">{tasks.map((task) => <li key={task.id}>
     <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={() => onComplete(task)}><Circle size={15} /></button>
     <div className="task-list-main">
-      <strong>{task.title}</strong><span>{task.projectId ? task.startDate && task.endDate ? `${projectNames.get(task.projectId) ?? "Project"} · ${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : `${projectNames.get(task.projectId) ?? "Project"} · Not scheduled` : "Uncategorized"}</span>
+      <strong>{task.title}</strong><span>{task.projectId ? projectNames.get(task.projectId) ?? "Project" : "Uncategorized"} · {task.startDate && task.endDate ? `${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : "Not scheduled"}</span>
     </div>
     <span className="task-list-actions">
       <button type="button" onClick={() => onOpen({ task })} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
@@ -140,7 +140,7 @@ export function TaskManager() {
   async function mutate(url: string, options: RequestInit) {
     setSaving(true); setError("");
     try { setData(await api(url, options)); return true; }
-    catch { return false; }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "Could not save changes."); return false; }
     finally { setSaving(false); }
   }
 
@@ -181,19 +181,20 @@ export function TaskManager() {
   }
 
   async function deleteProject(project: TaskProject) {
-    if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and lose their dates.`)) return;
+    if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and keep their dates.`)) return;
     const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" });
     if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("all"); } }
   }
 
-  async function quickAdd(event: FormEvent<HTMLFormElement>) {
+  function quickAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const title = String(new FormData(form).get("title") ?? "").trim();
     if (!title) return;
     const selectedProject = view === "project" ? projectId : null;
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) });
-    if (ok) form.reset();
+    setError("");
+    setTaskDialog({ defaults: { title, projectId: selectedProject } });
+    form.reset();
   }
 
   function select(next: View, selectedProject: string | null = null) { setView(next); setProjectId(selectedProject); setError(""); }
@@ -223,7 +224,7 @@ export function TaskManager() {
     if (!data || !event.over || saving) return;
     const id = String(event.active.id).replace(/^task:/, "");
     const task = data.tasks.find((item) => item.id === id);
-    if (!task?.projectId) return;
+    if (!task) return;
     const match = String(event.over.id).match(/(\d{4}-\d{2}-\d{2})$/);
     if (!match) return;
     const length = task.startDate && task.endDate ? daysBetween(task.startDate, task.endDate) : 0;
@@ -268,7 +269,7 @@ export function TaskManager() {
         {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={data.tasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={view === "all" ? allTasks : projectTasks} empty={view === "all" ? "There are no tasks yet." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
-    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} onClose={() => setTaskDialog(null)} onSave={saveTask} />}
+    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={() => setTaskDialog(null)} onSave={saveTask} />}
     {projectDialog && <ProjectDialog project={projectDialog === "new" ? undefined : projectDialog} busy={saving} onClose={() => setProjectDialog(null)} onSave={saveProject} />}
   </DndContext>;
 }

@@ -80,7 +80,7 @@ export function GanttView({ timelineStart, timelineEnd, tasks, projects, onOpen,
 }) {
   const dates = useMemo(() => dateRange(timelineStart, timelineEnd), [timelineStart, timelineEnd]);
   const today = localDate();
-  const scheduled = tasks.filter((task) => task.projectId && task.startDate && task.endDate && task.startDate <= timelineEnd && task.endDate >= timelineStart).sort((a, b) => a.startDate!.localeCompare(b.startDate!) || a.title.localeCompare(b.title));
+  const scheduled = tasks.filter((task) => task.startDate && task.endDate && task.startDate <= timelineEnd && task.endDate >= timelineStart).sort((a, b) => a.startDate!.localeCompare(b.startDate!) || a.title.localeCompare(b.title));
   const minWidth = 190 + dates.length * 34;
   const gridStyle = { "--gantt-days": dates.length, minWidth: `${minWidth}px` } as CSSProperties;
   const createOn = (date: string) => onOpen({ defaults: { startDate: date, endDate: date } });

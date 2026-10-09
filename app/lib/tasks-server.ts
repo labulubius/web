@@ -53,12 +53,13 @@ function storedRange(task: Record<string, unknown>) {
   return { startDate: startDate as string | null, endDate: endDate as string | null };
 }
 
-function parseTask(value: unknown): PersonalTask {
+function parseTask(value: unknown, legacy = false): PersonalTask {
   const task = commonTask(value, false);
   const range = storedRange(task);
-  if (task.projectId === null && range.startDate !== null) throw new Error("Stored task data is invalid.");
+  if (!legacy && (typeof task.description !== "string" || task.description.length > 300)) throw new Error("Stored task data is invalid.");
   return {
     id: String(task.id), title: String(task.title), projectId: task.projectId as string | null, ...range,
+    description: legacy ? "" : task.description as string,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
@@ -68,8 +69,8 @@ function migrateVersionTwoTask(value: unknown): PersonalTask {
   const range = storedRange(task);
   const project = task.projectId as string | null;
   return {
-    id: String(task.id), title: String(task.title), projectId: project,
-    startDate: project ? range.startDate : null, endDate: project ? range.endDate : null,
+    id: String(task.id), title: String(task.title), description: "", projectId: project,
+    startDate: range.startDate, endDate: range.endDate,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
@@ -83,27 +84,27 @@ function migrateLegacyTask(value: unknown): PersonalTask | null {
   }
   if (task.completedAt !== null) return null;
   const project = task.projectId as string | null;
-  const date = project ? task.date as string | null : null;
+  const date = task.date as string | null;
   return {
-    id: String(task.id), title: String(task.title), projectId: project,
+    id: String(task.id), title: String(task.title), description: "", projectId: project,
     startDate: date, endDate: date,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
 
 function parseData(value: unknown): ReadResult {
-  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3].includes(Number(value.version))) {
+  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3, 4].includes(Number(value.version))) {
     throw new Error("Stored task data is invalid.");
   }
   const projects = value.projects.map(parseProject);
   const tasks = value.version === 1
     ? value.tasks.map(migrateLegacyTask).filter((task): task is PersonalTask => task !== null)
-    : value.version === 2 ? value.tasks.map(migrateVersionTwoTask) : value.tasks.map(parseTask);
+    : value.version === 2 ? value.tasks.map(migrateVersionTwoTask) : value.tasks.map((task) => parseTask(task, value.version === 3));
   const projectIds = new Set(projects.map((project) => project.id));
   if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
     throw new Error("Stored task data is invalid.");
   }
-  return { data: { version: 3, tasks, projects }, migrated: value.version !== 3 };
+  return { data: { version: 4, tasks, projects }, migrated: value.version !== 4 };
 }
 
 export async function tasksRoot() {
@@ -132,7 +133,7 @@ async function readData(root: string): Promise<ReadResult> {
   let handle;
   try { handle = await open(path.join(root, DATA_FILE), constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 3, tasks: [], projects: [] }, migrated: false };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 4, tasks: [], projects: [] }, migrated: false };
     throw error;
   }
   try { return parseData(JSON.parse(await handle.readFile("utf8"))); }
@@ -200,11 +201,11 @@ export async function createTask(input: unknown) {
     const { data } = await readData(root);
     const selectedProject = projectId(input.projectId, data.projects);
     const range = taskRange(input.startDate, input.endDate);
-    if (!selectedProject && range.startDate) throw new Error("Invalid project task date range.");
     const now = new Date().toISOString();
     const task: PersonalTask = {
       id: randomUUID(), title: text(input.title, "task title", 200), projectId: selectedProject,
-      startDate: selectedProject ? range.startDate : null, endDate: selectedProject ? range.endDate : null,
+      description: "description" in input ? text(input.description, "task description", 300, true) : "",
+      startDate: range.startDate, endDate: range.endDate,
       createdAt: now, updatedAt: now,
     };
     data.tasks.unshift(task);
@@ -225,15 +226,13 @@ export async function updateTask(id: string, input: unknown) {
     const range = "startDate" in input || "endDate" in input
       ? taskRange("startDate" in input ? input.startDate : current.startDate, "endDate" in input ? input.endDate : current.endDate)
       : { startDate: current.startDate, endDate: current.endDate };
-    if (!selectedProject && range.startDate && !("projectId" in input && !("startDate" in input) && !("endDate" in input))) {
-      throw new Error("Invalid project task date range.");
-    }
     data.tasks[index] = {
       ...current,
       title: "title" in input ? text(input.title, "task title", 200) : current.title,
+      description: "description" in input ? text(input.description, "task description", 300, true) : current.description,
       projectId: selectedProject,
-      startDate: selectedProject ? range.startDate : null,
-      endDate: selectedProject ? range.endDate : null,
+      startDate: range.startDate,
+      endDate: range.endDate,
       updatedAt: new Date().toISOString(),
     };
     await writeData(root, data);
@@ -303,7 +302,7 @@ export async function deleteProject(id: string) {
     if (index < 0) throw new Error("Project not found.");
     data.projects.splice(index, 1);
     const now = new Date().toISOString();
-    data.tasks = data.tasks.map((task) => task.projectId === id ? { ...task, projectId: null, startDate: null, endDate: null, updatedAt: now } : task);
+    data.tasks = data.tasks.map((task) => task.projectId === id ? { ...task, projectId: null, updatedAt: now } : task);
     await writeData(root, data);
     return data;
   });
