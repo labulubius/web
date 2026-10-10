@@ -45,3 +45,33 @@ profiles:
               pattern: '\s*\|.*$'
               replacement: ''
             - name: parse_time
+
+  - match:
+      hostnames:
+        - www.worldbank.org
+        - worldbank.org
+      path: /en/research/all
+    config:
+      strategy: default
+      channel:
+        title: World Bank — All Research
+        time_zone: UTC
+      selectors:
+        items:
+          selector: '.n07v4 > ul > li'
+          enhance: false
+        title:
+          selector: '.n07v4-title a'
+        url:
+          selector: '.n07v4-title a'
+          extractor: href
+        description:
+          selector: '.n07v4-blurb'
+          extractor: text
+        published_at:
+          selector: '.n07v4-info:nth-of-type(3)'
+          post_process:
+            - name: gsub
+              pattern: '^\s*Date:\s*'
+              replacement: ''
+            - name: parse_time

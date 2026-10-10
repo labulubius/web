@@ -50,3 +50,8 @@ test("configured browser source keeps filters and extracts dates from actual car
   assert.match(adapter, /singleton_class\.prepend/);
   assert.doesNotMatch(adapter, /generate_feed_token|validate_and_decode_feed_token/);
 });
+
+test("configured static research source extracts document dates without a browser", () => {
+  for (const expected of ["path: /en/research/all", "strategy: default", ".n07v4 > ul > li", ".n07v4-info:nth-of-type(3)", "pattern: '^\\s*Date:"])
+    assert.ok(profiles.includes(expected), expected);
+});

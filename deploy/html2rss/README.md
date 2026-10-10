@@ -61,7 +61,7 @@ Botasaurus's initial-target validation. The Docker network is IPv4-only. Chromiu
 still has its own isolated container loopback for internal browser IPC; this is
 not the host's loopback and holds no host credentials or mounted private data.
 
-## Declarative browser profiles
+## Declarative source profiles
 
 The URL-only create API does not accept browser wait/selector controls. A small,
 read-only `RUBYOPT` adapter waits for the real SourceResolver to load, then prepends its token input method
@@ -75,13 +75,17 @@ parameters are retained, not rewritten. It can configure browser wait conditions
 and html2rss's existing CSS selectors and date transforms. It cannot change the
 channel URL, read local files, or carry proxy/cookie/header credentials.
 
-The World Bank English Press Release profile:
+The World Bank profiles use the same declarative mechanism. English Press Releases:
 
 - keeps the exact filter URL rather than resolving it to `/ext/en/news`;
 - waits for actual search-result links, not just the page load event;
 - extracts only `.search-item` cards, their title, URL, description and date;
 - uses `parse_time` on the displayed date, not a URL date or scrape timestamp;
 - disables automatic link extraction for this explicitly configured source.
+
+All Research uses ordinary HTTP (no browser), extracts exactly the `.n07v4` document cards,
+and strips the visible `Date:` prefix before `parse_time`. The source currently includes one
+future-dated document; downstream retention policy excludes future items until their date.
 
 Other complex sites may need a short declarative profile, not a new parser.
 Browser rendering is not a guarantee of faithful extraction: check result previews,

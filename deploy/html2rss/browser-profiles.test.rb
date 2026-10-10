@@ -25,6 +25,17 @@ check(LabulubiusHtml2rssProfiles.apply(base, wrong_filter, profiles).equal?(base
 check(LabulubiusHtml2rssProfiles.apply(base, url + '&lang_exact=English', profiles).equal?(base), 'reject duplicate query keys')
 check(LabulubiusHtml2rssProfiles.apply(base, url.gsub('+', '%20'), profiles)[:strategy] == 'botasaurus', 'query encoding')
 
+research_url = 'https://www.worldbank.org/en/research/all'
+research_base = { channel: { url: research_url }, auto_source: {}, strategy: :auto }
+research = LabulubiusHtml2rssProfiles.apply(research_base, research_url, profiles)
+check(research.dig(:channel, :url) == research_url, 'research URL preservation')
+check(research[:strategy] == 'default', 'research uses ordinary HTTP strategy')
+check(research.dig(:selectors, :items, :selector) == '.n07v4 > ul > li', 'research card selector')
+check(research.dig(:selectors, :published_at, :post_process).last[:name] == 'parse_time', 'research date extraction')
+check(!research.key?(:auto_source), 'research disables heuristic extraction')
+check(LabulubiusHtml2rssProfiles.apply(research_base, research_url + '?lang=English', profiles)[:strategy] == 'default', 'research query preservation')
+check(LabulubiusHtml2rssProfiles.apply(research_base, research_url.sub('https:', 'http:'), profiles).equal?(research_base), 'research requires HTTPS')
+
 # Exercise the actual prepend/bootstrap ordering used by RUBYOPT.
 # Some libraries (e.g. REXML::Functions) override Module.name with an XPath
 # function. The hook must use the native Module getter, not invoke that function.
