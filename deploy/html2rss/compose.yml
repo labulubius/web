@@ -25,16 +25,50 @@ services:
       RACK_ENV: production
       PORT: 4000
       AUTO_SOURCE_ENABLED: "true"
-      HTML2RSS_TOTAL_TIMEOUT_SECONDS: 20
-      REQUEST_TIMEOUT_SECONDS: 25
+      HTML2RSS_TOTAL_TIMEOUT_SECONDS: 35
+      REQUEST_TIMEOUT_SECONDS: 40
+      BOTASAURUS_SCRAPE_TIMEOUT_SECONDS: 30
+      BOTASAURUS_SCRAPE_WORK_TIMEOUT_SECONDS: 20
+      BOTASAURUS_SCRAPER_URL: http://botasaurus:4010
+      RUBYOPT: -r/app/config/browser-profiles.rb
+    volumes:
+      - ./browser-profiles.rb:/app/config/browser-profiles.rb:ro
+      - ./browser-profiles.yml:/app/config/browser-profiles.yml:ro
+    dns:
+      - 172.30.0.53
+    depends_on:
+      - dnsproxy
+      - botasaurus
+    networks:
+      - backend
+    mem_limit: 512m
+    cpus: 1.0
+  botasaurus:
+    image: html2rss/botasaurus-scrape-api@sha256:40523fdfc6178631d4273394d64958d50c28ceb4da4c2f59bb588327a8e21af2
+    restart: unless-stopped
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SCRAPE_MAX_WORKERS: 1
+      SCRAPE_MAX_PER_HOST: 1
+      SCRAPE_TIMEOUT_SECONDS: 30
+      SCRAPE_WORK_TIMEOUT_SECONDS: 20
+      SCRAPE_PREWARM: "false"
     dns:
       - 172.30.0.53
     depends_on:
       - dnsproxy
     networks:
-      - backend
-    mem_limit: 512m
+      backend:
+        ipv4_address: 172.30.0.54
+    mem_limit: 768m
     cpus: 1.0
+    shm_size: 512m
+    tmpfs:
+      - /tmp/scrape:rw,size=384m,mode=1777
 networks:
   backend:
     ipam:

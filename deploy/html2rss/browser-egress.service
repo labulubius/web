@@ -1,0 +1,11 @@
+[Unit]
+Description=Restrict html2rss browser container egress
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/html2rss/browser-egress.sh apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

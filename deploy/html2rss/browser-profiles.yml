@@ -1,0 +1,47 @@
+# Declarative browser/field configuration, not a website-specific parser.
+# Exact query matching avoids silently changing the user's chosen filters.
+profiles:
+  - match:
+      hostnames:
+        - www.worldbank.org
+        - worldbank.org
+      path: /en/news/all
+      query:
+        displayconttype_exact: Press Release
+        lang_exact: English
+    config:
+      strategy: botasaurus
+      channel:
+        title: World Bank — English Press Releases
+        language: en
+        time_zone: UTC
+      request:
+        max_redirects: 4
+        max_requests: 1
+        total_timeout_seconds: 35
+        botasaurus:
+          execution_mode: browser
+          navigation_mode: get
+          max_retries: 0
+          headless: true
+          wait_for_selector: 'main .search-list .search-item .search-title a'
+          wait_timeout_seconds: 20
+      selectors:
+        items:
+          selector: 'main .search-list .search-item'
+          enhance: false
+        title:
+          selector: '.search-title h2 a'
+        url:
+          selector: '.search-title h2 a'
+          extractor: href
+        description:
+          selector: '.search-description'
+          extractor: text
+        published_at:
+          selector: '.result-meta'
+          post_process:
+            - name: gsub
+              pattern: '\s*\|.*$'
+              replacement: ''
+            - name: parse_time

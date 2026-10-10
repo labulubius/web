@@ -4,6 +4,8 @@ import { readLimitedNewsResource } from "./news-feed-proxy";
 import { InvalidHtml2RssFeed, normalizeHtml2rssFeed } from "./news-html2rss-feed";
 import type { ParsedWebSource } from "./news-web-source-feed";
 
+// Browser wall 30s < gem 35s < web 40s < this client 43s.
+const HTML2RSS_REQUEST_TIMEOUT_MS = 43_000;
 const feedPathPattern = /^\/api\/v1\/feeds\/[A-Za-z0-9_.=-]+\.json$/;
 
 type CreateResponse = {
@@ -35,7 +37,7 @@ async function readFeed(feedPath: string, sourceUrl: string, previous: ParsedWeb
   if (!feedPathPattern.test(feedPath)) throw new Html2RssUnavailable("html2rss returned an invalid feed path.");
   const { api } = configuration();
   const endpoint = new URL(feedPath.replace(/^\/api\/v1\//, ""), api);
-  const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(27_000) });
+  const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(HTML2RSS_REQUEST_TIMEOUT_MS) });
   if (!response.ok) {
     await response.body?.cancel();
     throw new Html2RssUnavailable("html2rss could not refresh this page.");
@@ -54,7 +56,7 @@ export async function createHtml2rssSource(sourceUrl: string, now = Date.now()) 
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ url: sourceUrl }),
     cache: "no-store",
-    signal: AbortSignal.timeout(27_000),
+    signal: AbortSignal.timeout(HTML2RSS_REQUEST_TIMEOUT_MS),
   });
   const payload = await responseJson(response) as CreateResponse;
   if (!response.ok || payload.success !== true) throw new Html2RssUnavailable("html2rss could not extract articles from this page.");

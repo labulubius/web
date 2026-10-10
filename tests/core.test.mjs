@@ -692,7 +692,7 @@ test("Feeds keeps html2rss private and behind higher-precision discovery", async
   const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
   assert.match(client, /HTML2RSS_ACCESS_TOKEN/);
   assert.match(client, /api\.hostname !== "127\.0\.0\.1"/);
-  assert.match(client, /AbortSignal\.timeout\(27_000\)/);
+  assert.match(client, /AbortSignal\.timeout\(HTML2RSS_REQUEST_TIMEOUT_MS\)/);
   assert.match(sources, /adapter: "csis-topic-v1" \| "html2rss-v1"/);
   assert.ok(sources.indexOf("canonicalCsisTopicUrl(value)") < sources.indexOf("canonicalHtml2rssSourceUrl(value)"));
   assert.match(sources, /abnormally small batch/);
