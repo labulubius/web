@@ -53,12 +53,6 @@ was created by these probes. Automatically mapping Stack Overflow homepage/tag-p
 URLs would require a separate implementation and regression tests; it is not
 implemented by this documentation update.
 
-## Generated notice sources
-
-The tokenized CAU endpoint at `https://labulubius.com/api/news/cau/<token>` logs in through CAS server-side and publishes only title, date, publishing unit, original login-required link and a sanitized short summary. Credentials are encrypted with systemd credentials and must never enter environment files, Git, arguments or logs. `labulubius-cau-news-refresh.timer` refreshes its private cache every 30 minutes.
-
-The separate CIEE endpoint at `https://labulubius.com/api/news/ciee` adapts the public college listing and uses source-specific HTTP Basic authentication derived from `NEWS_FEED_PROXY_SECRET`. It publishes bounded, sanitized metadata and summaries without attachments or full bodies. `labulubius-ciee-news-refresh.timer` refreshes its cache every 30 minutes. Both generated feeds retain only notices from the latest five days.
-
 ## Five-day article lifecycle
 
 Miniflux polls subscriptions every 30 minutes and cleans read and unread archived entries after five days. `/api/news` independently requests only entries published in the latest five days and before the next UTC midnight, preserving chronological pagination and excluding future-dated content. GitHub stores code and CI history, not Miniflux article data.
@@ -92,7 +86,6 @@ After native RSS/Atom and registered high-precision adapters fail, `/feeds` may 
 - Verify a successful source check does not create a subscription until Save. For supported page mappings and direct feeds, test discovery separately from subscription creation; do not assume homepage access and feed access are equivalent.
 - Open a source from Sources, follow an item in a new tab, and return after an account recheck: the reader must stay on the selected source. Repeat with a Watchboard and with local storage unavailable. The navigation regressions in `tests/feeds-navigation.test.mjs` execute the actual effect and handlers without a browser.
 - Verify Watchboards require every configured tag, independently of the source's public-selection checkbox.
-- Confirm `labulubius-cau-news-refresh.timer` and `labulubius-ciee-news-refresh.timer` are active.
 - Confirm Miniflux is reachable only at `127.0.0.1:8083` and no standalone reader hostname is published.
 
 ## Short-lived verified feed reuse

@@ -35,12 +35,6 @@ npm run build
 
 Commit and push the verified revision to GitHub, restart `labulubius-web.service`, purge the cached HTML URLs `/`, `/about`, `/nav` and `/feeds` through the Cloudflare API, then run `scripts/health-check.sh`. Confirm the new GitHub Actions run succeeds and validate `MISS → HIT` for public HTML and both public News views. Recheck that RSC requests, `/api/health`, private News views, invalid cursors and `/drive/file/**` are not cached. GitHub is the source history and CI remote; it is not a deployment target. Never use `git clean` or a destructive reset on the production checkout without separately checking ignored environment files and the persistent data directories. Roll back by checking out or reverting to a known-good Git revision, rebuilding, restarting the service, purging the affected cache entries and repeating the health and cache-boundary checks.
 
-## CAU notice synchronization
-
-`labulubius-cau-news-refresh.timer` refreshes the authenticated school-notice feed every 30 minutes. Check it with `systemctl status labulubius-cau-news-refresh.timer` and `journalctl -u labulubius-cau-news-refresh.service`. Login failures do not log credentials or response bodies. Rotate the encrypted credentials with `systemd-creds encrypt --name=cau-username` and `--name=cau-password`, then restart `labulubius-web.service`.
-
-`labulubius-ciee-news-refresh.timer` independently refreshes the public CIEE notice feed every 30 minutes. Check it with `systemctl status labulubius-ciee-news-refresh.timer` and `journalctl -u labulubius-ciee-news-refresh.service`. Its cache is `${NEWS_DATA_DIR:-~/.local/share/labulubius/news}/ciee-feed.json`; a failed refresh keeps the last successful cache. Install the root-owned wrapper from `scripts/ciee-news-refresh.sh` and the unit templates from `deploy/systemd/`.
-
 ## Security headers
 
 Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive origin. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on the main and Drive hostnames after changes to Cloudflare Tunnel or a reverse proxy.
