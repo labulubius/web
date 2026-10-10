@@ -4,9 +4,12 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { newsCategories, newsFeeds } from "./news-server";
 import { newsReaderBackend } from "./news-reader-backend";
-import { discoverPinnedNewsFeedDetails, newsFeedProxyUrl } from "./news-feed-proxy";
+import { discoverPinnedNewsFeedDetails, fetchPinnedNewsResource, newsFeedProxyUrl, readLimitedNewsResource } from "./news-feed-proxy";
 import { NewsFeedDiscoveryError, withNewsFeedFallback, type NewsFeedDiscovery, type NewsFeedDiscoveryMethod } from "./news-feed-discovery";
-import { createWebSource, deleteWebSource, DuplicateWebSource, probeWebSource, UnsupportedWebSource, type WebSourceProbe } from "./news-web-sources";
+import { createPreparedWebSource, deleteWebSource, DuplicateWebSource, prepareWebSource, UnsupportedWebSource, type PreparedWebSource } from "./news-web-sources";
+import { parseNewsFeedPreview, reviewWebSourcePreview, UnreliableNewsSource, type NewsSourceReview } from "./news-source-preview";
+import { retainRecentWebSourceItems } from "./news-web-source-feed";
+import { NewsSourceProbeStore } from "./news-source-probe-cache";
 
 const blocked = new BlockList();
 for (const [network, bits] of [
@@ -97,14 +100,50 @@ async function feed(value: unknown) {
   return found;
 }
 
-export type NewsManagementResult = {
-  discovery?: { url: string; method: NewsFeedDiscoveryMethod };
-  probe?: WebSourceProbe | { kind: "feed"; method: Exclude<NewsFeedDiscoveryMethod, "web">; url: string };
+export type NewsSourceProbe = NewsSourceReview & {
+  token: string;
+  kind: "feed" | "web";
+  method: NewsFeedDiscoveryMethod;
+  url: string;
 };
+export type NewsManagementResult = { discovery?: { url: string; method: NewsFeedDiscoveryMethod }; probe?: NewsSourceProbe };
 
+type PreparedNewsSource =
+  | { kind: "feed"; found: NewsFeedDiscovery; review: NewsSourceReview }
+  | { kind: "web"; web: PreparedWebSource; review: NewsSourceReview };
 type AddNewsSource =
   | { kind: "feed"; found: NewsFeedDiscovery }
-  | { kind: "web"; web: Awaited<ReturnType<typeof createWebSource>> };
+  | { kind: "web"; web: Awaited<ReturnType<typeof createPreparedWebSource>> };
+const probeGlobal = globalThis as typeof globalThis & { __labulubiusNewsSourceProbesV1?: NewsSourceProbeStore<PreparedNewsSource> };
+const pendingProbes = probeGlobal.__labulubiusNewsSourceProbesV1 ??= new NewsSourceProbeStore<PreparedNewsSource>();
+
+function consumeProbe(ownerId: string, inputUrl: string, token: string) {
+  return pendingProbes.consume(ownerId, inputUrl, token) ?? invalid("Source check expired or does not match this URL. Check the source again.");
+}
+async function inspectSource(ownerId: string, inputUrl: string): Promise<NewsSourceProbe> {
+  let source: PreparedNewsSource;
+  try {
+    const located = await withNewsFeedFallback<{ kind: "feed"; found: NewsFeedDiscovery } | { kind: "web"; web: PreparedWebSource }>(
+      async () => ({ kind: "feed", found: await discoverPinnedNewsFeedDetails(inputUrl) }),
+      async () => ({ kind: "web", web: await prepareWebSource(inputUrl) }),
+    );
+    if (located.kind === "feed") {
+      const fetched = await fetchPinnedNewsResource(located.found.url);
+      if (!fetched.response.ok) { await fetched.response.body?.cancel(); return invalid("The discovered feed could not be inspected."); }
+      const body = await readLimitedNewsResource(fetched.response);
+      source = { ...located, review: parseNewsFeedPreview(body, located.found.url) };
+    } else {
+      source = { ...located, review: reviewWebSourcePreview(retainRecentWebSourceItems(located.web.source)) };
+    }
+  } catch (error) {
+    if (error instanceof NewsFeedDiscoveryError || error instanceof UnsupportedWebSource || error instanceof UnreliableNewsSource) return invalid(error.message);
+    return invalid("This page could not be inspected for reliable articles.");
+  }
+  const resolved = source.kind === "feed" ? source.found.url : source.web.data.url;
+  if ((await newsFeeds()).some((item) => { try { return new URL(item.url).href === new URL(resolved).href; } catch { return item.url === resolved; } })) return invalid("Source already exists.");
+  const token = pendingProbes.stage(ownerId, inputUrl, source);
+  return { token, kind: source.kind, method: source.kind === "feed" ? source.found.method : "web", url: resolved, ...source.review };
+}
 
 export async function manageNews(input: unknown, userId: string): Promise<NewsManagementResult | void> {
   const body = object(input);
@@ -112,19 +151,7 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
   switch (action) {
     case "probeFeed": {
       const url = await publicURL(body.url);
-      try {
-        const probe = await withNewsFeedFallback<NonNullable<NewsManagementResult["probe"]>>(
-          async () => {
-            const found = await discoverPinnedNewsFeedDetails(url);
-            return { kind: "feed", method: found.method, url: found.url };
-          },
-          () => probeWebSource(url),
-        );
-        return { probe };
-      } catch (error) {
-        if (error instanceof NewsFeedDiscoveryError || error instanceof UnsupportedWebSource) return invalid(error.message);
-        return invalid("This page could not be inspected for articles.");
-      }
+      return { probe: await inspectSource(userId, url) };
     }
     case "createCategory": {
       const name = categoryName(body.name);
@@ -150,17 +177,14 @@ export async function manageNews(input: unknown, userId: string): Promise<NewsMa
       // user-created folders exist.
       const dest = body.categoryId === undefined && body.category === undefined ? undefined : await category(body.categoryId ?? body.category);
       const title = optionalText(body.title, "title");
-      // Prefer a direct, native, or declared feed before trying a registered webpage adapter.
+      const probeToken = text(body.probeToken, "source check", 100);
+      const prepared = consumeProbe(userId, url, probeToken);
       let located: AddNewsSource;
       try {
-        located = await withNewsFeedFallback<AddNewsSource>(
-          async () => ({ kind: "feed", found: await discoverPinnedNewsFeedDetails(url) }),
-          async () => ({ kind: "web", web: await createWebSource(userId, url) }),
-        );
+        located = prepared.kind === "feed" ? { kind: "feed", found: prepared.found }
+          : { kind: "web", web: await createPreparedWebSource(userId, prepared.web) };
       } catch (error) {
-        if (error instanceof NewsFeedDiscoveryError || error instanceof DuplicateWebSource || error instanceof UnsupportedWebSource) {
-          return invalid(error.message);
-        }
+        if (error instanceof DuplicateWebSource || error instanceof UnsupportedWebSource) return invalid(error.message);
         return invalid("This page could not be converted into an article feed.");
       }
       let source: string;

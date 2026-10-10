@@ -19,6 +19,8 @@ import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
 import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
 import { canonicalCsisTopicUrl, filterFutureWebSourceItems, parseCsisTopicPage, renderWebSourceRss, retainRecentWebSourceItems } from "../app/lib/news-web-source-feed.ts";
 import { canonicalHtml2rssSourceUrl, normalizeHtml2rssFeed } from "../app/lib/news-html2rss-feed.ts";
+import { parseNewsFeedPreview, reviewWebSourcePreview, UnreliableNewsSource } from "../app/lib/news-source-preview.ts";
+import { NewsSourceProbeStore } from "../app/lib/news-source-probe-cache.ts";
 import nextConfig from "../next.config.ts";
 
 test("PDF handoff carries a private structured reference into Agent", () => {
@@ -624,6 +626,63 @@ test("Feeds excludes future web-source items after the current UTC day", () => {
   assert.equal((rss.match(/<item>/g) || []).length, 2);
 });
 
+test("Feeds source preview parses RSS and Atom articles, dates, summaries, and warnings", () => {
+  const now = Date.parse("2026-10-10T12:00:00Z");
+  const rss = new TextEncoder().encode(`<?xml version="1.0"?><rss version="2.0"><channel><title>Example &amp; News</title>
+    <item><title>First &amp; best</title><link>/first#fragment</link><pubDate>Fri, 09 Oct 2026 00:00:00 GMT</pubDate><description>A useful summary.</description></item>
+    <item><title>Repeated headline</title><link>https://example.org/repeated</link><pubDate>Thu, 08 Oct 2026 00:00:00 GMT</pubDate><description>Repeated headline</description></item>
+    <item><title>No date</title><link>https://example.org/no-date</link><description>Still an article.</description></item>
+  </channel></rss>`);
+  const checked = parseNewsFeedPreview(rss, "https://example.org/feed.xml", now);
+  assert.equal(checked.title, "Example & News");
+  assert.equal(checked.itemCount, 3);
+  assert.equal(checked.items[0].url, "https://example.org/first");
+  assert.equal(checked.items[0].summary, "A useful summary.");
+  assert.equal(checked.items[2].published, null);
+  assert.equal(checked.warnings.length, 2);
+
+  const atom = new TextEncoder().encode(`<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom source</title><entry><title>Atom item</title><link rel="alternate" href="/atom-item"/><published>2026-10-09T10:00:00Z</published><summary>Atom summary</summary></entry></feed>`);
+  const atomChecked = parseNewsFeedPreview(atom, "https://example.org/atom.xml", now);
+  assert.equal(atomChecked.items[0].url, "https://example.org/atom-item");
+  assert.equal(atomChecked.items[0].published, Date.parse("2026-10-09T10:00:00Z"));
+});
+
+test("Feeds source preview blocks unreliable dates but only warns about weak summaries", () => {
+  const now = Date.parse("2026-10-10T12:00:00Z");
+  const undated = new TextEncoder().encode(`<rss><channel><title>Bad</title><item><title>Navigation</title><link>https://example.org/nav</link><description>Navigation</description></item></channel></rss>`);
+  assert.throws(() => parseNewsFeedPreview(undated, "https://example.org/feed", now), UnreliableNewsSource);
+  const source = { title: "Web", description: "", items: [
+    { id: "one", title: "One", url: "https://example.org/one", published: now, publishedReliable: true, summary: "One" },
+    { id: "two", title: "Two", url: "https://example.org/two", published: now, publishedReliable: true, summary: "" },
+  ] };
+  const reviewed = reviewWebSourcePreview(source, now);
+  assert.equal(reviewed.itemCount, 2);
+  assert.match(reviewed.warnings[0], /no independent summary/);
+  assert.throws(() => reviewWebSourcePreview({ ...source, items: source.items.map((item) => ({ ...item, publishedReliable: false })) }, now), /No trustworthy publication dates/);
+  assert.throws(() => reviewWebSourcePreview({ ...source, items: source.items.map((item) => ({ ...item, published: Date.parse("2100-01-01T00:00:00Z") })) }, now), /No trustworthy publication dates/);
+});
+
+test("Feeds source checks are bounded, owner-bound, URL-bound, expiring, and one-use", () => {
+  let now = 1_000;
+  let serial = 0;
+  const store = new NewsSourceProbeStore(2, 100, () => now, () => `token-${++serial}`);
+  const first = store.stage("owner-a", "https://example.org/a", { id: 1 });
+  assert.equal(store.consume("owner-b", "https://example.org/a", first), null);
+  assert.equal(store.consume("owner-a", "https://example.org/a", first), null, "a mismatched attempt consumes the opaque token");
+  const second = store.stage("owner-a", "https://example.org/a", { id: 2 });
+  assert.equal(store.consume("owner-a", "https://example.org/b", second), null);
+  const expiring = store.stage("owner-a", "https://example.org/a", { id: 3 });
+  now += 100;
+  assert.equal(store.consume("owner-a", "https://example.org/a", expiring), null);
+  const oldest = store.stage("owner-a", "https://example.org/1", { id: 4 });
+  const kept = store.stage("owner-a", "https://example.org/2", { id: 5 });
+  const newest = store.stage("owner-a", "https://example.org/3", { id: 6 });
+  assert.equal(store.consume("owner-a", "https://example.org/1", oldest), null, "capacity evicts the oldest check");
+  assert.deepEqual(store.consume("owner-a", "https://example.org/2", kept), { id: 5 });
+  assert.deepEqual(store.consume("owner-a", "https://example.org/3", newest), { id: 6 });
+  assert.equal(store.consume("owner-a", "https://example.org/3", newest), null);
+});
+
 test("Feeds web sources stay private, cached, revocable, and Miniflux-backed", async () => {
   const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
   const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
@@ -634,7 +693,9 @@ test("Feeds web sources stay private, cached, revocable, and Miniflux-backed", a
   const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
 
   assert.match(management, /case "probeFeed"/);
-  assert.match(management, /createWebSource\(userId, url\)/);
+  assert.match(management, /createPreparedWebSource\(userId, prepared\.web\)/);
+  assert.match(management, /consumeProbe\(userId, url, probeToken\)/);
+  assert.match(management, /new NewsSourceProbeStore<PreparedNewsSource>/);
   assert.match(minifluxBackend, /feed_url:url/);
   assert.match(management, /deleteWebSource\(userId, source\.url\)/);
   assert.match(sources, /fetchPinnedNewsResource\(url\)/);
@@ -671,8 +732,11 @@ test("Feeds normalizes generic html2rss items with stable first-seen dates", () 
     ["https://example.org/dated", "Dated", Date.parse("2026-10-06T12:00:00Z")],
   ]);
   assert.equal(first.items[0].summary, "A & B");
+  assert.equal(first.items[0].publishedReliable, false);
+  assert.equal(first.items[1].publishedReliable, true);
   const refreshed = normalizeHtml2rssFeed(payload, url, now + 60_000, first);
   assert.equal(refreshed.items[0].published, now);
+  assert.equal(refreshed.items[0].publishedReliable, false);
 });
 
 test("Feeds retains generated webpage items for exactly five days and rejects future UTC dates", () => {

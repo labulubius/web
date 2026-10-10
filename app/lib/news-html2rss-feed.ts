@@ -50,20 +50,21 @@ function articleUrl(value: unknown, sourceUrl: string) {
   return url.href;
 }
 
-function publishedAt(item: JsonFeedItem, previous: Map<string, number>, id: string, now: number) {
+function publishedAt(item: JsonFeedItem, previous: Map<string, WebSourceItem>, id: string, now: number) {
   for (const value of [item.date_published, item.date_modified]) {
     if (typeof value !== "string") continue;
     const timestamp = Date.parse(value);
-    if (Number.isFinite(timestamp)) return timestamp;
+    if (Number.isFinite(timestamp)) return { published: timestamp, publishedReliable: true };
   }
-  return previous.get(id) ?? now;
+  const old = previous.get(id);
+  return old ? { published: old.published, publishedReliable: old.publishedReliable !== false } : { published: now, publishedReliable: false };
 }
 
 export function normalizeHtml2rssFeed(value: unknown, sourceUrl: string, now = Date.now(), previous?: ParsedWebSource): ParsedWebSource {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new InvalidHtml2RssFeed("html2rss returned an invalid feed.");
   const feed = value as JsonFeed;
   if (!Array.isArray(feed.items)) throw new InvalidHtml2RssFeed("html2rss returned an invalid feed.");
-  const prior = new Map((previous?.items || []).map((item) => [item.id, item.published]));
+  const prior = new Map((previous?.items || []).map((item) => [item.id, item]));
   const items = new Map<string, WebSourceItem>();
   for (const candidate of feed.items.slice(0, MAX_ITEMS)) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
@@ -72,11 +73,12 @@ export function normalizeHtml2rssFeed(value: unknown, sourceUrl: string, now = D
     const title = plainText(item.title, 300);
     if (!url || !title) continue;
     const id = url;
+    const timing = publishedAt(item, prior, id, now);
     items.set(id, {
       id,
       title,
       url,
-      published: publishedAt(item, prior, id, now),
+      ...timing,
       summary: plainText(item.summary || item.content_text, 1_000),
     });
   }

@@ -40,6 +40,8 @@ type WebSourceRecord = {
 type WebSourceRegistry = { version: 1; sources: WebSourceRecord[] };
 type WebSourceCache = { updatedAt: number; source: ParsedWebSource };
 
+export type PreparedWebSource = { data: WebSourceTokenData; source: ParsedWebSource; feedPath?: string };
+
 export type WebSourceProbe = {
   kind: "web";
   adapter: "csis-topic-v1" | "html2rss-v1";
@@ -60,7 +62,7 @@ function validItem(value: unknown): value is WebSourceItem {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as WebSourceItem;
   return typeof item.id === "string" && typeof item.title === "string" && typeof item.url === "string" &&
-    Number.isFinite(item.published) && typeof item.summary === "string";
+    Number.isFinite(item.published) && (item.publishedReliable === undefined || typeof item.publishedReliable === "boolean") && typeof item.summary === "string";
 }
 
 function validParsedSource(value: unknown): value is ParsedWebSource {
@@ -164,34 +166,32 @@ function acceptableRefresh(previous: ParsedWebSource, next: ParsedWebSource) {
   return next;
 }
 
-export async function probeWebSource(value: string): Promise<WebSourceProbe> {
+export async function prepareWebSource(value: string): Promise<PreparedWebSource> {
   const data = adapterFor(value);
   if (!data) throw new UnsupportedWebSource("This page has no discoverable RSS feed and no supported article adapter.");
-  const source = retainRecentWebSourceItems((await initialSource(data)).source);
-  return {
-    kind: "web",
-    adapter: data.adapter,
-    url: data.url,
-    title: source.title,
-    items: source.items.slice(0, 5).map(({ title, url, published }) => ({ title, url, published })),
-  };
+  const initial = await initialSource(data);
+  return { data, source: initial.source, ...(initial.feedPath ? { feedPath: initial.feedPath } : {}) };
+}
+
+export async function probeWebSource(value: string): Promise<WebSourceProbe> {
+  const prepared = await prepareWebSource(value);
+  const source = retainRecentWebSourceItems(prepared.source);
+  return { kind: "web", adapter: prepared.data.adapter, url: prepared.data.url, title: source.title,
+    items: source.items.slice(0, 5).map(({ title, url, published }) => ({ title, url, published })) };
 }
 
 let registryPending: Promise<unknown> = Promise.resolve();
 
-export async function createWebSource(ownerId: string, value: string) {
+export async function createPreparedWebSource(ownerId: string, prepared: PreparedWebSource) {
   validUserId(ownerId);
-  const data = adapterFor(value);
-  if (!data) throw new UnsupportedWebSource("This page has no discoverable RSS feed and no supported article adapter.");
-  const initial = await initialSource(data);
-  const parsed = initial.source;
+  const { data, source: parsed } = prepared;
   const operation = registryPending.catch(() => {}).then(async () => {
     const registry = await loadRegistry();
     if (registry.sources.some((source) => source.url === data.url)) throw new DuplicateWebSource("Source already exists.");
     const record: WebSourceRecord = {
       id: randomUUID(), ownerId, adapter: data.adapter, url: data.url,
       title: parsed.title, createdAt: Date.now(),
-      ...(initial.feedPath ? { html2rssFeedPath: initial.feedPath } : {}),
+      ...(prepared.feedPath ? { html2rssFeedPath: prepared.feedPath } : {}),
     };
     await atomicWrite(cachePath(record.id), { updatedAt: Date.now(), source: parsed } satisfies WebSourceCache, "web-cache");
     try {
@@ -205,6 +205,10 @@ export async function createWebSource(ownerId: string, value: string) {
   });
   registryPending = operation;
   return operation;
+}
+
+export async function createWebSource(ownerId: string, value: string) {
+  return createPreparedWebSource(ownerId, await prepareWebSource(value));
 }
 
 export async function deleteWebSource(ownerId: string, value: string) {

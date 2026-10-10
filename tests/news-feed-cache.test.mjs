@@ -8,7 +8,7 @@ import { Readable } from "node:stream";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
-const xml = '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Test</title></feed>';
+const xml = '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Test</title><entry><title>Test article</title><link href="https://example.org/article"/><published>2026-10-09T00:00:00Z</published><summary>Real summary</summary></entry></feed>';
 // Real modules, independent bundle caches, one server global. Mock only external boundaries.
 function bundle(shared, overrides = {}) {
   const modules = new Map();
@@ -64,8 +64,11 @@ test("real probe/add/signed proxy reuse across route bundles and redirect aliase
     const management = bundle(shared, overrides)("news-management");
     proxy = bundle(shared, overrides)("news-feed-proxy");
     const input = { url: "https://example.org/start" };
-    assert.equal((await management.manageNews({ ...input, action: "probeFeed" }, "test")).probe.kind, "feed");
-    await management.manageNews({ ...input, action: "addFeed" }, "test");
+    const checked = await management.manageNews({ ...input, action: "probeFeed" }, "test");
+    assert.equal(checked.probe.kind, "feed");
+    assert.equal(checked.probe.items[0].title, "Test article");
+    await management.manageNews({ ...input, action: "addFeed", probeToken: checked.probe.token }, "test");
+    await assert.rejects(management.manageNews({ ...input, action: "addFeed", probeToken: checked.probe.token }, "test"), /expired|does not match/);
     assert.equal(requests, 2, "only initial request plus validated redirect");
     assert.equal((await proxy.proxyNewsFeed("invalid.signature")).status, 404);
     assert.equal(requests, 2);

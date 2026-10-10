@@ -5,6 +5,7 @@ export type WebSourceItem = {
   title: string;
   url: string;
   published: number;
+  publishedReliable?: boolean;
   summary: string;
 };
 
