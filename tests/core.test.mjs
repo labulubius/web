@@ -134,7 +134,9 @@ test("production health checks distinguish retired Drive from live services", as
   const script = await readFile(new URL("../scripts/health-check.sh", import.meta.url), "utf8");
   assert.match(script, /MAIN_ORIGIN:-https:\/\/labulubius\.com/);
   assert.doesNotMatch(script, /\$\{DRIVE_ORIGIN:/);
-  assert.match(script, /RETIRED_DRIVE_ORIGIN/);
+  assert.match(script, /RETIRED_DRIVE_HOSTNAME/);
+  assert.doesNotMatch(script, /RETIRED_DRIVE_ORIGIN/);
+  assert.match(script, /NXDOMAIN/);
   assert.match(script, /status.*410/);
   assert.match(script, /AGENT_ORIGIN:-https:\/\/agent\.labulubius\.com/);
   assert.doesNotMatch(script, /FEEDS_ORIGIN/);

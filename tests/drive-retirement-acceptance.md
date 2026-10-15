@@ -42,7 +42,7 @@ Other routes changed visually or behaviorally: shared navigation on Home, Naviga
 
 ## States checked
 
-- Retirement: page, nested public links/downloads, management APIs, stale uploads, all HTTP methods, and the entire former hostname return `410 Gone` without touching storage.
+- Application retirement: page, nested public links/downloads, management APIs and stale uploads return `410 Gone` for all HTTP methods without touching storage. A defensive direct-origin host guard remains, but the public former hostname must not resolve; see the DNS retirement addendum below.
 - Anonymous requests and invalid bearer tokens cannot retrieve files or mutate storage; retirement responses do not enable CORS or return download headers.
 - Existing Tasks authentication boundary remains `401` for anonymous access; public News sidebar remains available.
 - Loading, populated/empty collections, editing and destructive dialogs for Drive: not applicable, because their implementation is removed rather than redesigned.
@@ -71,3 +71,11 @@ Only contents of the dedicated `/home/debian/drive-data` root are authorized for
 - One-off VM100 Chromium smoke: 60 route/width/theme combinations and the independent Agent iframe check passed. An ephemeral read-only container supplied browser libraries; existing services and host packages were not modified.
 
 Production restart, public health/cache checks, data deletion and GitHub Actions are deployment gates verified separately after committing this report. Source restoration from GitHub cannot restore deleted data.
+
+## DNS retirement correction — 2026-10-15
+
+The owner clarified that retirement requires removal from Cloudflare, not a live HTTP 410-only hostname. The exact `drive.labulubius.com` CNAME and local Cloudflare Tunnel ingress are deleted. All 12 unrelated DNS records are unchanged. The Tunnel configuration validated successfully and its service was restarted; the old hostname now matches the final `http_status:404` fallback rather than Next.js.
+
+Cloudflare and Google public DNS-over-HTTPS both returned `NXDOMAIN` with no answers for A, AAAA and CNAME. Main-site health and Agent remained available; Zotero DAV kept its unauthenticated 401 boundary. `/drive/**` and `/api/drive/**` on the main hostname retain their defensive 410 responses. No UI, authentication, CSP, persistent data or other DNS records changed in this correction.
+
+The health script now checks DNS NXDOMAIN rather than making HTTP requests to the retired hostname. Audit snapshots of DNS before/after and the pre-change Tunnel configuration are root-only under `/var/backups/labulubius/drive-dns-retirement-20261015T060051Z` on VM100; they contain configuration, not deleted Drive files. Recreating Drive DNS or ingress requires a new explicit owner decision.
