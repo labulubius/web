@@ -1,13 +1,12 @@
-# Private Drive
+# Drive — retired
 
-`/drive` is the administrator-only file manager at `https://labulubius.com/drive`. Its API and persistent files run on the same `web` VM at `https://drive.labulubius.com/api/drive` and `/api/drive/upload` through Cloudflare Tunnel. The Drive subdomain's page redirects to the main-site UI; its API does not. Drive storage is separate from Supabase Storage; public links reference selected files in place rather than copying them.
+The owner requested complete retirement of the custom Drive service and deletion of its server-side data.
 
-Every management API request checks the Supabase Bearer token and `site_is_admin()` role. CORS permits only `https://labulubius.com`; Drive management and ordinary Drive downloads remain private, while explicitly created `/drive/file/<UUID>` links provide public single-file downloads. Set `DRIVE_DATA_DIR` in the `web` service's `.env.local` to an absolute, writable directory **outside** the repository (for example `/home/debian/drive-data`). Back up this directory separately from Git and Supabase, and copy the complete directory with permissions when migrating servers.
+- `/drive`, all `/drive/**` capability/download paths, `/api/drive` and `/api/drive/**` return `410 Gone` with `private, no-store`.
+- The former `drive.labulubius.com` hostname also returns `410 Gone`; it is not a file service or a second health endpoint.
+- Drive navigation, UI, management APIs, public downloads, resumable-upload code and storage handlers are removed.
+- All contents of `/home/debian/drive-data`, including public-link metadata and pending-upload data, are deleted after deployment and retirement verification. The empty directory remains only because an independent PDF-to-EPUB cleanup unit lists it in its filesystem sandbox. No new data backup is created for this deletion.
+- `DRIVE_DATA_DIR` is no longer used. Do not restore files or enable Drive handlers on deployment.
+- `dav.labulubius.com`, Zotero authentication and `/srv/zotero-data` are separate and unchanged.
 
-The UI supports nested folders, file upload and download, and recursive deletion. Uploads use resumable sessions with 8 MiB chunks; unfinished sessions can be resumed by reselecting the same file, survive a service restart, count against the quota and expire after seven days when new sessions are created. The **total Drive quota** is 5 GiB, including pending uploads; new uploads also require their size plus 4 GiB of available disk space. Session creation performs the authoritative recursive usage scan under the Drive lock; completion converts an already reserved pending size to committed storage without repeating that scan. Deletion uses the same lock. Do not modify the storage tree out of band while upload sessions are pending; complete or discard those sessions before a restore. There is no longer a 20 MB per-file cap: an individual upload can be as large as the remaining quota, subject to disk space. Empty files are rejected, and an existing name cannot be overwritten. The administrator can create or revoke one opaque public link per file. Public links use `/drive/file/<UUID>` and return that file directly as an attachment; folders cannot be published. There is no rename, preview or online editing. Downloads are attachments with no-store headers; large downloads require a browser with streaming file-save support (otherwise the UI refuses files over 64 MiB).
-
-Keep disk usage, backup restores and the tunnel endpoint under review. Do not put Drive files under `public/` or assume that rebuilding/redeploying the application backs them up.
-
-## Public links
-
-Public-link metadata is stored in the private `.drive-shares` directory inside `DRIVE_DATA_DIR` and is included when the complete Drive directory is backed up. Versioned metadata contains an opaque UUID, the file-only capability scope and a relative Drive path; public URLs never expose the path. Creating and revoking links requires the same Supabase administrator check as other Drive management operations. Public reads re-resolve every path, reject internal names and symbolic links, and return `404` for missing, non-file or revoked targets. Deleting a file revokes its link. Deleting a folder revokes links for files below it.
+GitHub retains the old implementation in Git history (pre-retirement revision: `8d166a13f9d01d6495a87a7079d76d8a8cdb4a6b`). Restoring source cannot restore deleted files or resurrect old public links. Any future file service needs a new, explicit deployment and data decision.

@@ -4,11 +4,11 @@
 
 `GET /api/health` is an unauthenticated liveness check. It returns only `{"status":"ok"}` with `Cache-Control: no-store`; it intentionally does not disclose dependency, disk, version, path, or credential details.
 
-Run `scripts/health-check.sh` to check the main Next.js service, Drive API host and Agent hostname. Override `MAIN_ORIGIN`, `DRIVE_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor Miniflux and other dependency failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+Run `scripts/health-check.sh` to check the main Next.js service and Agent hostname, and require `410 Gone` for retired Drive page/API/share paths and its former hostname. Override `MAIN_ORIGIN`, `RETIRED_DRIVE_ORIGIN`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor Miniflux and other dependency failures through authenticated application checks and systemd/container logs rather than expanding the public response.
 
 ## Production host routing
 
-Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000` and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The workspace reader is at `https://labulubius.com/feeds`; Miniflux remains private on `127.0.0.1:8083`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
+Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `drive.labulubius.com` to Next.js on `127.0.0.1:3000` (the Drive hostname returns only uncached `410 Gone`, including its former health endpoint) and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The workspace reader is at `https://labulubius.com/feeds`; Miniflux remains private on `127.0.0.1:8083`. The former `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are retired. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
 
 The ImmortalWrt gateway's Nikki configuration routes only Cloudflare Tunnel destination port `7844` through Hong Kong `Node-1`; the active Tunnel should register at an HKG edge. This rule must not capture VM100's other outbound traffic or other LAN clients. The route improves the origin-to-Cloudflare leg but cannot control the Anycast edge selected for visitors, so clients in China may still enter Cloudflare through LAX. The 2026-10-06 comparison measured median total times of 2.783 seconds through Hong Kong, 5.219 seconds by direct domestic egress, and 6.899 seconds through the former RackNerd route. Gateway and VM100 rollback material is under `/root/backups/nikki-route-cutover-20261006T132639Z` on the gateway and `/var/backups/labulubius/network-route-cutover-20261006T132639Z` on VM100.
 
@@ -44,20 +44,18 @@ Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and pro
 Back up these independent data sets together at a documented point in time:
 
 - `${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}`, including `tasks.json` when tasks have been created;
-- the complete `DRIVE_DATA_DIR`, including `.upload-sessions`;
 - `${NEWS_DATA_DIR}` preferences and Watchboards;
 - a consistent Miniflux PostgreSQL backup;
 - Supabase data using the provider's supported export/backup mechanism.
 
-Pause new uploads or let pending sessions complete before taking a consistency-sensitive snapshot. Generate and retain checksums with the backup. Article-bearing Miniflux backups must follow the same five-day retention policy as the live Miniflux database.
+Generate and retain checksums with the backup. Drive has been retired and its live data deleted by owner request; do not restore `DRIVE_DATA_DIR` as an active service. Its empty directory remains solely for the independent PDF-to-EPUB cleanup sandbox; do not remove that directory without reviewing the dependent unit. Article-bearing Miniflux backups must follow the same five-day retention policy as the live Miniflux database.
 
 Perform periodic restores into isolated directories, never over live data. Before starting an isolated service, run:
 
 ```bash
 node scripts/verify-backup.mjs \
   --tasks /restore/tasks \
-  --drive /restore/drive \
   --news /restore/news
 ```
 
-The verifier is read-only. It rejects symlinks and malformed task, Drive share-link or News JSON. Restore and validate the Miniflux database separately with PostgreSQL tooling. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.
+The verifier is read-only. It rejects symlinks and malformed task or News JSON. Optional `--drive LEGACY_DIR` verifies an independently retained historical Drive backup, if one exists; it is not required for current backups. Restore and validate the Miniflux database separately with PostgreSQL tooling. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.

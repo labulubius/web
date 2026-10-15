@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Compass, HardDrive, Home, Info, Menu, Monitor, Moon, Rss, Sun } from "lucide-react";
+import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Rss, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -22,7 +22,6 @@ const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
   { href: "/feeds", label: "Feeds", icon: Rss },
-  { href: "/drive", label: "Drive", icon: HardDrive },
   { href: "/agent", label: "Agent", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];

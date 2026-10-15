@@ -35,40 +35,6 @@ test("PDF handoff carries a private structured reference into Agent", () => {
   assert.throws(() => pdfToEpubHandoff("drive", "", "book.pdf", 1), /Invalid/);
 });
 
-test("Drive public links are opaque, file-only, versioned, and protected", async () => {
-  const shares = await readFile(new URL("../app/lib/drive-shares.ts", import.meta.url), "utf8");
-  const publicRoute = await readFile(new URL("../app/drive/file/[id]/route.ts", import.meta.url), "utf8");
-  const legacyDownloadRoute = await readFile(new URL("../app/drive/file/[id]/download/route.ts", import.meta.url), "utf8");
-  const downloadResponse = await readFile(new URL("../app/drive/file/[id]/download-response.ts", import.meta.url), "utf8");
-  const shareApi = await readFile(new URL("../app/api/drive/shares/route.ts", import.meta.url), "utf8");
-  assert.match(shares, /const SHARE_DIRECTORY = "\.drive-shares"/);
-  assert.match(shares, /const SHARE_VERSION = 2/);
-  assert.match(shares, /const SHARE_SCOPE = "file-download"/);
-  assert.match(shares, /value\.version !== SHARE_VERSION \|\| value\.scope !== SHARE_SCOPE/);
-  assert.match(shares, /randomUUID\(\)/);
-  assert.match(shares, /resolveDrivePath/);
-  assert.match(shares, /O_NOFOLLOW/);
-  assert.match(shares, /if \(!stat\.isFile\(\)\) throw new Error\("Only files can have public links\."\)/);
-  assert.match(shareApi, /url: `\/drive\/file\/\$\{share\.id\}`/);
-  assert.doesNotMatch(shareApi, /`\/share\//);
-  assert.match(publicRoute, /servePublicDriveFile\(request, id\)/);
-  assert.match(publicRoute, /export const GET = serve/);
-  assert.match(publicRoute, /export const HEAD = serve/);
-  assert.match(legacyDownloadRoute, /servePublicDriveFile\(request, id\)/);
-  assert.match(downloadResponse, /resolvePublicDriveFile/);
-  assert.match(downloadResponse, /Content-Disposition/);
-  assert.match(downloadResponse, /Cache-Control": "no-store"/);
-  assert.match(downloadResponse, /Referrer-Policy": "no-referrer"/);
-  assert.match(downloadResponse, /X-Content-Type-Options": "nosniff"/);
-  assert.match(downloadResponse, /request\.method === "HEAD"/);
-  assert.match(downloadResponse, /status: 416/);
-  await assert.rejects(access(new URL("../app/drive/file/[id]/page.tsx", import.meta.url)), { code: "ENOENT" });
-  await assert.rejects(access(new URL("../app/drive/file/[id]/public-download.tsx", import.meta.url)), { code: "ENOENT" });
-  await assert.rejects(access(new URL("../app/api/share/[id]/route.ts", import.meta.url)), { code: "ENOENT" });
-  await assert.rejects(access(new URL("../app/share/[id]/page.tsx", import.meta.url)), { code: "ENOENT" });
-  await assert.rejects(access(new URL("../app/share/page.tsx", import.meta.url)), { code: "ENOENT" });
-});
-
 test("personal tasks keep private atomic storage and owner-only APIs", async () => {
   const server = await readFile(new URL("../app/lib/tasks-server.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/api/tasks/route.ts", import.meta.url), "utf8");
@@ -164,10 +130,12 @@ test("health response is minimal and not cached", async () => {
   assert.deepEqual(await response.json(), { status: "ok" });
 });
 
-test("production health checks exclude the retired reader hostname", async () => {
+test("production health checks distinguish retired Drive from live services", async () => {
   const script = await readFile(new URL("../scripts/health-check.sh", import.meta.url), "utf8");
   assert.match(script, /MAIN_ORIGIN:-https:\/\/labulubius\.com/);
-  assert.match(script, /DRIVE_ORIGIN:-https:\/\/drive\.labulubius\.com/);
+  assert.doesNotMatch(script, /\$\{DRIVE_ORIGIN:/);
+  assert.match(script, /RETIRED_DRIVE_ORIGIN/);
+  assert.match(script, /status.*410/);
   assert.match(script, /AGENT_ORIGIN:-https:\/\/agent\.labulubius\.com/);
   assert.doesNotMatch(script, /FEEDS_ORIGIN/);
 });
@@ -234,17 +202,15 @@ test("agent iframe stays mounted across workspace route changes", async () => {
 
 test("owner-only destinations remain visible and show access guidance", async () => {
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
-  const drive = await readFile(new URL("../app/drive/drive-manager.tsx", import.meta.url), "utf8");
   const agent = await readFile(new URL("../app/agent/agent-frame.tsx", import.meta.url), "utf8");
   const access = await readFile(new URL("../app/owner-access.tsx", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
 
-  assert.match(sidebar, /href="\/drive"/);
+  assert.doesNotMatch(sidebar, /href="\/drive"/);
   assert.doesNotMatch(sidebar, /href="\/share"/);
   assert.match(sidebar, /href="\/agent"/);
   assert.doesNotMatch(sidebar, /href="\/note"/);
   assert.doesNotMatch(sidebar, /isAdmin && <Link href="\/(?:drive|share|agent)"/);
-  assert.match(drive, /<OwnerAccess/);
   assert.match(agent, /if \(loading \|\| authError \|\| !user \|\| !isAdmin\)/);
   assert.match(agent, /return <PiWebFrame \/>/);
   assert.doesNotMatch(agent, /Use Sign in in the top toolbar/);
@@ -307,34 +273,6 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.doesNotMatch(reader, /News navigation|<span>All articles<\/span>|Articles are temporarily unavailable|No articles here yet|<th>In Articles<\/th>/);
 });
 
-test("Drive uses a responsive Dolphin-style browser without broadening owner access", async () => {
-  const manager = await readFile(new URL("../app/drive/drive-manager.tsx", import.meta.url), "utf8");
-  const styles = await readFile(new URL("../app/drive/drive.css", import.meta.url), "utf8");
-  const driveApi = await readFile(new URL("../app/api/drive/route.ts", import.meta.url), "utf8");
-  const sharesApi = await readFile(new URL("../app/api/drive/shares/route.ts", import.meta.url), "utf8");
-  assert.match(manager, /<OwnerAccess/);
-  assert.match(manager, /className="drive-sidebar" id="page-sidebar"/);
-  assert.match(manager, /My Drive/);
-  assert.match(manager, /Public links/);
-  assert.match(manager, /site-drive-view/);
-  assert.match(manager, /Details view/);
-  assert.match(manager, /Grid view/);
-  assert.match(manager, /drive-info/);
-  assert.match(manager, /<AccessibleDialog/);
-  assert.match(manager, /Create public link/);
-  assert.match(manager, /Revoke public link/);
-  assert.doesNotMatch(manager, /drive-storage|5 GB total/);
-  assert.doesNotMatch(styles, /\.drive-storage|drive-public-card|drive-download-dialog/);
-  assert.doesNotMatch(manager, /new URL\(`\/share|href=[{`"']\/share/);
-  assert.match(styles, /grid-template-columns: var\(--sidebar-width\) minmax\(0, 1fr\)/);
-  assert.match(styles, /\.drive-browser\.has-info \.drive-content/);
-  assert.match(styles, /@media \(max-width: 760px\)/);
-  assert.match(styles, /data-mobile-sidebar-open="true"/);
-  assert.match(styles, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(driveApi, /requireDriveAdmin/);
-  assert.match(sharesApi, /requireDriveAdmin/);
-});
-
 test("retired Note route and navigation stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -347,11 +285,9 @@ test("retired Note route and navigation stay absent", async () => {
 test("sidebar controls render for the configured workspace pages", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const drive = await readFile(new URL("../app/drive/page.tsx", import.meta.url), "utf8");
 
   assert.match(shell, /hasSidebar && <button/);
   assert.match(home, /title="Home" hasSidebar/);
-  assert.match(drive, /title="Drive" hasSidebar/);
   await assert.rejects(access(new URL("../app/share/page.tsx", import.meta.url)), { code: "ENOENT" });
 });
 

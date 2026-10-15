@@ -17,7 +17,6 @@ const pages = [
   ["app/page.tsx", "Home"],
   ["app/nav/layout.tsx", "Navigator"],
   ["app/feeds/page.tsx", "Feeds"],
-  ["app/drive/page.tsx", "Drive"],
   ["app/agent/page.tsx", "Pi Agent"],
   ["app/about/page.tsx", "About"],
 ];
