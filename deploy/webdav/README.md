@@ -10,7 +10,7 @@
 
 The root lists ordinary user files and folders, including `zotero/`. That folder is not hidden, protected, aliased or mounted specially: it can be renamed, moved, copied or deleted just like any other folder. Doing so may break Zotero synchronization or delete attachments. Zotero continues to use `https://dav.labulubius.com/zotero/`; its existing contents and account are preserved during the initial migration.
 
-This is not an HTML file browser or automatic folder-sync service. Authenticated WebDAV clients browse using PROPFIND; directory indexes remain disabled. The per-request upload limit is 95 MiB, below the Cloudflare proxied request limit. This change does not add chunked uploads, public shares, a new backup schedule or an automatic trash/recovery system. User deletions are real deletions. No old Drive data is restored.
+This is not an HTML file browser or automatic folder-sync service. Authenticated WebDAV clients browse using PROPFIND; directory indexes remain disabled. The per-request upload limit is 95 MiB, below the Cloudflare proxied request limit. This change does not add resumable/multi-request chunked uploads, public shares, a new backup schedule or an automatic trash/recovery system. User deletions are real deletions. No old Drive data is restored.
 
 ## Storage and service boundaries
 
@@ -23,6 +23,10 @@ This is not an HTML file browser or automatic folder-sync service. Authenticated
 - Existing administrator-auth bridge: `127.0.0.1:8082` (`zotero-auth.service`, unchanged).
 
 All listeners stay bound to loopback. The frontend normalizes only same-origin HTTPS Destination headers for the HTTP DAV engine; cross-origin destinations are rejected by the DAV engine. The engine retains authentication even for direct loopback requests. Relative directory redirects preserve HTTPS, and COPY/MOVE response Location headers are rewritten to public HTTPS. Authenticated and unauthenticated public responses are private/no-store; no DAV path belongs in a shared cache rule.
+
+## Streaming client compatibility
+
+The frontend buffers request bodies before proxying to the DAV engine. This decodes HTTP chunked transfer framing and supplies the actual body length, including zero for an empty MKCOL request. Without buffering, Solid Explorer or an HTTP gateway can stream an empty MKCOL with its headers arriving before the terminating chunk; Nginx DAV rejects that request with 415 ("MKCOL with body is unsupported") even though no body content follows. Real non-empty MKCOL bodies remain unsupported and must not be silently discarded. Chunked HTTP file PUT requests continue to work within the same 95 MiB request limit; buffering can use Nginx temporary disk space and does not enable resumable uploads.
 
 ## Verification and future configuration deployments
 

@@ -28,6 +28,7 @@ test("WebDAV has one authenticated file root and no Zotero-specific folder rules
   assert.match(config, /listen 127\.0\.0\.1:8081;/);
   assert.match(config, /listen 127\.0\.0\.1:8084;/);
   assert.match(config, /proxy_set_header Destination \$webdav_destination;/);
+  assert.match(config, /proxy_request_buffering on;/);
   assert.match(config, /root \/srv\/webdav-data;/);
   assert.match(config, /absolute_redirect off;/);
   assert.match(config, /location \/ \{\s+auth_request \/_zotero_auth;/);
@@ -101,7 +102,13 @@ http {
         });
         req.setTimeout(5_000, () => req.destroy(new Error("WebDAV fixture request timed out")));
         req.on("error", reject);
-        req.end(body);
+        if (headers["Transfer-Encoding"] === "chunked") {
+          // Flush headers before the terminating chunk, as streaming gateways do.
+          req.flushHeaders();
+          void delay(40).then(() => req.end(body));
+        } else {
+          req.end(body);
+        }
       });
     }
     for (let attempt = 0; ; attempt++) {
@@ -128,11 +135,33 @@ http {
     assert.match(listing.body, /<[^>]*href>\/zotero\//);
     assert.match(listing.headers["cache-control"], /no-store/);
     assert.equal((await request("GET", "/zotero/existing.zip")).body, "existing attachment fixture");
+    // Solid Explorer / HTTP gateways can send an empty body with chunked framing.
+    // Nginx DAV must receive Content-Length: 0, not Transfer-Encoding: chunked.
+    for (const suffix of ["", "/"]) {
+      const folder = `/${encodeURIComponent("数据结构")}${suffix}`;
+      const created = await request("MKCOL", folder, { "Transfer-Encoding": "chunked" });
+      assert.equal(created.status, 201, `empty chunked MKCOL: ${created.status} ${created.body}`);
+      assert.equal((await request("DELETE", `/${encodeURIComponent("数据结构")}/`)).status, 204);
+    }
+    const withBody = await request("MKCOL", "/unsupported-body/", { "Content-Type": "application/xml" }, "<unsupported/>");
+    assert.equal(withBody.status, 415, "real MKCOL bodies must not be silently discarded");
+    assert.equal((await request("PROPFIND", "/unsupported-body/", { Depth: "0" })).status, 404);
+    const chunkedBody = await request("MKCOL", "/unsupported-chunked-body/", { "Transfer-Encoding": "chunked" }, "<unsupported/>");
+    assert.equal(chunkedBody.status, 415);
+    assert.equal((await request("PROPFIND", "/unsupported-chunked-body/", { Depth: "0" })).status, 404);
+    const anonymousChunked = await request("MKCOL", "/anonymous-chunked/", { "Transfer-Encoding": "chunked" }, undefined, false);
+    assert.equal(anonymousChunked.status, 401);
+    assert.equal((await request("PUT", "/chunked-upload.txt", { "Transfer-Encoding": "chunked" }, "chunked upload fixture")).status, 201);
+    assert.equal((await request("GET", "/chunked-upload.txt")).body, "chunked upload fixture");
+    assert.equal((await request("DELETE", "/chunked-upload.txt")).status, 204);
     for (const folder of ["Documents", "zotero"]) {
       if (folder !== "zotero") assert.equal((await request("MKCOL", `/${folder}`)).status, 201);
       const file = `/${folder}/sample%20file.prop`;
       assert.equal((await request("PUT", file, { "Content-Type": "application/octet-stream" }, "fixture payload")).status, 201);
       assert.equal((await request("GET", file)).body, "fixture payload");
+      assert.equal((await request("PUT", file, { "Transfer-Encoding": "chunked" }, "updated fixture payload")).status, 204);
+      assert.equal((await request("GET", file)).body, "updated fixture payload");
+      assert.equal((await request("PUT", file, {}, "fixture payload")).status, 204);
       const destination = `https://dav.labulubius.com:443/${folder}/renamed.prop`;
       const moved = await request("MOVE", file, { Destination: destination, Overwrite: "F" });
       assert.ok([201, 204].includes(moved.status), `${folder} file MOVE: ${moved.status} ${moved.body}`);
