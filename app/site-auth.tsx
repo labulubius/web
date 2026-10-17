@@ -108,9 +108,9 @@ export function AccountControl() {
   }
 
   return <>
-    {authError ? <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }} title={authError}><LogIn size={15} /><span>{loading ? "Account" : "Sign in"}</span></button>
-      : user ? <button className="account-control" type="button" disabled={loading || saving} onClick={() => void signOut()} title={`Sign out ${user.email ?? ""}`}><UserIcon size={15} /><span>{loading ? "Checking…" : isAdmin ? "Owner" : "Read only"}</span><LogOut size={14} /></button>
-      : <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }}><LogIn size={15} /><span>{loading ? "Account" : "Sign in"}</span></button>}
+    {authError ? <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }} aria-label={loading ? "Checking account" : "Sign in"} title={authError}><LogIn size={18} /><span>{loading ? "Account" : "Sign in"}</span></button>
+      : user ? <button className="account-control" type="button" disabled={loading || saving} onClick={() => void signOut()} aria-label={loading ? "Checking account" : saving ? "Signing out" : "Sign out"} title={`Sign out ${user.email ?? ""}`}><UserIcon size={18} /><span>{loading ? "Checking…" : isAdmin ? "Owner" : "Read only"}</span><LogOut size={18} /></button>
+      : <button className="account-control" type="button" disabled={loading} onClick={() => { setError(""); setDialogOpen(true); }} aria-label={loading ? "Checking account" : "Sign in"} title={loading ? "Checking account" : "Sign in"}><LogIn size={18} /><span>{loading ? "Account" : "Sign in"}</span></button>}
     {error && !dialogOpen && <span className="account-error" role="alert">{error}</span>}
     {dialogOpen && <AccessibleDialog labelledBy="auth-dialog-title" busy={saving} onClose={() => setDialogOpen(false)} className="auth-dialog">
       <header><h2 id="auth-dialog-title">Site owner sign in</h2><button type="button" disabled={saving} onClick={() => setDialogOpen(false)} aria-label="Close"><X size={17} /></button></header>

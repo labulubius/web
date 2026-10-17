@@ -151,8 +151,9 @@ html[data-theme="dark"] .plasma-desktop {
 .menu-bar span:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); }
 
 .tool-bar { align-items: center; background: var(--window); border-bottom: 1px solid var(--separator); display: flex; min-height: 48px; padding: 4px 7px; }
+.tool-bar svg { flex: none; }
 .tool-bar nav { align-items: stretch; display: flex; gap: 2px; }
-.sidebar-toggle { align-items: center; align-self: stretch; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--text); cursor: pointer; display: flex; flex-direction: column; font-size: 10px; gap: 2px; justify-content: flex-start; margin-right: 2px; min-width: 58px; padding: 4px 7px; }
+.sidebar-toggle { align-items: center; align-self: center; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--text); cursor: pointer; display: flex; flex-direction: column; font-size: 10px; gap: 2px; justify-content: center; margin-right: 2px; min-height: 47px; min-width: 58px; padding: 4px 7px; }
 .mobile-sidebar-toggle, .mobile-sidebar-backdrop { display: none; }
 .sidebar-toggle svg { color: var(--link); }
 .sidebar-toggle:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--separator); }
@@ -168,7 +169,7 @@ html[data-theme="dark"] .plasma-desktop {
 .account-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .account-control:disabled { cursor: wait; opacity: .65; }
 .account-control > svg:last-child:not(:first-child) { margin-left: 2px; }
-.theme-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 7px; min-height: 30px; padding: 4px 9px; }
+.theme-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 6px; height: 32px; padding: 0 9px; }
 .theme-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .theme-control:active { background: color-mix(in srgb, var(--accent) 33%, var(--button)); }
 
@@ -301,12 +302,12 @@ html[data-theme="dark"] .plasma-desktop {
   .menu-bar { display: none; }
   .tool-bar { height: 43px; min-height: 43px; }
   .tool-bar nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
-  .tool-bar nav a { min-width: 43px; padding: 5px; }
+  .tool-bar nav a { height: 34px; justify-content: center; min-width: 43px; padding: 5px; }
   .sidebar-toggle { display: none; }
-  .mobile-sidebar-toggle { display: flex; flex: none; min-width: 43px; width: 43px; padding: 5px; }
-  .mobile-sidebar-toggle svg { flex: none; }
+  .mobile-sidebar-toggle { display: flex; flex: none; height: 34px; min-height: 34px; min-width: 43px; width: 43px; padding: 5px; }
   .mobile-sidebar-toggle span, .tool-bar nav a span, .toolbar-context, .theme-control span, .account-control span { display: none; }
-  .theme-control { justify-content: center; padding: 4px; width: 34px; }
+  .account-control, .theme-control { flex: none; height: 34px; justify-content: center; padding: 0; width: 34px; }
+  .account-control > svg:last-child:not(:first-child) { display: none; }
   .status-bar { display: none; }
   .plasma-panel { border-bottom: 0; border-left: 0; border-radius: 0; border-right: 0; bottom: 0; height: 55px; left: 0; padding: 4px 10px; right: 0; }
   .launcher-button, .panel-separator, .panel-spacer, .system-tray, .panel-theme, .digital-clock, .show-desktop { display: none; }

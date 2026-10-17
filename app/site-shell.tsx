@@ -119,7 +119,7 @@ export function SiteShell({
             aria-label={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
             title={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
           >
-            <Menu size={20} />
+            <Menu size={18} />
             <span>Sidebar</span>
           </button>}
           <nav aria-label="Main navigation">
@@ -132,7 +132,7 @@ export function SiteShell({
           <div className="toolbar-spacer" />
           <div className="toolbar-account-slot"><AccountControl /></div>
           <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${displayedThemeMode}`} aria-label={`Color theme: ${displayedThemeMode}. Click to change.`}>
-            <ThemeIcon size={17} /><span>{displayedThemeMode === "system" ? "System theme" : `${displayedThemeMode} theme`}</span>
+            <ThemeIcon size={18} /><span>{displayedThemeMode === "system" ? "System theme" : `${displayedThemeMode} theme`}</span>
           </button>
         </div>
 
