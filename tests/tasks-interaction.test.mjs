@@ -98,18 +98,18 @@ test("task dialog keeps saving and errors accessible", () => {
   assert.ok(nodes(tree).some((n) => n.props.role === "alert" && n.children.includes("Cannot save")));
 });
 
-for (const view of ["all", "gantt", "archive", "project"]) {
+for (const view of ["all", "gantt", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
       const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
       const calls = []; const dialogs = [];
-      const handle = new Function("FormData", "view", "projectId", "TASK_ARCHIVE_PROJECT_ID", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-        class { get() { return "  Report  "; } }, view, "project-1", archiveProjectId,
+      const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+        class { get() { return "  Report  "; } }, view, "project-1",
         async (...args) => { calls.push(args); return success; }, (value) => dialogs.push(value),
       );
       let reset = false;
       await handle({ preventDefault() {}, currentTarget: { reset() { reset = true; } } });
-      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : view === "archive" ? archiveProjectId : null }) }]]);
+      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : null }) }]]);
       assert.deepEqual(dialogs, []);
       assert.equal(reset, success);
     });
@@ -119,8 +119,8 @@ for (const view of ["all", "gantt", "archive", "project"]) {
 test("quick add ignores blank titles without opening a dialog", async () => {
   const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
   const unexpected = () => assert.fail("Blank title must not submit, reset, or open a dialog");
-  const handle = new Function("FormData", "view", "projectId", "TASK_ARCHIVE_PROJECT_ID", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-    class { get() { return "   "; } }, "all", null, archiveProjectId, unexpected, unexpected,
+  const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+    class { get() { return "   "; } }, "all", null, unexpected, unexpected,
   );
   await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
@@ -157,16 +157,17 @@ test("Gantt includes dated uncategorized tasks and excludes unscheduled or out-o
   assert.equal(bars[0].props.task, dated);
 });
 
-test("Archive navigation is ordered, restorable and excluded from active views", () => {
+test("Archive is an ordinary project row while its tasks stay out of active views", () => {
   const all = source.indexOf("<span>All tasks</span>");
-  const archive = source.indexOf("<span>Archive</span>");
   const gantt = source.indexOf("<span>Gantt</span>");
-  assert.ok(all >= 0 && all < archive && archive < gantt);
+  assert.ok(all >= 0 && all < gantt);
+  assert.doesNotMatch(source, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(source, /data\?\.tasks\.filter\(\(task\) => !isArchivedTask\(task\)\)/);
-  assert.match(source, /data\?\.tasks\.filter\(isArchivedTask\)/);
   assert.match(source, /tasks=\{allTasks\}/);
-  assert.match(source, /data\?\.projects\.filter\(\(project\) => !isArchiveProject\(project\)\)/);
-  assert.match(source, /\["gantt", "all", "archive", "inbox", "project"\]/);
+  assert.match(source, /items=\{data\.projects\.map/);
+  assert.match(source, /data\.projects\.map\(\(project\) => <SortableProjectRow/);
+  assert.match(source, /storedView === "archive" \? "project"/);
+  assert.match(source, /storedView === "archive" \? TASK_ARCHIVE_PROJECT_ID/);
 });
 
 test("Archive is available in the task editor and another project can restore a task", () => {

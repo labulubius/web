@@ -7,11 +7,11 @@ The root route `/` is a private, administrator-only task manager. Signed-out and
 Tasks have views derived from project membership:
 
 - All tasks contains every active project task and every Uncategorized task, but excludes Archive.
-- Archive is a protected system project shown between All tasks and Gantt. Assigning Archive in the task editor removes a task from active views; assigning another project restores it.
-- Project pages contain all tasks assigned to that project. Project tasks may remain unscheduled or use an inclusive start and end date. User-created projects can be reordered by dragging their sidebar rows and edited or deleted with trailing row actions.
+- Archive appears in the Projects list and supports the same selection, quick-add, rename, delete and drag-order interactions as every other project. Its only special behavior is that assigned tasks stay out of All tasks and Gantt; assigning another project restores them to active views.
+- Project pages contain all tasks assigned to that project. Project tasks may remain unscheduled or use an inclusive start and end date. Projects can be reordered by dragging their sidebar rows and edited or deleted with trailing row actions.
 - Gantt contains only scheduled non-Archive tasks in the selected date range.
 
-The Gantt chart uses one-day columns and an administrator-selected date range of at most two months. It supports ranges across month boundaries, task movement and edge resizing. The browser remembers the selected All tasks, Archive, Gantt or project location and the valid Gantt date range. Only opaque project IDs and navigation dates are saved locally; task content is not.
+The Gantt chart uses one-day columns and an administrator-selected date range of at most two months. It supports ranges across month boundaries, task movement and edge resizing. The browser remembers the selected All tasks, Gantt or project location and the valid Gantt date range. A legacy saved Archive view restores as the Archive project. Only opaque project IDs and navigation dates are saved locally; task content is not.
 
 Tasks contain a title, optional project and optional project-only date range. They do not contain descriptions, notes or times of day. Completing a task permanently deletes it. There is no completed-task history or restore view. All tasks and project rows provide explicit edit and confirmed Delete actions; the edit dialog itself contains only Cancel and Save.
 
@@ -19,7 +19,7 @@ The current version intentionally excludes dependencies, progress percentages, m
 
 ## Persistence and migration
 
-Archive uses a stable reserved project ID, is created automatically when absent, and cannot be renamed or deleted through the project API. Existing version 4 data remains compatible and is updated atomically on the first authenticated read.
+Archive uses a stable reserved project ID only to implement active-view filtering. It otherwise follows ordinary project API behavior, including rename, reorder and deletion. Version 5 creates Archive for new data and migrates versions 1–4 once; deleting it from version 5 data does not recreate it. Creating a new project named Archive when the reserved ID is absent restores the archived-project role.
 
 Task data is stored outside Git in:
 
@@ -29,7 +29,7 @@ ${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}/tasks.json
 
 `TASKS_DATA_DIR`, when set, must be an absolute real directory outside the repository. The service creates the directory with owner-only permissions. Writes are serialized within the web process and committed through an exclusive temporary file, `fsync`, and atomic rename. Reads and writes reject symbolic links. Task IDs and project IDs are opaque UUIDs. Project order is the validated order of the `projects` array and is saved atomically with the rest of the task data.
 
-Version 3 stores optional inclusive `startDate` and `endDate` values as local `YYYY-MM-DD` dates only for project tasks. Both values may be null for unscheduled project tasks and must be null for Uncategorized tasks. Version 1 and version 2 data migrate atomically on first authenticated read. Historical completed tasks are discarded, old notes are removed, and dates are cleared from tasks without a project.
+Version 5 stores task descriptions, optional inclusive `startDate` and `endDate` values as local `YYYY-MM-DD` dates, and ordinary ordered projects including Archive. Versions 1–4 migrate atomically on first authenticated read. Historical completed tasks are discarded and old notes are removed.
 
 Deleting a project preserves its tasks by making them Uncategorized and clearing their dates.
 
@@ -41,7 +41,7 @@ The API validates request size, UUIDs, field lengths, real calendar dates, order
 
 ## Backup and restore
 
-Back up the entire Tasks directory with the other persistent datasets. An empty directory is valid before the first task is created. The backup verifier accepts versions 1, 2 and 3 so older backups can be restored and migrated by the application:
+Back up the entire Tasks directory with the other persistent datasets. An empty directory is valid before the first task is created. The backup verifier accepts versions 1 through 5 so current and older backups can be restored and migrated by the application:
 
 ```bash
 node scripts/verify-backup.mjs \

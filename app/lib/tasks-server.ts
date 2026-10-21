@@ -118,7 +118,7 @@ function migrateLegacyTask(value: unknown): PersonalTask | null {
 }
 
 function parseData(value: unknown): ReadResult {
-  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3, 4].includes(Number(value.version))) {
+  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3, 4, 5].includes(Number(value.version))) {
     throw new Error("Stored task data is invalid.");
   }
   const projects = value.projects.map(parseProject);
@@ -129,9 +129,9 @@ function parseData(value: unknown): ReadResult {
   if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
     throw new Error("Stored task data is invalid.");
   }
-  const data: TaskData = { version: 4, tasks, projects };
-  const archiveAdded = ensureArchiveProject(data);
-  return { data, migrated: value.version !== 4 || archiveAdded };
+  const data: TaskData = { version: 5, tasks, projects };
+  const archiveAdded = value.version === 5 ? false : ensureArchiveProject(data);
+  return { data, migrated: value.version !== 5 || archiveAdded };
 }
 
 export async function tasksRoot() {
@@ -160,7 +160,7 @@ async function readData(root: string): Promise<ReadResult> {
   let handle;
   try { handle = await open(path.join(root, DATA_FILE), constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 4, tasks: [], projects: [archiveProject()] }, migrated: false };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 5, tasks: [], projects: [archiveProject()] }, migrated: false };
     throw error;
   }
   try { return parseData(JSON.parse(await handle.readFile("utf8"))); }
@@ -288,8 +288,9 @@ export async function createProject(input: unknown) {
     const name = text(input.name, "project name", 80);
     if (data.projects.some((project) => project.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("Project name already exists.");
     const now = new Date().toISOString();
-    const archiveIndex = data.projects.findIndex((project) => project.id === TASK_ARCHIVE_PROJECT_ID);
-    data.projects.splice(archiveIndex < 0 ? data.projects.length : archiveIndex, 0, { id: randomUUID(), name, createdAt: now, updatedAt: now });
+    const id = name.toLocaleLowerCase() === TASK_ARCHIVE_PROJECT_NAME.toLocaleLowerCase() && !data.projects.some((project) => project.id === TASK_ARCHIVE_PROJECT_ID)
+      ? TASK_ARCHIVE_PROJECT_ID : randomUUID();
+    data.projects.push({ id, name, createdAt: now, updatedAt: now });
     await writeData(root, data);
     return data;
   });
@@ -307,7 +308,7 @@ export async function reorderProjects(input: unknown) {
 }
 
 export async function updateProject(id: string, input: unknown) {
-  if (!UUID.test(id) || id === TASK_ARCHIVE_PROJECT_ID || !object(input)) throw new Error("Invalid project.");
+  if (!UUID.test(id) || !object(input)) throw new Error("Invalid project.");
   const root = await tasksRoot();
   return locked(root, async () => {
     const { data } = await readData(root);
@@ -322,7 +323,7 @@ export async function updateProject(id: string, input: unknown) {
 }
 
 export async function deleteProject(id: string) {
-  if (!UUID.test(id) || id === TASK_ARCHIVE_PROJECT_ID) throw new Error("Invalid project.");
+  if (!UUID.test(id)) throw new Error("Invalid project.");
   const root = await tasksRoot();
   return locked(root, async () => {
     const { data } = await readData(root);

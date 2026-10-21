@@ -65,10 +65,10 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(styles, /\.task-message/);
   assert.match(manager, /Delete project .*Its tasks will become Uncategorized and keep their dates/);
   assert.match(manager, /site-tasks-location-v1/);
-  assert.ok(manager.indexOf("<span>All tasks</span>") < manager.indexOf("<span>Archive</span>"));
-  assert.ok(manager.indexOf("<span>Archive</span>") < manager.indexOf("<span>Gantt</span>"));
+  assert.ok(manager.indexOf("<span>All tasks</span>") < manager.indexOf("<span>Gantt</span>"));
+  assert.doesNotMatch(manager, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(server, /id === TASK_ARCHIVE_PROJECT_ID/);
-  assert.match(manager, /String\(value\.view\) === "inbox" \? "all"/);
+  assert.match(manager, /storedView === "inbox" \? "all"/);
   assert.match(manager, /aria-label={`Edit \$\{task\.title\}`}/);
   assert.match(manager, /aria-label={`Delete \$\{task\.title\}`}/);
   assert.doesNotMatch(manager, /completedAt|view === "completed"/);
@@ -87,7 +87,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(projectsApi, /reorderProjects/);
   assert.match(server, /value\.version === 1/);
   assert.match(server, /value\.version === 2/);
-  assert.match(server, /version: 4/);
+  assert.match(server, /version: 5/);
   assert.match(server, /projectId: null, updatedAt: now/);
 });
 

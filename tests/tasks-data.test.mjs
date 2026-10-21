@@ -32,7 +32,7 @@ test("uncategorized task descriptions and dates survive create, update and reloa
   const api = await fixture(t);
   let data = await api.createTask({ title: "Report", description: " First line\nSecond line ", ...range });
   const id = data.tasks[0].id;
-  assert.equal(data.version, 4);
+  assert.equal(data.version, 5);
   assert.equal(data.tasks[0].projectId, null);
   assert.equal(data.tasks[0].description, "First line\nSecond line");
   assert.deepEqual(await api.loadTaskData(), data);
@@ -54,7 +54,7 @@ test("uncategorized task descriptions and dates survive create, update and reloa
 test("moving out of or deleting a project preserves task descriptions and dates", async (t) => {
   const api = await fixture(t);
   let data = await api.createProject({ name: "Course" });
-  const projectId = data.projects[0].id;
+  const projectId = data.projects.find(({ name }) => name === "Course").id;
   data = await api.createTask({ title: "Report", description: "Keep me", projectId, ...range });
   const id = data.tasks[0].id;
   data = await api.updateTask(id, { projectId: null });
@@ -85,7 +85,7 @@ test("invalid descriptions and date ranges never overwrite existing data", async
   }
 });
 
-for (const version of [1, 2, 3]) {
+for (const version of [1, 2, 3, 4]) {
   test(`version ${version} tasks migrate to descriptions without losing dates`, async (t) => {
     const api = await fixture(t);
     const task = {
@@ -93,10 +93,11 @@ for (const version of [1, 2, 3]) {
       createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z",
       ...(version === 1 ? { date: range.startDate, notes: "", completedAt: null, startMinute: null, durationMinutes: 30 } : range),
       ...(version === 2 ? { notes: "" } : {}),
+      ...(version === 4 ? { description: "" } : {}),
     };
     await writeFile(path.join(api.root, "tasks.json"), JSON.stringify({ version, tasks: [task], projects: [] }));
     const data = await api.loadTaskData();
-    assert.equal(data.version, 4);
+    assert.equal(data.version, 5);
     assert.equal(data.tasks[0].description, "");
     assert.equal(data.tasks[0].startDate, range.startDate);
     assert.equal(data.tasks[0].endDate, version === 1 ? range.startDate : range.endDate);
@@ -113,18 +114,23 @@ test("invalid stored description is rejected rather than silently discarded", as
   await assert.rejects(api.loadTaskData(), /Stored task data is invalid/);
 });
 
-test("Archive is initialized as one protected system project", async (t) => {
+test("Archive supports ordinary project rename, deletion and recreation", async (t) => {
   const api = await fixture(t);
   let data = await api.loadTaskData();
   assert.deepEqual(data.projects.map(({ id, name }) => ({ id, name })), [{ id: taskTypes.TASK_ARCHIVE_PROJECT_ID, name: "Archive" }]);
   data = await api.createProject({ name: "Course" });
-  assert.deepEqual(data.projects.map(({ name }) => name), ["Course", "Archive"]);
+  assert.deepEqual(data.projects.map(({ name }) => name), ["Archive", "Course"]);
   data = await api.createTask({ title: "Later", projectId: taskTypes.TASK_ARCHIVE_PROJECT_ID, ...range });
   assert.equal(taskTypes.isArchivedTask(data.tasks[0]), true);
-  await assert.rejects(api.createProject({ name: "archive" }), /already exists/);
-  await assert.rejects(api.updateProject(taskTypes.TASK_ARCHIVE_PROJECT_ID, { name: "Later" }), /Invalid project/);
-  await assert.rejects(api.deleteProject(taskTypes.TASK_ARCHIVE_PROJECT_ID), /Invalid project/);
-  assert.equal((await api.loadTaskData()).tasks[0].projectId, taskTypes.TASK_ARCHIVE_PROJECT_ID);
+  data = await api.updateProject(taskTypes.TASK_ARCHIVE_PROJECT_ID, { name: "Storage" });
+  assert.equal(data.projects[0].name, "Storage");
+  assert.equal(data.tasks[0].projectId, taskTypes.TASK_ARCHIVE_PROJECT_ID);
+  data = await api.deleteProject(taskTypes.TASK_ARCHIVE_PROJECT_ID);
+  assert.deepEqual(data.projects.map(({ name }) => name), ["Course"]);
+  assert.equal(data.tasks[0].projectId, null);
+  assert.deepEqual(await api.loadTaskData(), data, "version 5 must not recreate a deleted Archive");
+  data = await api.createProject({ name: "Archive" });
+  assert.equal(data.projects.at(-1).id, taskTypes.TASK_ARCHIVE_PROJECT_ID);
 });
 
 test("an existing Archive project migrates to the stable system ID", async (t) => {

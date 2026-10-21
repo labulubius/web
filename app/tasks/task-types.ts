@@ -20,7 +20,7 @@ export type PersonalTask = {
 };
 
 export type TaskData = {
-  version: 4;
+  version: 5;
   tasks: PersonalTask[];
   projects: TaskProject[];
 };
