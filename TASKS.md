@@ -4,19 +4,22 @@ The root route `/` is a private, administrator-only task manager. Signed-out and
 
 ## Views and behavior
 
-Tasks have two modes derived from project membership:
+Tasks have views derived from project membership:
 
-- All tasks contains every project task and every Uncategorized task. Uncategorized tasks have no dates and never appear in Gantt.
-- Project pages contain all tasks assigned to that project. Project tasks may remain unscheduled or use an inclusive start and end date. Projects can be reordered by dragging their sidebar rows and edited or deleted with trailing row actions.
-- Gantt contains only scheduled project tasks in the selected date range.
+- All tasks contains every active project task and every Uncategorized task, but excludes Archive.
+- Archive is a protected system project shown between All tasks and Gantt. Assigning Archive in the task editor removes a task from active views; assigning another project restores it.
+- Project pages contain all tasks assigned to that project. Project tasks may remain unscheduled or use an inclusive start and end date. User-created projects can be reordered by dragging their sidebar rows and edited or deleted with trailing row actions.
+- Gantt contains only scheduled non-Archive tasks in the selected date range.
 
-The Gantt chart uses one-day columns and an administrator-selected date range of at most two months. It supports ranges across month boundaries, task movement and edge resizing. The browser remembers the selected All tasks, Gantt or project location and the valid Gantt date range. Only opaque project IDs and navigation dates are saved locally; task content is not.
+The Gantt chart uses one-day columns and an administrator-selected date range of at most two months. It supports ranges across month boundaries, task movement and edge resizing. The browser remembers the selected All tasks, Archive, Gantt or project location and the valid Gantt date range. Only opaque project IDs and navigation dates are saved locally; task content is not.
 
 Tasks contain a title, optional project and optional project-only date range. They do not contain descriptions, notes or times of day. Completing a task permanently deletes it. There is no completed-task history or restore view. All tasks and project rows provide explicit edit and confirmed Delete actions; the edit dialog itself contains only Cancel and Save.
 
 The current version intentionally excludes dependencies, progress percentages, milestones, recurrence, reminders, labels, priority levels, nested projects, collaboration and external calendar synchronization.
 
 ## Persistence and migration
+
+Archive uses a stable reserved project ID, is created automatically when absent, and cannot be renamed or deleted through the project API. Existing version 4 data remains compatible and is updated atomically on the first authenticated read.
 
 Task data is stored outside Git in:
 

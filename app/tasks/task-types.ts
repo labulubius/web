@@ -1,3 +1,6 @@
+export const TASK_ARCHIVE_PROJECT_ID = "00000000-0000-4000-8000-000000000001";
+export const TASK_ARCHIVE_PROJECT_NAME = "Archive";
+
 export type TaskProject = {
   id: string;
   name: string;
@@ -23,3 +26,11 @@ export type TaskData = {
 };
 
 export type TaskDraft = Pick<PersonalTask, "title" | "description" | "projectId" | "startDate" | "endDate">;
+
+export function isArchiveProject(project: TaskProject) {
+  return project.id === TASK_ARCHIVE_PROJECT_ID;
+}
+
+export function isArchivedTask(task: PersonalTask) {
+  return task.projectId === TASK_ARCHIVE_PROJECT_ID;
+}

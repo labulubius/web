@@ -17,10 +17,11 @@ function compile(file, imports, environment) {
   return exports;
 }
 const projectOrder = compile("app/tasks/project-order.ts", {}, process);
+const taskTypes = compile("app/tasks/task-types.ts", {}, process);
 async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), "tasks-regression-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const server = compile("app/lib/tasks-server.ts", { "server-only": {}, "../tasks/project-order": projectOrder }, {
+  const server = compile("app/lib/tasks-server.ts", { "server-only": {}, "../tasks/project-order": projectOrder, "../tasks/task-types": taskTypes }, {
     env: { TASKS_DATA_DIR: root }, cwd: () => process.cwd(),
   });
   return { ...server, root };
@@ -61,7 +62,7 @@ test("moving out of or deleting a project preserves task descriptions and dates"
   assert.equal(data.tasks[0].startDate, range.startDate);
   await api.updateTask(id, { projectId });
   data = await api.deleteProject(projectId);
-  assert.equal(data.projects.length, 0);
+  assert.deepEqual(data.projects.map(({ id }) => id), [taskTypes.TASK_ARCHIVE_PROJECT_ID]);
   assert.equal(data.tasks[0].projectId, null);
   assert.equal(data.tasks[0].description, "Keep me");
   assert.equal(data.tasks[0].startDate, range.startDate);
@@ -110,4 +111,34 @@ test("invalid stored description is rejected rather than silently discarded", as
   data.tasks[0].description = "x".repeat(301);
   await writeFile(path.join(api.root, "tasks.json"), JSON.stringify(data));
   await assert.rejects(api.loadTaskData(), /Stored task data is invalid/);
+});
+
+test("Archive is initialized as one protected system project", async (t) => {
+  const api = await fixture(t);
+  let data = await api.loadTaskData();
+  assert.deepEqual(data.projects.map(({ id, name }) => ({ id, name })), [{ id: taskTypes.TASK_ARCHIVE_PROJECT_ID, name: "Archive" }]);
+  data = await api.createProject({ name: "Course" });
+  assert.deepEqual(data.projects.map(({ name }) => name), ["Course", "Archive"]);
+  data = await api.createTask({ title: "Later", projectId: taskTypes.TASK_ARCHIVE_PROJECT_ID, ...range });
+  assert.equal(taskTypes.isArchivedTask(data.tasks[0]), true);
+  await assert.rejects(api.createProject({ name: "archive" }), /already exists/);
+  await assert.rejects(api.updateProject(taskTypes.TASK_ARCHIVE_PROJECT_ID, { name: "Later" }), /Invalid project/);
+  await assert.rejects(api.deleteProject(taskTypes.TASK_ARCHIVE_PROJECT_ID), /Invalid project/);
+  assert.equal((await api.loadTaskData()).tasks[0].projectId, taskTypes.TASK_ARCHIVE_PROJECT_ID);
+});
+
+test("an existing Archive project migrates to the stable system ID", async (t) => {
+  const api = await fixture(t);
+  const previousId = "11111111-1111-4111-8111-111111111111";
+  const taskId = "22222222-2222-4222-8222-222222222222";
+  const timestamp = "2026-10-01T00:00:00.000Z";
+  await writeFile(path.join(api.root, "tasks.json"), JSON.stringify({
+    version: 4,
+    projects: [{ id: previousId, name: "archive", createdAt: timestamp, updatedAt: timestamp }],
+    tasks: [{ id: taskId, title: "Later", description: "", projectId: previousId, ...range, createdAt: timestamp, updatedAt: timestamp }],
+  }));
+  const data = await api.loadTaskData();
+  assert.deepEqual(data.projects.map(({ id, name }) => ({ id, name })), [{ id: taskTypes.TASK_ARCHIVE_PROJECT_ID, name: "Archive" }]);
+  assert.equal(data.tasks[0].projectId, taskTypes.TASK_ARCHIVE_PROJECT_ID);
+  assert.deepEqual(JSON.parse(await readFile(path.join(api.root, "tasks.json"), "utf8")), data);
 });

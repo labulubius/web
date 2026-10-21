@@ -9,6 +9,7 @@ const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
 const compile = (node) => ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" } }).outputText;
+const archiveProjectId = "00000000-0000-4000-8000-000000000001";
 const task = { id: "task-1", title: "A long task title", projectId: null };
 
 for (const confirmed of [false, true]) {
@@ -97,18 +98,18 @@ test("task dialog keeps saving and errors accessible", () => {
   assert.ok(nodes(tree).some((n) => n.props.role === "alert" && n.children.includes("Cannot save")));
 });
 
-for (const view of ["all", "gantt", "project"]) {
+for (const view of ["all", "gantt", "archive", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
       const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
       const calls = []; const dialogs = [];
-      const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-        class { get() { return "  Report  "; } }, view, "project-1",
+      const handle = new Function("FormData", "view", "projectId", "TASK_ARCHIVE_PROJECT_ID", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+        class { get() { return "  Report  "; } }, view, "project-1", archiveProjectId,
         async (...args) => { calls.push(args); return success; }, (value) => dialogs.push(value),
       );
       let reset = false;
       await handle({ preventDefault() {}, currentTarget: { reset() { reset = true; } } });
-      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : null }) }]]);
+      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : view === "archive" ? archiveProjectId : null }) }]]);
       assert.deepEqual(dialogs, []);
       assert.equal(reset, success);
     });
@@ -118,8 +119,8 @@ for (const view of ["all", "gantt", "project"]) {
 test("quick add ignores blank titles without opening a dialog", async () => {
   const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
   const unexpected = () => assert.fail("Blank title must not submit, reset, or open a dialog");
-  const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-    class { get() { return "   "; } }, "all", null, unexpected, unexpected,
+  const handle = new Function("FormData", "view", "projectId", "TASK_ARCHIVE_PROJECT_ID", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
+    class { get() { return "   "; } }, "all", null, archiveProjectId, unexpected, unexpected,
   );
   await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
@@ -154,4 +155,30 @@ test("Gantt includes dated uncategorized tasks and excludes unscheduled or out-o
   const bars = nodes(tree).filter((n) => n.tag === "bar");
   assert.equal(bars.length, 1);
   assert.equal(bars[0].props.task, dated);
+});
+
+test("Archive navigation is ordered, restorable and excluded from active views", () => {
+  const all = source.indexOf("<span>All tasks</span>");
+  const archive = source.indexOf("<span>Archive</span>");
+  const gantt = source.indexOf("<span>Gantt</span>");
+  assert.ok(all >= 0 && all < archive && archive < gantt);
+  assert.match(source, /data\?\.tasks\.filter\(\(task\) => !isArchivedTask\(task\)\)/);
+  assert.match(source, /data\?\.tasks\.filter\(isArchivedTask\)/);
+  assert.match(source, /tasks=\{allTasks\}/);
+  assert.match(source, /data\?\.projects\.filter\(\(project\) => !isArchiveProject\(project\)\)/);
+  assert.match(source, /\["gantt", "all", "archive", "inbox", "project"\]/);
+});
+
+test("Archive is available in the task editor and another project can restore a task", () => {
+  const projects = [
+    { id: "project-1", name: "Course" },
+    { id: archiveProjectId, name: "Archive" },
+  ];
+  const archived = { ...task, description: "", projectId: archiveProjectId, startDate: null, endDate: null };
+  const tree = renderDialog({ value: { task: archived }, projects, busy: false, onClose() {}, onSave() {} });
+  const all = nodes(tree);
+  const select = all.find((node) => node.tag === "select" && node.props.name === "projectId");
+  assert.equal(select.props.defaultValue, archiveProjectId);
+  assert.ok(all.some((node) => node.tag === "option" && node.props.value === archiveProjectId && node.children.includes("Archive")));
+  assert.ok(all.some((node) => node.tag === "option" && node.props.value === "project-1" && node.children.includes("Course")));
 });
