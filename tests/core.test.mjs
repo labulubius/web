@@ -23,6 +23,11 @@ import { parseNewsFeedPreview, reviewWebSourcePreview, UnreliableNewsSource } fr
 import { NewsSourceProbeStore } from "../app/lib/news-source-probe-cache.ts";
 import nextConfig from "../next.config.ts";
 
+test("private Tasks shell is dynamically rendered so deployments cannot serve a stale client", async () => {
+  const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(home, /export const dynamic = "force-dynamic"/);
+});
+
 test("PDF handoff carries a private structured reference into Agent", () => {
   const prompt = pdfToEpubHandoff("drive", "Books/中文扫描.pdf", "中文扫描.pdf", 1234);
   assert.match(prompt, /^\/skill:pdf-to-epub/);
