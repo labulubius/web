@@ -6,7 +6,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { reorderTaskProjects } from "../tasks/project-order";
+import { reorderTaskProjects, reorderTasks } from "../tasks/project-order";
 import { TASK_ARCHIVE_PROJECT_ID, TASK_ARCHIVE_PROJECT_NAME, type PersonalTask, type TaskData, type TaskProject } from "../tasks/task-types";
 
 const DATA_FILE = "tasks.json";
@@ -78,13 +78,21 @@ function storedRange(task: Record<string, unknown>) {
   return { startDate: startDate as string | null, endDate: endDate as string | null };
 }
 
-function parseTask(value: unknown, legacy = false): PersonalTask {
+function parseTask(value: unknown, legacyDescription = false, legacyImportant = false): PersonalTask {
   const task = commonTask(value, false);
   const range = storedRange(task);
-  if (!legacy && (typeof task.description !== "string" || task.description.length > 300)) throw new Error("Stored task data is invalid.");
+  if (!legacyDescription && (typeof task.description !== "string" || task.description.length > 300)) throw new Error("Stored task data is invalid.");
+  const isImportant = legacyImportant ? false : task.isImportant;
+  const importantSortOrder = legacyImportant ? null : task.importantSortOrder;
+  if (typeof isImportant !== "boolean" ||
+      !(importantSortOrder === null || (Number.isInteger(importantSortOrder) && Number(importantSortOrder) >= 0)) ||
+      (isImportant && importantSortOrder === null) || (!isImportant && importantSortOrder !== null)) {
+    throw new Error("Stored task data is invalid.");
+  }
   return {
     id: String(task.id), title: String(task.title), projectId: task.projectId as string | null, ...range,
-    description: legacy ? "" : task.description as string,
+    description: legacyDescription ? "" : task.description as string,
+    isImportant, importantSortOrder: importantSortOrder as number | null,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
@@ -96,6 +104,7 @@ function migrateVersionTwoTask(value: unknown): PersonalTask {
   return {
     id: String(task.id), title: String(task.title), description: "", projectId: project,
     startDate: range.startDate, endDate: range.endDate,
+    isImportant: false, importantSortOrder: null,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
@@ -113,25 +122,29 @@ function migrateLegacyTask(value: unknown): PersonalTask | null {
   return {
     id: String(task.id), title: String(task.title), description: "", projectId: project,
     startDate: date, endDate: date,
+    isImportant: false, importantSortOrder: null,
     createdAt: String(task.createdAt), updatedAt: String(task.updatedAt),
   };
 }
 
+// Stored version: 5 data predates Important metadata and migrates to version 6.
 function parseData(value: unknown): ReadResult {
-  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3, 4, 5].includes(Number(value.version))) {
+  if (!object(value) || !Array.isArray(value.tasks) || !Array.isArray(value.projects) || ![1, 2, 3, 4, 5, 6].includes(Number(value.version))) {
     throw new Error("Stored task data is invalid.");
   }
   const projects = value.projects.map(parseProject);
   const tasks = value.version === 1
     ? value.tasks.map(migrateLegacyTask).filter((task): task is PersonalTask => task !== null)
-    : value.version === 2 ? value.tasks.map(migrateVersionTwoTask) : value.tasks.map((task) => parseTask(task, value.version === 3));
+    : value.version === 2 ? value.tasks.map(migrateVersionTwoTask) : value.tasks.map((task) => parseTask(task, value.version === 3, Number(value.version) < 6));
   const projectIds = new Set(projects.map((project) => project.id));
-  if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
+  const importantOrders = tasks.filter((task) => task.isImportant).map((task) => task.importantSortOrder!);
+  if (projectIds.size !== projects.length || new Set(tasks.map((task) => task.id)).size !== tasks.length ||
+      new Set(importantOrders).size !== importantOrders.length || tasks.some((task) => task.projectId && !projectIds.has(task.projectId))) {
     throw new Error("Stored task data is invalid.");
   }
-  const data: TaskData = { version: 5, tasks, projects };
-  const archiveAdded = value.version === 5 ? false : ensureArchiveProject(data);
-  return { data, migrated: value.version !== 5 || archiveAdded };
+  const data: TaskData = { version: 6, tasks, projects };
+  const archiveAdded = Number(value.version) >= 5 ? false : ensureArchiveProject(data);
+  return { data, migrated: value.version !== 6 || archiveAdded };
 }
 
 export async function tasksRoot() {
@@ -160,7 +173,7 @@ async function readData(root: string): Promise<ReadResult> {
   let handle;
   try { handle = await open(path.join(root, DATA_FILE), constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 5, tasks: [], projects: [archiveProject()] }, migrated: false };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { data: { version: 6, tasks: [], projects: [archiveProject()] }, migrated: false };
     throw error;
   }
   try { return parseData(JSON.parse(await handle.readFile("utf8"))); }
@@ -229,10 +242,15 @@ export async function createTask(input: unknown) {
     const selectedProject = projectId(input.projectId, data.projects);
     const range = taskRange(input.startDate, input.endDate);
     const now = new Date().toISOString();
+    const isImportant = "isImportant" in input ? input.isImportant : false;
+    if (typeof isImportant !== "boolean" || "importantSortOrder" in input) throw new Error("Invalid task.");
+    const importantSortOrder = isImportant
+      ? Math.max(-1, ...data.tasks.filter((task) => task.isImportant).map((task) => task.importantSortOrder ?? -1)) + 1
+      : null;
     const task: PersonalTask = {
       id: randomUUID(), title: text(input.title, "task title", 200), projectId: selectedProject,
       description: "description" in input ? text(input.description, "task description", 300, true) : "",
-      startDate: range.startDate, endDate: range.endDate,
+      startDate: range.startDate, endDate: range.endDate, isImportant, importantSortOrder,
       createdAt: now, updatedAt: now,
     };
     data.tasks.unshift(task);
@@ -253,6 +271,11 @@ export async function updateTask(id: string, input: unknown) {
     const range = "startDate" in input || "endDate" in input
       ? taskRange("startDate" in input ? input.startDate : current.startDate, "endDate" in input ? input.endDate : current.endDate)
       : { startDate: current.startDate, endDate: current.endDate };
+    if ("importantSortOrder" in input || ("isImportant" in input && typeof input.isImportant !== "boolean")) throw new Error("Invalid task.");
+    const isImportant = "isImportant" in input ? input.isImportant as boolean : current.isImportant;
+    const importantSortOrder = isImportant
+      ? current.isImportant ? current.importantSortOrder : Math.max(-1, ...data.tasks.filter((task) => task.isImportant).map((task) => task.importantSortOrder ?? -1)) + 1
+      : null;
     data.tasks[index] = {
       ...current,
       title: "title" in input ? text(input.title, "task title", 200) : current.title,
@@ -260,6 +283,8 @@ export async function updateTask(id: string, input: unknown) {
       projectId: selectedProject,
       startDate: range.startDate,
       endDate: range.endDate,
+      isImportant,
+      importantSortOrder,
       updatedAt: new Date().toISOString(),
     };
     await writeData(root, data);
@@ -275,6 +300,23 @@ export async function deleteTask(id: string) {
     const index = data.tasks.findIndex((task) => task.id === id);
     if (index < 0) throw new Error("Task not found.");
     data.tasks.splice(index, 1);
+    await writeData(root, data);
+    return data;
+  });
+}
+
+export async function reorderStoredTasks(input: unknown) {
+  if (!object(input) || !["base", "important"].includes(String(input.mode))) throw new Error("Invalid task order.");
+  const root = await tasksRoot();
+  return locked(root, async () => {
+    const { data } = await readData(root);
+    if (input.mode === "base") {
+      data.tasks = reorderTasks(data.tasks, input.taskIds);
+    } else {
+      const important = reorderTasks(data.tasks.filter((task) => task.isImportant), input.taskIds);
+      const orderById = new Map(important.map((task, index) => [task.id, index]));
+      data.tasks = data.tasks.map((task) => task.isImportant ? { ...task, importantSortOrder: orderById.get(task.id)! } : task);
+    }
     await writeData(root, data);
     return data;
   });

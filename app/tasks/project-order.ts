@@ -10,3 +10,12 @@ export function reorderTaskProjects(projects: TaskProject[], value: unknown) {
   if (value.length !== projects.length || value.some((id) => !projectsById.has(id))) throw new Error("Invalid project order.");
   return value.map((id) => projectsById.get(id)!);
 }
+
+export function reorderTasks<T extends { id: string }>(tasks: T[], value: unknown) {
+  if (!Array.isArray(value) || value.some((id) => typeof id !== "string" || !UUID.test(id)) || new Set(value).size !== value.length) {
+    throw new Error("Invalid task order.");
+  }
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  if (value.length !== tasks.length || value.some((id) => !tasksById.has(id))) throw new Error("Invalid task order.");
+  return value.map((id) => tasksById.get(id)!);
+}

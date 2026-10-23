@@ -8,9 +8,10 @@ const parsed = ts.createSourceFile("tasks.tsx", source, ts.ScriptTarget.Latest, 
 const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskManager");
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
+const row = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableTaskRow");
 const compile = (node) => ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" } }).outputText;
 const archiveProjectId = "00000000-0000-4000-8000-000000000001";
-const task = { id: "task-1", title: "A long task title", projectId: null };
+const task = { id: "task-1", title: "A long task title", projectId: null, isImportant: false, importantSortOrder: null };
 
 for (const confirmed of [false, true]) {
   test(`deleting a task requires confirmation: ${confirmed}`, async () => {
@@ -41,16 +42,22 @@ const h = (tag, props, ...children) => ({ tag, props: props ?? {}, children: chi
 function nodes(tree) { return tree && typeof tree === "object" ? [tree, ...tree.children.flatMap(nodes)] : []; }
 test("task body is inert and edit, delete, complete stay separate", () => {
   const calls = [];
-  const render = new Function("h", "CheckCircle2", "Circle", "Pencil", "Trash2", "shortDate", `${compile(list)}; return TaskList;`)(h, "check", "circle", "pencil", "trash", (date) => date);
-  const tree = render({ tasks: [task], projects: [], empty: "Empty", onOpen: (value) => calls.push(["edit", value]), onDelete: (value) => calls.push(["delete", value]), onComplete: (value) => calls.push(["complete", value]) });
+  const renderRow = new Function("h", "useSortable", "CSS", "GripVertical", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+    h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
+    { Transform: { toString: () => undefined } }, "grip", "circle", "star", "pencil", "trash", (date) => date,
+  );
+  const tree = renderRow({ task, projectName: "Uncategorized", disabled: false, onOpen: () => calls.push(["edit", { task }]), onDelete: () => calls.push(["delete", task]), onComplete: () => calls.push(["complete", task]), onImportant: () => calls.push(["important", task]) });
   const all = nodes(tree);
   const body = all.find((n) => n.props.className === "task-list-main");
   assert.equal(body.tag, "div");
   assert.equal(body.props.onClick, undefined);
   assert.equal(all.find((n) => n.tag === "li").props.onClick, undefined);
-  for (const action of ["Delete", "Edit", "Complete"]) all.find((n) => n.props["aria-label"] === `${action} ${task.title}`).props.onClick();
-  assert.deepEqual(calls, [["delete", task], ["edit", { task }], ["complete", task]]);
-  assert.ok(nodes(render({ tasks: [], projects: [], empty: "Empty" })).some((n) => n.props.className === "task-empty"));
+  for (const action of ["Delete", "Edit", "Complete", "Add"]) all.find((n) => n.props["aria-label"]?.startsWith(`${action} ${task.title}`)).props.onClick();
+  assert.deepEqual(calls, [["delete", task], ["edit", { task }], ["complete", task], ["important", task]]);
+  const actionLabels = all.filter((n) => n.props.className?.includes?.("task-important") || ["Edit task", "Delete task"].includes(n.props.title)).map((n) => n.props.title);
+  assert.deepEqual(actionLabels, ["Add to Important", "Edit task", "Delete task"]);
+  const renderList = new Function("h", "CheckCircle2", `${compile(list)}; return TaskList;`)(h, "check");
+  assert.ok(nodes(renderList({ tasks: [], projects: [], empty: "Empty" })).some((n) => n.props.className === "task-empty"));
 });
 
 test("Gantt title and draggable bar do not activate editing", () => {
@@ -98,7 +105,7 @@ test("task dialog keeps saving and errors accessible", () => {
   assert.ok(nodes(tree).some((n) => n.props.role === "alert" && n.children.includes("Cannot save")));
 });
 
-for (const view of ["all", "gantt", "project"]) {
+for (const view of ["all", "important", "gantt", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
       const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
@@ -109,7 +116,7 @@ for (const view of ["all", "gantt", "project"]) {
       );
       let reset = false;
       await handle({ preventDefault() {}, currentTarget: { reset() { reset = true; } } });
-      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : null }) }]]);
+      assert.deepEqual(calls, [["/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Report", projectId: view === "project" ? "project-1" : null, ...(view === "important" ? { isImportant: true } : {}) }) }]]);
       assert.deepEqual(dialogs, []);
       assert.equal(reset, success);
     });
@@ -127,8 +134,11 @@ test("quick add ignores blank titles without opening a dialog", async () => {
 
 test("uncategorized tasks retain dates in the list and can move on Gantt", () => {
   const scheduled = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
-  const render = new Function("h", "CheckCircle2", "Circle", "Pencil", "Trash2", "shortDate", `${compile(list)}; return TaskList;`)(h, "check", "circle", "pencil", "trash", (date) => date);
-  const tree = render({ tasks: [scheduled], projects: [], empty: "Empty" });
+  const renderRow = new Function("h", "useSortable", "CSS", "GripVertical", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+    h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
+    { Transform: { toString: () => undefined } }, "grip", "circle", "star", "pencil", "trash", (date) => date,
+  );
+  const tree = renderRow({ task: scheduled, projectName: "Uncategorized", disabled: false, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {} });
   assert.ok(nodes(tree).some((n) => n.tag === "span" && n.children.includes("2026-10-10 – 2026-10-15")));
   const drag = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "dragEnd");
   const patches = [];
@@ -182,4 +192,21 @@ test("Archive is available in the task editor and another project can restore a 
   assert.equal(select.props.defaultValue, archiveProjectId);
   assert.ok(all.some((node) => node.tag === "option" && node.props.value === archiveProjectId && node.children.includes("Archive")));
   assert.ok(all.some((node) => node.tag === "option" && node.props.value === "project-1" && node.children.includes("Course")));
+});
+
+
+test("Important navigation includes starred Archive tasks without adding them to active views", () => {
+  assert.match(source, /<span>Important<\/span>/);
+  assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.isImportant\)/);
+  assert.match(source, /Starred tasks from every project, including Archive/);
+  assert.match(source, /view === "important" \? importantTasks/);
+  assert.match(source, /tasks=\{allTasks\}/);
+});
+
+test("task list sorting separates base and Important persistence", () => {
+  assert.match(source, /mode: "important"/);
+  assert.match(source, /mode: "base"/);
+  assert.match(source, /importantSortOrder: orderById\.get\(task\.id\)!/);
+  assert.match(source, /if \(!ok\) setData\(before\)/);
+  assert.match(source, /sortableKeyboardCoordinates/);
 });

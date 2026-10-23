@@ -1,9 +1,9 @@
 "use client";
 
-import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarRange, CheckCircle2, Circle, Folder, GripVertical, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
@@ -12,8 +12,9 @@ import { GanttView } from "./gantt-view";
 import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-type View = "gantt" | "all" | "project";
+type View = "gantt" | "all" | "important" | "project";
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
+type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
 
 function HomeAccess({ description, status, action }: { description: string; status?: string; action?: ReactNode }) {
   return <section className="owner-access">
@@ -26,26 +27,54 @@ function HomeAccess({ description, status, action }: { description: string; stat
   </section>;
 }
 
-function TaskList({ tasks, empty, projects, onOpen, onComplete, onDelete }: {
+function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onImportant, onDelete }: {
+  task: PersonalTask;
+  projectName: string;
+  disabled: boolean;
+  onOpen: () => void;
+  onComplete: () => void;
+  onImportant: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: `list:${task.id}`, disabled });
+  return <li ref={setNodeRef} className={isDragging ? "dragging" : ""} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
+    <button ref={setActivatorNodeRef} className="task-drag-handle" type="button" disabled={disabled} aria-label={`Reorder ${task.title}`} title="Drag to reorder" {...attributes} {...listeners}><GripVertical size={14} /></button>
+    <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={onComplete}><Circle size={15} /></button>
+    <div className="task-list-main">
+      <strong>{task.title}</strong><span>{projectName} · {task.startDate && task.endDate ? `${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : "Not scheduled"}</span>
+    </div>
+    <span className="task-list-actions">
+      <button className={task.isImportant ? "task-important active" : "task-important"} type="button" disabled={disabled} onClick={onImportant} aria-label={`${task.isImportant ? "Remove" : "Add"} ${task.title} ${task.isImportant ? "from" : "to"} Important`} title={task.isImportant ? "Remove from Important" : "Add to Important"}><Star size={14} fill={task.isImportant ? "currentColor" : "none"} /></button>
+      <button type="button" disabled={disabled} onClick={onOpen} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
+      <button type="button" disabled={disabled} onClick={onDelete} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>
+    </span>
+  </li>;
+}
+
+function TaskList({ tasks, empty, projects, disabled, onOpen, onComplete, onImportant, onDelete }: {
   tasks: PersonalTask[];
   empty: string;
   projects: TaskProject[];
+  disabled: boolean;
   onOpen: (value: TaskDialogValue) => void;
   onComplete: (task: PersonalTask) => void;
+  onImportant: (task: PersonalTask) => void;
   onDelete: (task: PersonalTask) => void;
 }) {
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   if (!tasks.length) return <div className="task-empty"><CheckCircle2 size={30} /><strong>Nothing here</strong><span>{empty}</span></div>;
-  return <ul className="task-list">{tasks.map((task) => <li key={task.id}>
-    <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={() => onComplete(task)}><Circle size={15} /></button>
-    <div className="task-list-main">
-      <strong>{task.title}</strong><span>{task.projectId ? projectNames.get(task.projectId) ?? "Project" : "Uncategorized"} · {task.startDate && task.endDate ? `${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : "Not scheduled"}</span>
-    </div>
-    <span className="task-list-actions">
-      <button type="button" onClick={() => onOpen({ task })} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
-      <button type="button" onClick={() => onDelete(task)} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>
-    </span>
-  </li>)}</ul>;
+  return <SortableContext items={tasks.map((task) => `list:${task.id}`)} strategy={verticalListSortingStrategy}>
+    <ul className="task-list">{tasks.map((task) => <SortableTaskRow
+      key={task.id}
+      task={task}
+      projectName={task.projectId ? projectNames.get(task.projectId) ?? "Project" : "Uncategorized"}
+      disabled={disabled}
+      onOpen={() => onOpen({ task })}
+      onComplete={() => onComplete(task)}
+      onImportant={() => onImportant(task)}
+      onDelete={() => onDelete(task)}
+    />)}</ul>
+  </SortableContext>;
 }
 
 function SortableProjectRow({ project, active, disabled, onSelect, onEdit, onDelete }: {
@@ -70,7 +99,7 @@ function readLocation(projects: TaskProject[]): StoredLocation | null {
   try {
     const value = JSON.parse(window.localStorage.getItem(LOCATION_KEY) ?? "null") as (Partial<StoredLocation> & { view?: View | "archive" | "inbox" }) | null;
     const storedView = String(value?.view);
-    if (!value || value.version !== 1 || !["gantt", "all", "archive", "inbox", "project"].includes(storedView) || !validTimelineRange(value.timelineStart, value.timelineEnd)) return null;
+    if (!value || value.version !== 1 || !["gantt", "all", "important", "archive", "inbox", "project"].includes(storedView) || !validTimelineRange(value.timelineStart, value.timelineEnd)) return null;
     const savedView: View = storedView === "inbox" ? "all" : storedView === "archive" ? "project" : storedView as View;
     const savedProjectId = storedView === "archive" ? TASK_ARCHIVE_PROJECT_ID : value.projectId ?? null;
     if (savedView === "project" && (!savedProjectId || !projects.some((project) => project.id === savedProjectId))) return { ...value, view: "all", projectId: null } as StoredLocation;
@@ -95,7 +124,11 @@ export function TaskManager() {
   const [error, setError] = useState("");
   const requestGeneration = useRef(0);
   const locationRestored = useRef(false);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const api = useCallback(async (url: string, options: RequestInit = {}) => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -151,12 +184,24 @@ export function TaskManager() {
     if (ok) setTaskDialog(null);
   }
 
-  async function patchTask(task: PersonalTask, patch: Partial<TaskDraft>) {
+  async function patchTask(task: PersonalTask, patch: TaskPatch) {
     const before = data;
     if (data) setData({ ...data, tasks: data.tasks.map((item) => item.id === task.id ? { ...item, ...patch, updatedAt: new Date().toISOString() } : item) });
     const ok = await mutate(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
     if (!ok && before) setData(before);
     return ok;
+  }
+
+  async function toggleImportant(task: PersonalTask) {
+    if (!data) return;
+    const before = data;
+    const isImportant = !task.isImportant;
+    const importantSortOrder = isImportant
+      ? Math.max(-1, ...data.tasks.filter((item) => item.isImportant).map((item) => item.importantSortOrder ?? -1)) + 1
+      : null;
+    setData({ ...data, tasks: data.tasks.map((item) => item.id === task.id ? { ...item, isImportant, importantSortOrder } : item) });
+    const ok = await mutate(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isImportant }) });
+    if (!ok) setData(before);
   }
 
   async function saveTask(draft: TaskDraft) {
@@ -194,7 +239,8 @@ export function TaskManager() {
     const title = String(new FormData(form).get("title") ?? "").trim();
     if (!title) return;
     const selectedProject = view === "project" ? projectId : null;
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, projectId: selectedProject }) });
+    const values = { title, projectId: selectedProject, ...(view === "important" ? { isImportant: true } : {}) };
+    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     if (ok) form.reset();
   }
 
@@ -221,7 +267,45 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
+  const allTasks = useMemo(() => data?.tasks.filter((task) => !isArchivedTask(task)) ?? [], [data]);
+  const importantTasks = useMemo(() => {
+    const baseOrder = new Map((data?.tasks ?? []).map((task, index) => [task.id, index]));
+    return (data?.tasks.filter((task) => task.isImportant) ?? []).sort((a, b) =>
+      (a.importantSortOrder ?? Number.MAX_SAFE_INTEGER) - (b.importantSortOrder ?? Number.MAX_SAFE_INTEGER) ||
+      (baseOrder.get(a.id) ?? 0) - (baseOrder.get(b.id) ?? 0),
+    );
+  }, [data]);
+  const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
+  const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
+  const visibleTasks = view === "all" ? allTasks : view === "important" ? importantTasks : projectTasks;
+
+  async function taskListDragEnd(event: DragEndEvent) {
+    if (!data || !event.over || event.active.id === event.over.id || saving) return;
+    const sourceId = String(event.active.id).replace(/^list:/, "");
+    const targetId = String(event.over.id).replace(/^list:/, "");
+    const sourceIndex = visibleTasks.findIndex((task) => task.id === sourceId);
+    const targetIndex = visibleTasks.findIndex((task) => task.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const before = data;
+    const moved = arrayMove(visibleTasks, sourceIndex, targetIndex);
+    if (view === "important") {
+      const orderById = new Map(moved.map((task, index) => [task.id, index]));
+      const tasks = data.tasks.map((task) => task.isImportant ? { ...task, importantSortOrder: orderById.get(task.id)! } : task);
+      setData({ ...data, tasks });
+      const ok = await mutate("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "important", taskIds: moved.map((task) => task.id) }) });
+      if (!ok) setData(before);
+      return;
+    }
+    const visibleIds = new Set(moved.map((task) => task.id));
+    let cursor = 0;
+    const tasks = data.tasks.map((task) => visibleIds.has(task.id) ? moved[cursor++] : task);
+    setData({ ...data, tasks });
+    const ok = await mutate("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "base", taskIds: tasks.map((task) => task.id) }) });
+    if (!ok) setData(before);
+  }
+
   function dragEnd(event: DragEndEvent) {
+    if (String(event.active.id).startsWith("list:")) { void taskListDragEnd(event); return; }
     if (!data || !event.over || saving) return;
     const id = String(event.active.id).replace(/^task:/, "");
     const task = data.tasks.find((item) => item.id === id);
@@ -232,11 +316,8 @@ export function TaskManager() {
     void patchTask(task, { startDate: match[1], endDate: addDays(match[1], length) });
   }
 
-  const allTasks = useMemo(() => data?.tasks.filter((task) => !isArchivedTask(task)) ?? [], [data]);
-  const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
-  const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
-  const title = view === "all" ? "All tasks" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
-  const description = view === "all" ? "All active project and uncategorized tasks." : "Scheduled and unscheduled tasks in this project.";
+  const title = view === "all" ? "All tasks" : view === "important" ? "Important" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
+  const description = view === "all" ? "All active project and uncategorized tasks." : view === "important" ? "Starred tasks from every project, including Archive." : "Scheduled and unscheduled tasks in this project.";
 
   if (loading) return <HomeAccess description="Opening home…" />;
   if (authError) return <HomeAccess description="Home is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
@@ -244,12 +325,13 @@ export function TaskManager() {
   if (loadingData && !data) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
   if (!data) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
 
-  return <DndContext sensors={sensors} onDragEnd={dragEnd}>
+  return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
     <div className="task-layout">
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
         <nav aria-label="Task navigation">
           <button className={view === "all" ? "selected" : ""} aria-current={view === "all" ? "page" : undefined} type="button" onClick={() => select("all")}><ListTodo size={16} /><span>All tasks</span></button>
+          <button className={view === "important" ? "selected" : ""} aria-current={view === "important" ? "page" : undefined} type="button" onClick={() => select("important")}><Star size={16} fill={view === "important" ? "currentColor" : "none"} /><span>Important</span></button>
           <button className={view === "gantt" ? "selected" : ""} aria-current={view === "gantt" ? "page" : undefined} type="button" onClick={() => select("gantt")}><CalendarRange size={16} /><span>Gantt</span></button>
         </nav>
         <div className="tasks-project-heading"><h2>Projects</h2><button type="button" onClick={() => setProjectDialog("new")} aria-label="Create project" title="Create project"><Plus size={14} /></button></div>
@@ -265,9 +347,9 @@ export function TaskManager() {
           <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1>{view !== "gantt" && <span>{description}</span>}</div>
           {view === "gantt" && <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>}
         </header>
-        <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
+        <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : view === "important" ? "Add an important task…" : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
         {error && <p className="task-error" role="alert">{error}</p>}
-        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={view === "all" ? allTasks : projectTasks} empty={view === "all" ? "There are no active tasks yet." : "This project has no tasks."} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onDelete={(task) => void deleteTask(task)} />}
+        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={visibleTasks} empty={view === "all" ? "There are no active tasks yet." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={() => setTaskDialog(null)} onSave={saveTask} />}

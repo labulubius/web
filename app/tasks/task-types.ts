@@ -15,12 +15,14 @@ export type PersonalTask = {
   projectId: string | null;
   startDate: string | null;
   endDate: string | null;
+  isImportant: boolean;
+  importantSortOrder: number | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type TaskData = {
-  version: 5;
+  version: 6;
   tasks: PersonalTask[];
   projects: TaskProject[];
 };

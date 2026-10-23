@@ -32,7 +32,7 @@ test("uncategorized task descriptions and dates survive create, update and reloa
   const api = await fixture(t);
   let data = await api.createTask({ title: "Report", description: " First line\nSecond line ", ...range });
   const id = data.tasks[0].id;
-  assert.equal(data.version, 5);
+  assert.equal(data.version, 6);
   assert.equal(data.tasks[0].projectId, null);
   assert.equal(data.tasks[0].description, "First line\nSecond line");
   assert.deepEqual(await api.loadTaskData(), data);
@@ -85,7 +85,7 @@ test("invalid descriptions and date ranges never overwrite existing data", async
   }
 });
 
-for (const version of [1, 2, 3, 4]) {
+for (const version of [1, 2, 3, 4, 5]) {
   test(`version ${version} tasks migrate to descriptions without losing dates`, async (t) => {
     const api = await fixture(t);
     const task = {
@@ -93,11 +93,11 @@ for (const version of [1, 2, 3, 4]) {
       createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z",
       ...(version === 1 ? { date: range.startDate, notes: "", completedAt: null, startMinute: null, durationMinutes: 30 } : range),
       ...(version === 2 ? { notes: "" } : {}),
-      ...(version === 4 ? { description: "" } : {}),
+      ...(version >= 4 ? { description: "" } : {}),
     };
     await writeFile(path.join(api.root, "tasks.json"), JSON.stringify({ version, tasks: [task], projects: [] }));
     const data = await api.loadTaskData();
-    assert.equal(data.version, 5);
+    assert.equal(data.version, 6);
     assert.equal(data.tasks[0].description, "");
     assert.equal(data.tasks[0].startDate, range.startDate);
     assert.equal(data.tasks[0].endDate, version === 1 ? range.startDate : range.endDate);
@@ -128,7 +128,7 @@ test("Archive supports ordinary project rename, deletion and recreation", async 
   data = await api.deleteProject(taskTypes.TASK_ARCHIVE_PROJECT_ID);
   assert.deepEqual(data.projects.map(({ name }) => name), ["Course"]);
   assert.equal(data.tasks[0].projectId, null);
-  assert.deepEqual(await api.loadTaskData(), data, "version 5 must not recreate a deleted Archive");
+  assert.deepEqual(await api.loadTaskData(), data, "version 6 must not recreate a deleted Archive");
   data = await api.createProject({ name: "Archive" });
   assert.equal(data.projects.at(-1).id, taskTypes.TASK_ARCHIVE_PROJECT_ID);
 });
@@ -147,4 +147,50 @@ test("an existing Archive project migrates to the stable system ID", async (t) =
   assert.deepEqual(data.projects.map(({ id, name }) => ({ id, name })), [{ id: taskTypes.TASK_ARCHIVE_PROJECT_ID, name: "Archive" }]);
   assert.equal(data.tasks[0].projectId, taskTypes.TASK_ARCHIVE_PROJECT_ID);
   assert.deepEqual(JSON.parse(await readFile(path.join(api.root, "tasks.json"), "utf8")), data);
+});
+
+
+test("Important state persists and Archive tasks can stay Important", async (t) => {
+  const api = await fixture(t);
+  let data = await api.createTask({ title: "Archived favorite", projectId: taskTypes.TASK_ARCHIVE_PROJECT_ID, isImportant: true });
+  const id = data.tasks[0].id;
+  assert.equal(data.tasks[0].isImportant, true);
+  assert.equal(data.tasks[0].importantSortOrder, 0);
+  assert.equal(taskTypes.isArchivedTask(data.tasks[0]), true);
+  data = await api.updateTask(id, { isImportant: false });
+  assert.equal(data.tasks[0].isImportant, false);
+  assert.equal(data.tasks[0].importantSortOrder, null);
+  data = await api.updateTask(id, { isImportant: true });
+  assert.equal(data.tasks[0].importantSortOrder, 0);
+  assert.deepEqual(await api.loadTaskData(), data);
+});
+
+test("base and Important orders persist independently", async (t) => {
+  const api = await fixture(t);
+  let data = await api.createTask({ title: "First", isImportant: true });
+  data = await api.createTask({ title: "Second", isImportant: true });
+  data = await api.createTask({ title: "Third" });
+  const byTitle = new Map(data.tasks.map((task) => [task.title, task.id]));
+  const baseIds = [byTitle.get("First"), byTitle.get("Third"), byTitle.get("Second")];
+  data = await api.reorderStoredTasks({ mode: "base", taskIds: baseIds });
+  assert.deepEqual(data.tasks.map((task) => task.title), ["First", "Third", "Second"]);
+  data = await api.reorderStoredTasks({ mode: "important", taskIds: [byTitle.get("Second"), byTitle.get("First")] });
+  assert.deepEqual(data.tasks.map((task) => task.title), ["First", "Third", "Second"]);
+  assert.deepEqual(data.tasks.filter((task) => task.isImportant).sort((a, b) => a.importantSortOrder - b.importantSortOrder).map((task) => task.title), ["Second", "First"]);
+  assert.deepEqual(await api.loadTaskData(), data);
+});
+
+test("invalid task orders and Important fields do not overwrite data", async (t) => {
+  const api = await fixture(t);
+  const data = await api.createTask({ title: "Task", isImportant: true });
+  const id = data.tasks[0].id;
+  for (const input of [
+    { mode: "base", taskIds: [] },
+    { mode: "base", taskIds: [id, id] },
+    { mode: "base", taskIds: ["unknown"] },
+    { mode: "important", taskIds: [] },
+  ]) await assert.rejects(api.reorderStoredTasks(input), /Invalid task order/);
+  await assert.rejects(api.updateTask(id, { isImportant: "yes" }), /Invalid task/);
+  await assert.rejects(api.updateTask(id, { importantSortOrder: 9 }), /Invalid task/);
+  assert.deepEqual(await api.loadTaskData(), data);
 });
