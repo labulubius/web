@@ -3,7 +3,7 @@
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarRange, CheckCircle2, Circle, Folder, GripVertical, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
+import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
@@ -37,13 +37,13 @@ function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onIm
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: `list:${task.id}`, disabled });
-  return <li ref={setNodeRef} className={isDragging ? "dragging" : ""} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
-    <button ref={setActivatorNodeRef} className="task-drag-handle" type="button" disabled={disabled} aria-label={`Reorder ${task.title}`} title="Drag to reorder" {...attributes} {...listeners}><GripVertical size={14} /></button>
-    <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={onComplete}><Circle size={15} /></button>
-    <div className="task-list-main">
+  const stopDragStart = (event: { stopPropagation: () => void }) => event.stopPropagation();
+  return <li ref={setNodeRef} className={`reorderable${disabled ? " disabled" : ""}${isDragging ? " dragging" : ""}`} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }} {...listeners}>
+    <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onPointerDown={stopDragStart} onTouchStart={stopDragStart} onKeyDown={stopDragStart} onClick={onComplete}><Circle size={15} /></button>
+    <div ref={setActivatorNodeRef} className="task-list-main" aria-label={`Reorder ${task.title}`} {...attributes}>
       <strong>{task.title}</strong><span>{projectName} · {task.startDate && task.endDate ? `${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : "Not scheduled"}</span>
     </div>
-    <span className="task-list-actions">
+    <span className="task-list-actions" onPointerDown={stopDragStart} onTouchStart={stopDragStart} onKeyDown={stopDragStart}>
       <button className={task.isImportant ? "task-important active" : "task-important"} type="button" disabled={disabled} onClick={onImportant} aria-label={`${task.isImportant ? "Remove" : "Add"} ${task.title} ${task.isImportant ? "from" : "to"} Important`} title={task.isImportant ? "Remove from Important" : "Add to Important"}><Star size={14} fill={task.isImportant ? "currentColor" : "none"} /></button>
       <button type="button" disabled={disabled} onClick={onOpen} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button>
       <button type="button" disabled={disabled} onClick={onDelete} aria-label={`Delete ${task.title}`} title="Delete task"><Trash2 size={14} /></button>

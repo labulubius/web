@@ -42,16 +42,30 @@ const h = (tag, props, ...children) => ({ tag, props: props ?? {}, children: chi
 function nodes(tree) { return tree && typeof tree === "object" ? [tree, ...tree.children.flatMap(nodes)] : []; }
 test("task body is inert and edit, delete, complete stay separate", () => {
   const calls = [];
-  const renderRow = new Function("h", "useSortable", "CSS", "GripVertical", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
-    h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
-    { Transform: { toString: () => undefined } }, "grip", "circle", "star", "pencil", "trash", (date) => date,
+  const dragStart = () => {};
+  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+    h, () => ({ attributes: { role: "button", tabIndex: 0 }, listeners: { onPointerDown: dragStart, onKeyDown: dragStart }, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
+    { Transform: { toString: () => undefined } }, "circle", "star", "pencil", "trash", (date) => date,
   );
   const tree = renderRow({ task, projectName: "Uncategorized", disabled: false, onOpen: () => calls.push(["edit", { task }]), onDelete: () => calls.push(["delete", task]), onComplete: () => calls.push(["complete", task]), onImportant: () => calls.push(["important", task]) });
   const all = nodes(tree);
   const body = all.find((n) => n.props.className === "task-list-main");
   assert.equal(body.tag, "div");
   assert.equal(body.props.onClick, undefined);
-  assert.equal(all.find((n) => n.tag === "li").props.onClick, undefined);
+  const taskRow = all.find((n) => n.tag === "li");
+  assert.equal(taskRow.props.onClick, undefined);
+  assert.equal(taskRow.props.onPointerDown, dragStart, "the whole row starts pointer dragging");
+  assert.equal(body.props.onKeyDown, undefined, "keyboard events bubble to the row listener");
+  assert.equal(body.props.role, "button");
+  assert.equal(body.props.tabIndex, 0);
+  assert.equal(body.props["aria-label"], `Reorder ${task.title}`);
+  assert.ok(!all.some((n) => n.props.className === "task-drag-handle"));
+  assert.doesNotMatch(source, /GripVertical|task-drag-handle/);
+  let stopped = 0;
+  const stopEvent = { stopPropagation() { stopped++; } };
+  all.find((n) => n.props.className === "task-check").props.onPointerDown(stopEvent);
+  all.find((n) => n.props.className === "task-list-actions").props.onPointerDown(stopEvent);
+  assert.equal(stopped, 2, "task actions stop drag activation");
   for (const action of ["Delete", "Edit", "Complete", "Add"]) all.find((n) => n.props["aria-label"]?.startsWith(`${action} ${task.title}`)).props.onClick();
   assert.deepEqual(calls, [["delete", task], ["edit", { task }], ["complete", task], ["important", task]]);
   const actionLabels = all.filter((n) => n.props.className?.includes?.("task-important") || ["Edit task", "Delete task"].includes(n.props.title)).map((n) => n.props.title);
@@ -134,9 +148,9 @@ test("quick add ignores blank titles without opening a dialog", async () => {
 
 test("uncategorized tasks retain dates in the list and can move on Gantt", () => {
   const scheduled = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
-  const renderRow = new Function("h", "useSortable", "CSS", "GripVertical", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
     h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
-    { Transform: { toString: () => undefined } }, "grip", "circle", "star", "pencil", "trash", (date) => date,
+    { Transform: { toString: () => undefined } }, "circle", "star", "pencil", "trash", (date) => date,
   );
   const tree = renderRow({ task: scheduled, projectName: "Uncategorized", disabled: false, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {} });
   assert.ok(nodes(tree).some((n) => n.tag === "span" && n.children.includes("2026-10-10 – 2026-10-15")));
