@@ -160,6 +160,9 @@ test("global headers include baseline browser protections", async () => {
   assert.equal(headers.get("x-frame-options"), "DENY");
   assert.ok(headers.has("referrer-policy"));
   assert.ok(headers.has("permissions-policy"));
+  const cacheResetRule = rules.find(({ source, has }) => source === "/" && has?.some(({ type, key }) => type === "query" && key === "v"));
+  const homeHeaders = new Map(cacheResetRule.headers.map(({ key, value }) => [key.toLowerCase(), value]));
+  assert.equal(homeHeaders.get("clear-site-data"), '"cache"');
 });
 
 test("agent page exchanges the Supabase bearer token without putting it in the iframe URL", async () => {

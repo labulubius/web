@@ -26,7 +26,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  async headers() { return [{ source: "/:path*", headers: securityHeaders }]; },
+  async headers() {
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      { source: "/", has: [{ type: "query", key: "v" }], headers: [{ key: "Clear-Site-Data", value: "\"cache\"" }] },
+    ];
+  },
   async redirects() { return [{ source: "/communities", destination: "/forums", permanent: true }]; },
 };
 
