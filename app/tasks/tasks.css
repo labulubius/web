@@ -13,6 +13,17 @@
 .tasks-sidebar nav button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--window)); }
 .tasks-sidebar nav button.selected { background: var(--accent); color: white; }
 .tasks-sidebar nav button.selected svg { color: white; }
+.tasks-navigation-list { display: flex; flex-direction: column; gap: 1px; }
+.tasks-navigation-list > div { min-width: 0; position: relative; }
+.tasks-navigation-list > div > button { width: 100%; }
+.tasks-navigation-list > div.reorderable > button { cursor: grab; touch-action: none; }
+.tasks-navigation-list > div.reorderable > button:active { cursor: grabbing; }
+.tasks-navigation-list > div.disabled > button { cursor: wait; }
+.tasks-navigation-list > div.dragging { box-shadow: 0 5px 14px rgba(0, 0, 0, .18); opacity: .78; }
+.task-navigation-error { color: var(--negative); display: flex; flex-direction: column; font-size: 9px; gap: 5px; line-height: 12px; margin: 6px 9px 0; }
+.task-navigation-error button { align-self: flex-start; background: var(--button); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); cursor: pointer; font-size: 9px; padding: 3px 7px; }
+.task-navigation-error button:hover { border-color: var(--accent); }
+.task-navigation-error button:disabled { cursor: wait; opacity: .55; }
 .tasks-project-heading { border-top: 1px solid var(--separator); margin-top: 16px; padding-top: 12px; }
 .tasks-project-list { display: flex; flex-direction: column; gap: 1px; }
 .tasks-project-list > p { color: var(--text-muted); font-size: 10px; margin: 8px 9px; }

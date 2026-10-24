@@ -65,7 +65,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(styles, /\.task-message/);
   assert.match(manager, /Delete project .*Its tasks will become Uncategorized and keep their dates/);
   assert.match(manager, /site-tasks-location-v1/);
-  assert.ok(manager.indexOf("<span>All tasks</span>") < manager.indexOf("<span>Gantt</span>"));
+  assert.ok(manager.indexOf('label: "All tasks"') < manager.indexOf('label: "Gantt"'));
   assert.doesNotMatch(manager, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(server, /id === TASK_ARCHIVE_PROJECT_ID/);
   assert.match(manager, /storedView === "inbox" \? "all"/);

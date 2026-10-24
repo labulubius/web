@@ -9,6 +9,7 @@ const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
 const row = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableTaskRow");
+const navigationRow = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableNavigationRow");
 const compile = (node) => ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" } }).outputText;
 const archiveProjectId = "00000000-0000-4000-8000-000000000001";
 const task = { id: "task-1", title: "A long task title", projectId: null, isImportant: false, importantSortOrder: null };
@@ -182,8 +183,8 @@ test("Gantt includes dated uncategorized tasks and excludes unscheduled or out-o
 });
 
 test("Archive is an ordinary project row while its tasks stay out of active views", () => {
-  const all = source.indexOf("<span>All tasks</span>");
-  const gantt = source.indexOf("<span>Gantt</span>");
+  const all = source.indexOf('label: "All tasks"');
+  const gantt = source.indexOf('label: "Gantt"');
   assert.ok(all >= 0 && all < gantt);
   assert.doesNotMatch(source, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(source, /data\?\.tasks\.filter\(\(task\) => !isArchivedTask\(task\)\)/);
@@ -210,7 +211,7 @@ test("Archive is available in the task editor and another project can restore a 
 
 
 test("Important navigation includes starred Archive tasks without adding them to active views", () => {
-  assert.match(source, /<span>Important<\/span>/);
+  assert.match(source, /important: \{ label: "Important"/);
   assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.isImportant\)/);
   assert.match(source, /Starred tasks from every project, including Archive/);
   assert.match(source, /view === "important" \? importantTasks/);
@@ -223,4 +224,79 @@ test("task list sorting separates base and Important persistence", () => {
   assert.match(source, /importantSortOrder: orderById\.get\(task\.id\)!/);
   assert.match(source, /if \(!ok\) setData\(before\)/);
   assert.match(source, /sortableKeyboardCoordinates/);
+});
+
+
+test("task view rows are fully draggable, selectable, and namespaced from other sortables", () => {
+  const calls = [];
+  const pointer = () => {};
+  const render = new Function("h", "useSortable", "CSS", "NAVIGATION_VIEWS", `${compile(navigationRow)}; return SortableNavigationRow;`)(
+    h,
+    (options) => {
+      calls.push(options);
+      return { attributes: { "aria-roledescription": "sortable" }, listeners: { onPointerDown: pointer }, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false };
+    },
+    { Transform: { toString: () => undefined } },
+    { all: { label: "All tasks", icon: "list" }, important: { label: "Important", icon: "star" }, gantt: { label: "Gantt", icon: "calendar" } },
+  );
+  let selected = 0;
+  const tree = render({ id: "important", active: true, disabled: false, onSelect: () => selected++ });
+  assert.deepEqual(calls, [{ id: "view:important", disabled: false }]);
+  const button = nodes(tree).find((node) => node.tag === "button");
+  assert.equal(button.props.onPointerDown, pointer);
+  assert.equal(button.props["aria-current"], "page");
+  assert.equal(button.props["aria-roledescription"], "sortable");
+  button.props.onClick();
+  assert.equal(selected, 1);
+});
+
+test("task navigation sorting is isolated, optimistic, and rolls back independently", () => {
+  assert.match(source, /items=\{navigationOrder\.map\(\(id\) => `view:\$\{id\}`\)\}/);
+  assert.match(source, /<DndContext sensors=\{sensors\} collisionDetection=\{closestCenter\} onDragEnd=\{\(event\) => void navigationDragEnd\(event\)\}>/);
+  assert.match(source, /navigationSaveInFlight\.current/);
+  assert.match(source, /setNavigationOrder\(next\)/);
+  assert.match(source, /method: "PUT"/);
+  assert.match(source, /JSON\.stringify\(\{ order: next \}\)/);
+  assert.match(source, /setNavigationOrder\(before\)/);
+  assert.match(source, /setNavigationSaving\(true\)/);
+  assert.doesNotMatch(source, /setSaving\(true\)[\s\S]{0,120}navigation-order/);
+  assert.match(source, /PointerSensor/);
+  assert.match(source, /TouchSensor/);
+  assert.match(source, /KeyboardSensor/);
+  assert.match(source, /className="sr-only" role="status" aria-live="polite"/);
+});
+
+test("task navigation preferences are bound to the initiating account and stale work is invalidated", () => {
+  assert.match(source, /const \{ supabase, user, isAdmin/);
+  assert.match(source, /const accountId = user\?\.id \?\? null/);
+  assert.match(source, /sessionData\.session\.user\.id !== expectedAccountId/);
+  assert.match(source, /accountIdRef\.current !== requestedAccountId/);
+  assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*navigationLoadGeneration\.current\+\+/);
+  assert.match(source, /navigationSaveGeneration\.current\+\+/);
+  assert.match(source, /navigationLoadAbort\.current\?\.abort\(\)/);
+  assert.match(source, /navigationSaveAbort\.current\?\.abort\(\)/);
+  assert.match(source, /setNavigationOrder\(DEFAULT_NAVIGATION_ORDER\)/);
+  assert.match(source, /setNavigationReadyAccountId\(null\)/);
+  assert.match(source, /setNavigationSaving\(false\)/);
+});
+
+test("failed task-navigation loads disable only sorting and expose a focused retry", () => {
+  assert.match(source, /const navigationReady = Boolean\(accountId && navigationReadyAccountId === accountId\)/);
+  assert.match(source, /disabled=\{!navigationReady \|\| navigationLoading \|\| navigationSaving\}/);
+  assert.match(source, /onSelect=\{\(\) => select\(id\)\}/);
+  assert.match(source, /if \(!navigationReady \|\| navigationLoading \|\| !accountId/);
+  assert.match(source, /onClick=\{\(\) => void loadNavigationPreference\(\)\}/);
+  assert.match(source, />\{navigationLoading \? "Retrying…" : "Retry"\}<\/button>/);
+  assert.match(source, /sorting is unavailable/);
+});
+
+test("task navigation has no permanent feedback row and clears success announcements", () => {
+  const styles = readFileSync("app/tasks/tasks.css", "utf8");
+  assert.doesNotMatch(source, /task-navigation-feedback|navigationStatus \|\| " "/);
+  assert.doesNotMatch(styles, /task-navigation-feedback|min-height: 24px/);
+  assert.match(source, /className="sr-only" role="status" aria-live="polite"/);
+  assert.match(source, /window\.setTimeout\(\(\) => \{/);
+  assert.match(source, /setNavigationStatus\(""\)/);
+  assert.match(source, /\}, 2400\)/);
+  assert.match(source, /navigationError && <div className="task-navigation-error" role="alert">/);
 });

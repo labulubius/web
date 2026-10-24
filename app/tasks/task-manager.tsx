@@ -4,7 +4,7 @@ import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor,
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
@@ -13,8 +13,22 @@ import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskDa
 
 const LOCATION_KEY = "site-tasks-location-v1";
 type View = "gantt" | "all" | "important" | "project";
+type NavigationView = Exclude<View, "project">;
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
+
+const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"];
+const NAVIGATION_VIEWS = {
+  all: { label: "All tasks", icon: ListTodo },
+  important: { label: "Important", icon: Star },
+  gantt: { label: "Gantt", icon: CalendarRange },
+} satisfies Record<NavigationView, { label: string; icon: typeof ListTodo }>;
+
+function validNavigationOrder(value: unknown): value is NavigationView[] {
+  return Array.isArray(value) && value.length === DEFAULT_NAVIGATION_ORDER.length &&
+    value.every((id) => typeof id === "string" && DEFAULT_NAVIGATION_ORDER.includes(id as NavigationView)) &&
+    new Set(value).size === DEFAULT_NAVIGATION_ORDER.length;
+}
 
 function HomeAccess({ description, status, action }: { description: string; status?: string; action?: ReactNode }) {
   return <section className="owner-access">
@@ -25,6 +39,21 @@ function HomeAccess({ description, status, action }: { description: string; stat
     {status && <p className="owner-access-status" role="alert">{status}</p>}
     {action && <div className="owner-access-actions">{action}</div>}
   </section>;
+}
+
+function SortableNavigationRow({ id, active, disabled, onSelect }: {
+  id: NavigationView;
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: `view:${id}`, disabled });
+  const { label, icon: Icon } = NAVIGATION_VIEWS[id];
+  return <div ref={setNodeRef} className={`reorderable${disabled ? " disabled" : ""}${isDragging ? " dragging" : ""}`} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
+    <button ref={setActivatorNodeRef} className={active ? "selected" : ""} aria-current={active ? "page" : undefined} type="button" onClick={onSelect} {...attributes} {...listeners}>
+      <Icon size={16} fill={id === "important" && active ? "currentColor" : "none"} /><span>{label}</span>
+    </button>
+  </div>;
 }
 
 function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onImportant, onDelete }: {
@@ -110,7 +139,8 @@ function readLocation(projects: TaskProject[]): StoredLocation | null {
 }
 
 export function TaskManager() {
-  const { supabase, isAdmin, loading, authError, retryAuth } = useSiteAuth();
+  const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
+  const accountId = user?.id ?? null;
   const [data, setData] = useState<TaskData | null>(null);
   const [view, setView] = useState<View>("gantt");
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -121,32 +151,89 @@ export function TaskManager() {
   const [projectDialog, setProjectDialog] = useState<TaskProject | "new" | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [navigationOrder, setNavigationOrder] = useState<NavigationView[]>(DEFAULT_NAVIGATION_ORDER);
+  const [navigationReadyAccountId, setNavigationReadyAccountId] = useState<string | null>(null);
+  const [navigationLoading, setNavigationLoading] = useState(false);
+  const [navigationSaving, setNavigationSaving] = useState(false);
+  const [navigationError, setNavigationError] = useState("");
+  const [navigationStatus, setNavigationStatus] = useState("");
   const [error, setError] = useState("");
+  const accountIdRef = useRef(accountId);
   const requestGeneration = useRef(0);
+  const navigationLoadGeneration = useRef(0);
+  const navigationSaveGeneration = useRef(0);
+  const navigationSaveInFlight = useRef(false);
+  const navigationLoadAbort = useRef<AbortController | null>(null);
+  const navigationSaveAbort = useRef<AbortController | null>(null);
+  const navigationStatusTimer = useRef<number | null>(null);
   const locationRestored = useRef(false);
+  const navigationReady = Boolean(accountId && navigationReadyAccountId === accountId);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const api = useCallback(async (url: string, options: RequestInit = {}) => {
+  const authenticatedRequest = useCallback(async <T,>(url: string, options: RequestInit = {}, expectedAccountId?: string) => {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw new Error("Session expired. Please sign in again.");
+    if (expectedAccountId && sessionData.session.user.id !== expectedAccountId) throw new Error("Account changed before the request started.");
     const response = await fetch(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${sessionData.session.access_token}` }, cache: "no-store" });
-    const body = await response.json().catch(() => null) as { data?: TaskData; error?: string } | null;
+    const body = await response.json().catch(() => null) as ({ error?: string } & T) | null;
     if (!response.ok) throw new Error(`${body?.error ?? "Task request failed."} (HTTP ${response.status})`);
-    if (!body?.data) throw new Error("Task response was incomplete.");
-    return body.data;
+    if (!body) throw new Error("Task response was incomplete.");
+    return body;
   }, [supabase]);
 
+  const api = useCallback(async (url: string, options: RequestInit = {}) => {
+    const body = await authenticatedRequest<{ data?: TaskData }>(url, options);
+    if (!body.data) throw new Error("Task response was incomplete.");
+    return body.data;
+  }, [authenticatedRequest]);
+
+  const navigationApi = useCallback(async (expectedAccountId: string, options: RequestInit = {}) => {
+    const body = await authenticatedRequest<{ order?: unknown }>("/api/tasks/navigation-order", options, expectedAccountId);
+    if (!validNavigationOrder(body.order)) throw new Error("Task navigation response was incomplete.");
+    return body.order;
+  }, [authenticatedRequest]);
+
+  const loadNavigationPreference = useCallback(async (requestedAccountId = accountId) => {
+    if (!isAdmin || !requestedAccountId) return false;
+    const generation = ++navigationLoadGeneration.current;
+    navigationLoadAbort.current?.abort();
+    const controller = new AbortController();
+    navigationLoadAbort.current = controller;
+    setNavigationLoading(true);
+    setNavigationError("");
+    try {
+      const order = await navigationApi(requestedAccountId, { signal: controller.signal });
+      if (generation !== navigationLoadGeneration.current || accountIdRef.current !== requestedAccountId) return false;
+      setNavigationOrder(order);
+      setNavigationReadyAccountId(requestedAccountId);
+      return true;
+    } catch {
+      if (generation !== navigationLoadGeneration.current || accountIdRef.current !== requestedAccountId) return false;
+      setNavigationReadyAccountId(null);
+      setNavigationError("Could not load task view order. The current order is shown, but sorting is unavailable.");
+      return false;
+    } finally {
+      if (generation === navigationLoadGeneration.current && accountIdRef.current === requestedAccountId) {
+        setNavigationLoading(false);
+        if (navigationLoadAbort.current === controller) navigationLoadAbort.current = null;
+      }
+    }
+  }, [accountId, isAdmin, navigationApi]);
+
   const load = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !accountId) return;
+    const requestedAccountId = accountId;
     const generation = ++requestGeneration.current;
     setLoadingData(true); setError("");
     try {
-      const next = await api("/api/tasks");
-      if (generation === requestGeneration.current) {
+      const [taskResult] = await Promise.allSettled([api("/api/tasks"), loadNavigationPreference(requestedAccountId)]);
+      if (taskResult.status === "rejected") throw taskResult.reason;
+      if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) {
+        const next = taskResult.value;
         setData(next);
         if (!locationRestored.current) {
           locationRestored.current = true;
@@ -156,15 +243,45 @@ export function TaskManager() {
         }
       }
     }
-    catch (failure) { if (generation === requestGeneration.current) setError(failure instanceof Error ? failure.message : "Could not load tasks."); }
-    finally { if (generation === requestGeneration.current) setLoadingData(false); }
-  }, [api, isAdmin]);
+    catch (failure) { if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) setError(failure instanceof Error ? failure.message : "Could not load tasks."); }
+    finally { if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) setLoadingData(false); }
+  }, [accountId, api, isAdmin, loadNavigationPreference]);
+
+  useLayoutEffect(() => {
+    accountIdRef.current = accountId;
+    requestGeneration.current++;
+    navigationLoadGeneration.current++;
+    navigationSaveGeneration.current++;
+    navigationLoadAbort.current?.abort();
+    navigationSaveAbort.current?.abort();
+    navigationLoadAbort.current = null;
+    navigationSaveAbort.current = null;
+    navigationSaveInFlight.current = false;
+    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
+    navigationStatusTimer.current = null;
+    const reset = window.setTimeout(() => {
+      if (accountIdRef.current !== accountId) return;
+      setNavigationOrder(DEFAULT_NAVIGATION_ORDER);
+      setNavigationReadyAccountId(null);
+      setNavigationLoading(false);
+      setNavigationSaving(false);
+      setNavigationError("");
+      setNavigationStatus("");
+    }, 0);
+    return () => window.clearTimeout(reset);
+  }, [accountId]);
 
   useEffect(() => {
     const generation = requestGeneration;
     const timer = window.setTimeout(() => void load(), 0);
     return () => { window.clearTimeout(timer); generation.current++; };
   }, [load]);
+
+  useEffect(() => () => {
+    navigationLoadAbort.current?.abort();
+    navigationSaveAbort.current?.abort();
+    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!locationReady) return;
@@ -255,6 +372,52 @@ export function TaskManager() {
     setTimelineStart(startDate); setTimelineEnd(endDate); setError("");
   }
 
+  async function navigationDragEnd(event: DragEndEvent) {
+    if (!navigationReady || navigationLoading || !accountId || !event.over || event.active.id === event.over.id || navigationSaveInFlight.current) return;
+    const requestedAccountId = accountId;
+    const sourceId = String(event.active.id).replace(/^view:/, "") as NavigationView;
+    const targetId = String(event.over.id).replace(/^view:/, "") as NavigationView;
+    const sourceIndex = navigationOrder.indexOf(sourceId);
+    const targetIndex = navigationOrder.indexOf(targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const before = navigationOrder;
+    const next = arrayMove(navigationOrder, sourceIndex, targetIndex);
+    const generation = ++navigationSaveGeneration.current;
+    navigationSaveAbort.current?.abort();
+    const controller = new AbortController();
+    navigationSaveAbort.current = controller;
+    navigationSaveInFlight.current = true;
+    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
+    navigationStatusTimer.current = null;
+    setNavigationOrder(next);
+    setNavigationSaving(true);
+    setNavigationError("");
+    setNavigationStatus("Saving task view order…");
+    try {
+      const saved = await navigationApi(requestedAccountId, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next }), signal: controller.signal });
+      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
+        setNavigationOrder(saved);
+        setNavigationStatus("Task view order saved.");
+        navigationStatusTimer.current = window.setTimeout(() => {
+          if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) setNavigationStatus("");
+          navigationStatusTimer.current = null;
+        }, 2400);
+      }
+    } catch {
+      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
+        setNavigationOrder(before);
+        setNavigationError("Could not save task view order. The previous order was restored.");
+        setNavigationStatus("");
+      }
+    } finally {
+      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
+        navigationSaveInFlight.current = false;
+        setNavigationSaving(false);
+        if (navigationSaveAbort.current === controller) navigationSaveAbort.current = null;
+      }
+    }
+  }
+
   async function projectDragEnd(event: DragEndEvent) {
     if (!data || !event.over || event.active.id === event.over.id || saving) return;
     const sourceIndex = data.projects.findIndex((project) => project.id === event.active.id);
@@ -330,10 +493,14 @@ export function TaskManager() {
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
         <nav aria-label="Task navigation">
-          <button className={view === "all" ? "selected" : ""} aria-current={view === "all" ? "page" : undefined} type="button" onClick={() => select("all")}><ListTodo size={16} /><span>All tasks</span></button>
-          <button className={view === "important" ? "selected" : ""} aria-current={view === "important" ? "page" : undefined} type="button" onClick={() => select("important")}><Star size={16} fill={view === "important" ? "currentColor" : "none"} /><span>Important</span></button>
-          <button className={view === "gantt" ? "selected" : ""} aria-current={view === "gantt" ? "page" : undefined} type="button" onClick={() => select("gantt")}><CalendarRange size={16} /><span>Gantt</span></button>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void navigationDragEnd(event)}>
+            <SortableContext items={navigationOrder.map((id) => `view:${id}`)} strategy={verticalListSortingStrategy}>
+              <div className="tasks-navigation-list">{navigationOrder.map((id) => <SortableNavigationRow key={id} id={id} active={view === id} disabled={!navigationReady || navigationLoading || navigationSaving} onSelect={() => select(id)} />)}</div>
+            </SortableContext>
+          </DndContext>
         </nav>
+        {navigationError && <div className="task-navigation-error" role="alert"><span>{navigationError}</span><button type="button" disabled={navigationLoading} onClick={() => void loadNavigationPreference()}>{navigationLoading ? "Retrying…" : "Retry"}</button></div>}
+        <p className="sr-only" role="status" aria-live="polite">{navigationStatus}</p>
         <div className="tasks-project-heading"><h2>Projects</h2><button type="button" onClick={() => setProjectDialog("new")} aria-label="Create project" title="Create project"><Plus size={14} /></button></div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void projectDragEnd(event)}>
           <SortableContext items={data.projects.map((project) => project.id)} strategy={verticalListSortingStrategy}>
