@@ -47,6 +47,10 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
 
   useEffect(() => { onDraftChange?.(initial); }, [initial, onDraftChange]);
 
+  function changeDraft(event: FormEvent<HTMLFormElement>) {
+    onDraftChange?.(readDraft(event.currentTarget, false));
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSave(readDraft(event.currentTarget, true));
@@ -54,7 +58,7 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
 
   return <AccessibleDialog labelledBy="task-dialog-title" busy={busy} onClose={onClose} className="task-dialog">
     <header><h2 id="task-dialog-title">{task ? "Task details" : "New task"}</h2><button type="button" disabled={busy} onClick={onClose} aria-label="Close"><X size={17} /></button></header>
-    <form onChange={(event) => onDraftChange?.(readDraft(event.currentTarget, false))} onSubmit={(event) => void submit(event)}>
+    <form onChange={changeDraft} onInput={changeDraft} onSubmit={(event) => void submit(event)}>
       <div className="task-form-primary">
         <label>Title<input ref={titleInput} name="title" defaultValue={initial.title} maxLength={200} required /></label>
         <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}><option value="">Uncategorized</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>

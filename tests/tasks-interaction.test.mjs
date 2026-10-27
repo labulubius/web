@@ -124,8 +124,13 @@ test("task dialog reports unsubmitted field changes without normalizing dates", 
   const drafts = [];
   const tree = renderDialog({ value: {}, projects: [], busy: false, onClose() {}, onSave() {}, onDraftChange: (draft) => drafts.push(draft) });
   const form = nodes(tree).find((node) => node.tag === "form");
-  form.props.onChange({ currentTarget: { title: "Draft title", description: "Draft description", projectId: "project-1", startDate: "", endDate: "2026-11-04" } });
-  assert.deepEqual(drafts, [{ title: "Draft title", description: "Draft description", projectId: "project-1", startDate: null, endDate: "2026-11-04" }]);
+  const fields = { title: "Draft title", description: "Draft description", projectId: "project-1", startDate: "", endDate: "2026-11-04" };
+  form.props.onInput({ currentTarget: fields });
+  form.props.onChange({ currentTarget: fields });
+  assert.deepEqual(drafts, [
+    { title: "Draft title", description: "Draft description", projectId: "project-1", startDate: null, endDate: "2026-11-04" },
+    { title: "Draft title", description: "Draft description", projectId: "project-1", startDate: null, endDate: "2026-11-04" },
+  ]);
 });
 
 test("task dialog drafts stay in TaskManager state across transient auth loading", () => {
