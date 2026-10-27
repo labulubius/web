@@ -5,14 +5,15 @@ import { FormEvent, useEffect, useMemo, useRef } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
 import type { PersonalTask, TaskDraft, TaskProject } from "./task-types";
 
-export type TaskDialogValue = { task?: PersonalTask; defaults?: Partial<TaskDraft> };
+export type TaskDialogValue = { task?: PersonalTask; defaults?: Partial<TaskDraft>; draft?: TaskDraft };
 
-export function TaskDialog({ value, projects, busy, error, onClose, onSave }: {
+export function TaskDialog({ value, projects, busy, error, onClose, onDraftChange, onSave }: {
   value: TaskDialogValue;
   error?: string;
   projects: TaskProject[];
   busy: boolean;
   onClose: () => void;
+  onDraftChange?: (draft: TaskDraft) => void;
   onSave: (draft: TaskDraft) => Promise<void>;
 }) {
   const titleInput = useRef<HTMLInputElement>(null);
@@ -23,27 +24,37 @@ export function TaskDialog({ value, projects, busy, error, onClose, onSave }: {
   }, []);
   const task = value.task;
   const initial = useMemo<TaskDraft>(() => ({
-    title: task?.title ?? value.defaults?.title ?? "",
-    description: task?.description ?? value.defaults?.description ?? "",
-    projectId: task?.projectId ?? value.defaults?.projectId ?? null,
-    startDate: task?.startDate ?? value.defaults?.startDate ?? null,
-    endDate: task?.endDate ?? value.defaults?.endDate ?? null,
-  }), [task, value.defaults]);
+    title: value.draft?.title ?? task?.title ?? value.defaults?.title ?? "",
+    description: value.draft?.description ?? task?.description ?? value.defaults?.description ?? "",
+    projectId: value.draft?.projectId ?? task?.projectId ?? value.defaults?.projectId ?? null,
+    startDate: value.draft?.startDate ?? task?.startDate ?? value.defaults?.startDate ?? null,
+    endDate: value.draft?.endDate ?? task?.endDate ?? value.defaults?.endDate ?? null,
+  }), [task, value.defaults, value.draft]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  function readDraft(formElement: HTMLFormElement, normalizeDates: boolean): TaskDraft {
+    const form = new FormData(formElement);
     const projectId = String(form.get("projectId") ?? "") || null;
     const enteredStart = String(form.get("startDate") ?? "") || null;
     const enteredEnd = String(form.get("endDate") ?? "") || null;
-    const startDate = enteredStart ?? enteredEnd;
-    const endDate = enteredEnd ?? enteredStart;
-    await onSave({ title: String(form.get("title") ?? ""), description: String(form.get("description") ?? ""), projectId, startDate, endDate });
+    return {
+      title: String(form.get("title") ?? ""),
+      description: String(form.get("description") ?? ""),
+      projectId,
+      startDate: normalizeDates ? enteredStart ?? enteredEnd : enteredStart,
+      endDate: normalizeDates ? enteredEnd ?? enteredStart : enteredEnd,
+    };
+  }
+
+  useEffect(() => { onDraftChange?.(initial); }, [initial, onDraftChange]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSave(readDraft(event.currentTarget, true));
   }
 
   return <AccessibleDialog labelledBy="task-dialog-title" busy={busy} onClose={onClose} className="task-dialog">
     <header><h2 id="task-dialog-title">{task ? "Task details" : "New task"}</h2><button type="button" disabled={busy} onClick={onClose} aria-label="Close"><X size={17} /></button></header>
-    <form onSubmit={(event) => void submit(event)}>
+    <form onChange={(event) => onDraftChange?.(readDraft(event.currentTarget, false))} onSubmit={(event) => void submit(event)}>
       <div className="task-form-primary">
         <label>Title<input ref={titleInput} name="title" defaultValue={initial.title} maxLength={200} required /></label>
         <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}><option value="">Uncategorized</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>

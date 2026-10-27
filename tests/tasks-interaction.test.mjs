@@ -17,9 +17,9 @@ const task = { id: "task-1", title: "A long task title", projectId: null, isImpo
 for (const confirmed of [false, true]) {
   test(`deleting a task requires confirmation: ${confirmed}`, async () => {
     const requests = []; const dialogs = []; const prompts = [];
-    const handler = new Function("window", "mutate", "setTaskDialog", `${compile(deletion)}; return deleteTask;`)(
+    const handler = new Function("window", "mutate", "closeTaskDialog", `${compile(deletion)}; return deleteTask;`)(
       { confirm: (message) => { prompts.push(message); return confirmed; } },
-      async (...args) => { requests.push(args); return true; }, (value) => dialogs.push(value),
+      async (...args) => { requests.push(args); return true; }, () => dialogs.push(null),
     );
     await handler(task);
     assert.equal(prompts.length, 1);
@@ -32,8 +32,8 @@ for (const confirmed of [false, true]) {
 
 test("failed deletion does not close the current dialog", async () => {
   const dialogs = [];
-  const handler = new Function("window", "mutate", "setTaskDialog", `${compile(deletion)}; return deleteTask;`)(
-    { confirm: () => true }, async () => false, (value) => dialogs.push(value),
+  const handler = new Function("window", "mutate", "closeTaskDialog", `${compile(deletion)}; return deleteTask;`)(
+    { confirm: () => true }, async () => false, () => dialogs.push(null),
   );
   await handler(task);
   assert.deepEqual(dialogs, []);
@@ -118,6 +118,25 @@ test("task dialog keeps saving and errors accessible", () => {
   assert.equal(tree.props.busy, true);
   assert.ok(nodes(tree).filter((n) => n.tag === "button").every((n) => n.props.disabled));
   assert.ok(nodes(tree).some((n) => n.props.role === "alert" && n.children.includes("Cannot save")));
+});
+
+test("task dialog reports unsubmitted field changes without normalizing dates", () => {
+  const drafts = [];
+  const tree = renderDialog({ value: {}, projects: [], busy: false, onClose() {}, onSave() {}, onDraftChange: (draft) => drafts.push(draft) });
+  const form = nodes(tree).find((node) => node.tag === "form");
+  form.props.onChange({ currentTarget: { title: "Draft title", description: "Draft description", projectId: "project-1", startDate: "", endDate: "2026-11-04" } });
+  assert.deepEqual(drafts, [{ title: "Draft title", description: "Draft description", projectId: "project-1", startDate: null, endDate: "2026-11-04" }]);
+});
+
+test("task dialog drafts are session-scoped, account-bound, restored, and cleared deliberately", () => {
+  assert.match(source, /TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v1:"/);
+  assert.match(source, /window\.sessionStorage\.setItem/);
+  assert.match(source, /window\.sessionStorage\.removeItem/);
+  assert.match(source, /value\.accountId !== accountId/);
+  assert.match(source, /current \?\? \{ task, draft: \{ \.\.\.stored\.draft, projectId \} \}/);
+  assert.match(source, /if \(ok\) closeTaskDialog\(\)/);
+  assert.match(source, /onClose=\{closeTaskDialog\}/);
+  assert.match(source, /onDraftChange=\{rememberTaskDraft\}/);
 });
 
 for (const view of ["all", "important", "gantt", "project"]) {

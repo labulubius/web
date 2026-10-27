@@ -12,10 +12,53 @@ import { GanttView } from "./gantt-view";
 import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
+const TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v1:";
 type View = "gantt" | "all" | "important" | "project";
 type NavigationView = Exclude<View, "project">;
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
+type StoredTaskDialogDraft = { version: 1; accountId: string; taskId: string | null; draft: TaskDraft };
+
+function validDraftDate(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function validTaskDraft(value: unknown): value is TaskDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Partial<TaskDraft>;
+  return typeof draft.title === "string" && draft.title.length <= 200 &&
+    typeof draft.description === "string" && draft.description.length <= 300 &&
+    (draft.projectId === null || typeof draft.projectId === "string") &&
+    validDraftDate(draft.startDate) && validDraftDate(draft.endDate);
+}
+
+function taskDialogDraftKey(accountId: string) {
+  return `${TASK_DIALOG_DRAFT_KEY_PREFIX}${accountId}`;
+}
+
+function readTaskDialogDraft(accountId: string): StoredTaskDialogDraft | null {
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(taskDialogDraftKey(accountId)) ?? "null") as Partial<StoredTaskDialogDraft> | null;
+    if (!value || value.version !== 1 || value.accountId !== accountId ||
+      !(value.taskId === null || typeof value.taskId === "string") || !validTaskDraft(value.draft)) return null;
+    return value as StoredTaskDialogDraft;
+  } catch {
+    return null;
+  }
+}
+
+function writeTaskDialogDraft(accountId: string, taskId: string | null, draft: TaskDraft) {
+  try {
+    window.sessionStorage.setItem(taskDialogDraftKey(accountId), JSON.stringify({ version: 1, accountId, taskId, draft } satisfies StoredTaskDialogDraft));
+  } catch {
+    // Editing still works when browser session storage is unavailable.
+  }
+}
+
+function clearTaskDialogDraft(accountId: string) {
+  try { window.sessionStorage.removeItem(taskDialogDraftKey(accountId)); }
+  catch { /* Closing and saving still work when browser session storage is unavailable. */ }
+}
 
 const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"];
 const NAVIGATION_VIEWS = {
@@ -305,6 +348,21 @@ export function TaskManager() {
     catch { /* Task navigation still works when browser storage is unavailable. */ }
   }, [locationReady, projectId, timelineEnd, timelineStart, view]);
 
+  useEffect(() => {
+    if (!accountId || !data || taskDialog) return;
+    const stored = readTaskDialogDraft(accountId);
+    if (!stored) return;
+    const task = stored.taskId ? data.tasks.find((item) => item.id === stored.taskId) : undefined;
+    if (stored.taskId && !task) { clearTaskDialogDraft(accountId); return; }
+    const projectId = stored.draft.projectId && data.projects.some((project) => project.id === stored.draft.projectId)
+      ? stored.draft.projectId
+      : null;
+    const timer = window.setTimeout(() => {
+      setTaskDialog((current) => current ?? { task, draft: { ...stored.draft, projectId } });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [accountId, data, taskDialog]);
+
   async function mutate(url: string, options: RequestInit) {
     setSaving(true); setError("");
     try { setData(await api(url, options)); return true; }
@@ -313,8 +371,7 @@ export function TaskManager() {
   }
 
   async function createTask(draft: TaskDraft) {
-    const ok = await mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
-    if (ok) setTaskDialog(null);
+    return mutate("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
   }
 
   async function patchTask(task: PersonalTask, patch: TaskPatch) {
@@ -337,20 +394,29 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
+  function closeTaskDialog() {
+    if (accountId) clearTaskDialogDraft(accountId);
+    setTaskDialog(null);
+  }
+
+  const rememberTaskDraft = useCallback((draft: TaskDraft) => {
+    if (accountId && taskDialog) writeTaskDialogDraft(accountId, taskDialog.task?.id ?? null, draft);
+  }, [accountId, taskDialog]);
+
   async function saveTask(draft: TaskDraft) {
-    if (taskDialog?.task) { if (await patchTask(taskDialog.task, draft)) setTaskDialog(null); }
-    else await createTask(draft);
+    const ok = taskDialog?.task ? await patchTask(taskDialog.task, draft) : await createTask(draft);
+    if (ok) closeTaskDialog();
   }
 
   async function completeTask(task: PersonalTask) {
     const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" });
-    if (ok) setTaskDialog(null);
+    if (ok) closeTaskDialog();
   }
 
   async function deleteTask(task: PersonalTask) {
     if (!window.confirm(`Delete “${task.title}”? This cannot be undone.`)) return;
     const ok = await mutate(`/api/tasks/${task.id}`, { method: "DELETE" });
-    if (ok) setTaskDialog(null);
+    if (ok) closeTaskDialog();
   }
 
   async function saveProject(name: string) {
@@ -535,7 +601,7 @@ export function TaskManager() {
         {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={visibleTasks} empty={view === "all" ? "There are no active tasks yet." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
-    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={() => setTaskDialog(null)} onSave={saveTask} />}
+    {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={closeTaskDialog} onDraftChange={rememberTaskDraft} onSave={saveTask} />}
     {projectDialog && <ProjectDialog project={projectDialog === "new" ? undefined : projectDialog} busy={saving} onClose={() => setProjectDialog(null)} onSave={saveProject} />}
   </DndContext>;
 }
