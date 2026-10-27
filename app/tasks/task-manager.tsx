@@ -341,6 +341,8 @@ export function TaskManager() {
   }
 
   const rememberTaskDraft = useCallback((draft: TaskDraft) => {
+    // SiteAuth may briefly unmount TaskDialog while rechecking a resumed tab;
+    // keep the uncontrolled form values in this still-mounted parent state.
     setTaskDialog((current) => {
       if (!current || current.draft &&
         current.draft.title === draft.title && current.draft.description === draft.description &&
