@@ -12,60 +12,10 @@ import { GanttView } from "./gantt-view";
 import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-const TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v2:";
-const TASK_DIALOG_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 type View = "gantt" | "all" | "important" | "project";
 type NavigationView = Exclude<View, "project">;
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
-type StoredTaskDialogDraft = { version: 2; accountId: string; taskId: string | null; savedAt: number; draft: TaskDraft };
-
-function validDraftDate(value: unknown): value is string | null {
-  return value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value));
-}
-
-function validTaskDraft(value: unknown): value is TaskDraft {
-  if (!value || typeof value !== "object") return false;
-  const draft = value as Partial<TaskDraft>;
-  return typeof draft.title === "string" && draft.title.length <= 200 &&
-    typeof draft.description === "string" && draft.description.length <= 300 &&
-    (draft.projectId === null || typeof draft.projectId === "string") &&
-    validDraftDate(draft.startDate) && validDraftDate(draft.endDate);
-}
-
-function taskDialogDraftKey(accountId: string) {
-  return `${TASK_DIALOG_DRAFT_KEY_PREFIX}${accountId}`;
-}
-
-function readTaskDialogDraft(accountId: string): StoredTaskDialogDraft | null {
-  const key = taskDialogDraftKey(accountId);
-  try {
-    const value = JSON.parse(window.localStorage.getItem(key) ?? "null") as Partial<StoredTaskDialogDraft> | null;
-    const now = Date.now();
-    if (!value || value.version !== 2 || value.accountId !== accountId || typeof value.savedAt !== "number" ||
-      value.savedAt > now + 60_000 || now - value.savedAt > TASK_DIALOG_DRAFT_MAX_AGE_MS ||
-      !(value.taskId === null || typeof value.taskId === "string") || !validTaskDraft(value.draft)) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    return value as StoredTaskDialogDraft;
-  } catch {
-    return null;
-  }
-}
-
-function writeTaskDialogDraft(accountId: string, taskId: string | null, draft: TaskDraft) {
-  try {
-    window.localStorage.setItem(taskDialogDraftKey(accountId), JSON.stringify({ version: 2, accountId, taskId, savedAt: Date.now(), draft } satisfies StoredTaskDialogDraft));
-  } catch {
-    // Editing still works when browser storage is unavailable.
-  }
-}
-
-function clearTaskDialogDraft(accountId: string) {
-  try { window.localStorage.removeItem(taskDialogDraftKey(accountId)); }
-  catch { /* Closing and saving still work when browser storage is unavailable. */ }
-}
 
 const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"];
 const NAVIGATION_VIEWS = {
@@ -355,21 +305,6 @@ export function TaskManager() {
     catch { /* Task navigation still works when browser storage is unavailable. */ }
   }, [locationReady, projectId, timelineEnd, timelineStart, view]);
 
-  useEffect(() => {
-    if (!accountId || !data || taskDialog) return;
-    const stored = readTaskDialogDraft(accountId);
-    if (!stored) return;
-    const task = stored.taskId ? data.tasks.find((item) => item.id === stored.taskId) : undefined;
-    if (stored.taskId && !task) { clearTaskDialogDraft(accountId); return; }
-    const projectId = stored.draft.projectId && data.projects.some((project) => project.id === stored.draft.projectId)
-      ? stored.draft.projectId
-      : null;
-    const timer = window.setTimeout(() => {
-      setTaskDialog((current) => current ?? { task, draft: { ...stored.draft, projectId } });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [accountId, data, taskDialog]);
-
   async function mutate(url: string, options: RequestInit) {
     setSaving(true); setError("");
     try { setData(await api(url, options)); return true; }
@@ -402,13 +337,18 @@ export function TaskManager() {
   }
 
   function closeTaskDialog() {
-    if (accountId) clearTaskDialogDraft(accountId);
     setTaskDialog(null);
   }
 
   const rememberTaskDraft = useCallback((draft: TaskDraft) => {
-    if (accountId && taskDialog) writeTaskDialogDraft(accountId, taskDialog.task?.id ?? null, draft);
-  }, [accountId, taskDialog]);
+    setTaskDialog((current) => {
+      if (!current || current.draft &&
+        current.draft.title === draft.title && current.draft.description === draft.description &&
+        current.draft.projectId === draft.projectId && current.draft.startDate === draft.startDate &&
+        current.draft.endDate === draft.endDate) return current;
+      return { ...current, draft };
+    });
+  }, []);
 
   async function saveTask(draft: TaskDraft) {
     const ok = taskDialog?.task ? await patchTask(taskDialog.task, draft) : await createTask(draft);
