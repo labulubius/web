@@ -1,10 +1,10 @@
 "use client";
 
-import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, type Modifier, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
-import { FormEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
@@ -28,6 +28,19 @@ function validNavigationOrder(value: unknown): value is NavigationView[] {
   return Array.isArray(value) && value.length === DEFAULT_NAVIGATION_ORDER.length &&
     value.every((id) => typeof id === "string" && DEFAULT_NAVIGATION_ORDER.includes(id as NavigationView)) &&
     new Set(value).size === DEFAULT_NAVIGATION_ORDER.length;
+}
+
+function restrictTaskListDrag(list: HTMLUListElement | null, { active, draggingNodeRect, transform }: Parameters<Modifier>[0]) {
+  if (!String(active?.id).startsWith("list:") || !draggingNodeRect || !list) return transform;
+  const bounds = list.getBoundingClientRect();
+  return {
+    ...transform,
+    x: 0,
+    y: Math.min(
+      Math.max(transform.y, bounds.top - draggingNodeRect.top),
+      bounds.bottom - draggingNodeRect.bottom,
+    ),
+  };
 }
 
 function HomeAccess({ description, status, action }: { description: string; status?: string; action?: ReactNode }) {
@@ -80,11 +93,12 @@ function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onIm
   </li>;
 }
 
-function TaskList({ tasks, empty, projects, disabled, onOpen, onComplete, onImportant, onDelete }: {
+function TaskList({ tasks, empty, projects, disabled, listRef, onOpen, onComplete, onImportant, onDelete }: {
   tasks: PersonalTask[];
   empty: string;
   projects: TaskProject[];
   disabled: boolean;
+  listRef: RefObject<HTMLUListElement | null>;
   onOpen: (value: TaskDialogValue) => void;
   onComplete: (task: PersonalTask) => void;
   onImportant: (task: PersonalTask) => void;
@@ -93,7 +107,7 @@ function TaskList({ tasks, empty, projects, disabled, onOpen, onComplete, onImpo
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   if (!tasks.length) return <div className="task-empty"><CheckCircle2 size={30} /><strong>Nothing here</strong><span>{empty}</span></div>;
   return <SortableContext items={tasks.map((task) => `list:${task.id}`)} strategy={verticalListSortingStrategy}>
-    <ul className="task-list">{tasks.map((task) => <SortableTaskRow
+    <ul ref={listRef} className="task-list">{tasks.map((task) => <SortableTaskRow
       key={task.id}
       task={task}
       projectName={task.projectId ? projectNames.get(task.projectId) ?? "Project" : "Uncategorized"}
@@ -167,6 +181,8 @@ export function TaskManager() {
   const navigationSaveAbort = useRef<AbortController | null>(null);
   const navigationStatusTimer = useRef<number | null>(null);
   const locationRestored = useRef(false);
+  const taskListRef = useRef<HTMLUListElement | null>(null);
+  const taskListModifier = useCallback<Modifier>((args) => restrictTaskListDrag(taskListRef.current, args), []);
   const navigationReady = Boolean(accountId && navigationReadyAccountId === accountId);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -488,7 +504,7 @@ export function TaskManager() {
   if (loadingData && !data) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
   if (!data) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
 
-  return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
+  return <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[taskListModifier]} onDragEnd={dragEnd}>
     <div className="task-layout">
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
@@ -516,7 +532,7 @@ export function TaskManager() {
         </header>
         <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : view === "important" ? "Add an important task…" : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
         {error && <p className="task-error" role="alert">{error}</p>}
-        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={visibleTasks} empty={view === "all" ? "There are no active tasks yet." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />}
+        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={visibleTasks} empty={view === "all" ? "There are no active tasks yet." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />}
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={() => setTaskDialog(null)} onSave={saveTask} />}

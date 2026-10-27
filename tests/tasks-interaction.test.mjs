@@ -226,6 +226,18 @@ test("task list sorting separates base and Important persistence", () => {
   assert.match(source, /sortableKeyboardCoordinates/);
 });
 
+test("task list dragging stays inside the visible list", () => {
+  const restrict = parsed.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "restrictTaskListDrag");
+  const modifier = new Function(`${compile(restrict)}; return restrictTaskListDrag;`)();
+  const transform = { x: 24, y: 500, scaleX: 1, scaleY: 1 };
+  const list = { getBoundingClientRect: () => ({ top: 100, bottom: 300 }) };
+  assert.deepEqual(modifier(list, { active: { id: "list:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform }), { ...transform, x: 0, y: 125 });
+  assert.deepEqual(modifier(list, { active: { id: "list:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform: { ...transform, y: -100 } }), { ...transform, x: 0, y: -20 });
+  assert.equal(modifier(list, { active: { id: "task:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform }), transform, "Gantt dragging is unchanged");
+  assert.match(source, /modifiers=\{\[taskListModifier\]\}/);
+  assert.match(source, /<ul ref=\{listRef\} className="task-list">/);
+});
+
 
 test("task view rows are fully draggable, selectable, and namespaced from other sortables", () => {
   const calls = [];
