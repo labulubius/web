@@ -308,6 +308,17 @@ test("task navigation sorting is isolated, optimistic, and rolls back independen
   assert.match(source, /className="sr-only" role="status" aria-live="polite"/);
 });
 
+test("same-account auth rechecks keep the loaded task workspace mounted", () => {
+  assert.match(source, /const \[dataAccountId, setDataAccountId\] = useState<string \| null>\(null\)/);
+  assert.match(source, /setDataAccountId\(requestedAccountId\)/);
+  assert.match(source, /const readyForAccount = Boolean\(data && accountId && dataAccountId === accountId && isAdmin\)/);
+  assert.match(source, /if \(loading && !readyForAccount\) return <HomeAccess/);
+  assert.doesNotMatch(source, /if \(loading\) return <HomeAccess/);
+  assert.match(source, /if \(!data \|\| dataAccountId !== accountId\) return <section/);
+  assert.match(source, /setDataAccountId\(null\)/);
+  assert.match(source, /setTaskDialog\(null\)/);
+});
+
 test("task navigation preferences are bound to the initiating account and stale work is invalidated", () => {
   assert.match(source, /const \{ supabase, user, isAdmin/);
   assert.match(source, /const accountId = user\?\.id \?\? null/);

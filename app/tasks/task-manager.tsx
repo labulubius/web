@@ -156,6 +156,7 @@ export function TaskManager() {
   const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
   const accountId = user?.id ?? null;
   const [data, setData] = useState<TaskData | null>(null);
+  const [dataAccountId, setDataAccountId] = useState<string | null>(null);
   const [view, setView] = useState<View>("gantt");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [timelineStart, setTimelineStart] = useState(() => monthStart());
@@ -251,6 +252,7 @@ export function TaskManager() {
       if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) {
         const next = taskResult.value;
         setData(next);
+        setDataAccountId(requestedAccountId);
         if (!locationRestored.current) {
           locationRestored.current = true;
           const saved = readLocation(next.projects);
@@ -277,6 +279,13 @@ export function TaskManager() {
     navigationStatusTimer.current = null;
     const reset = window.setTimeout(() => {
       if (accountIdRef.current !== accountId) return;
+      setData(null);
+      setDataAccountId(null);
+      setLoadingData(true);
+      setTaskDialog(null);
+      setProjectDialog(null);
+      setLocationReady(false);
+      locationRestored.current = false;
       setNavigationOrder(DEFAULT_NAVIGATION_ORDER);
       setNavigationReadyAccountId(null);
       setNavigationLoading(false);
@@ -513,11 +522,12 @@ export function TaskManager() {
   const title = view === "all" ? "All tasks" : view === "important" ? "Important" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
   const description = view === "all" ? "All active project and uncategorized tasks." : view === "important" ? "Starred tasks from every project, including Archive." : "Scheduled and unscheduled tasks in this project.";
 
-  if (loading) return <HomeAccess description="Opening home…" />;
+  const readyForAccount = Boolean(data && accountId && dataAccountId === accountId && isAdmin);
+  if (loading && !readyForAccount) return <HomeAccess description="Opening home…" />;
   if (authError) return <HomeAccess description="Home is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
   if (!isAdmin) return <HomeAccess description="Sign in to continue." />;
-  if (loadingData && !data) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
-  if (!data) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
+  if (loadingData && (!data || dataAccountId !== accountId)) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
+  if (!data || dataAccountId !== accountId) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
 
   return <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[taskListModifier]} onDragEnd={dragEnd}>
     <div className="task-layout">
