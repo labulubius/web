@@ -141,6 +141,23 @@ test("task dialog drafts survive tab reloads, remain account-bound, expire, and 
   assert.match(source, /onDraftChange=\{rememberTaskDraft\}/);
 });
 
+test("task dialog draft storage restores valid data and removes expired data", () => {
+  const functions = Object.fromEntries(["validDraftDate", "validTaskDraft", "taskDialogDraftKey", "readTaskDialogDraft", "writeTaskDialogDraft", "clearTaskDialogDraft"].map((name) => [name, parsed.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === name)]));
+  const storage = new Map();
+  const window = { localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) } };
+  let now = 1_000_000;
+  const Date = { now: () => now };
+  const create = new Function("window", "Date", `const TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v2:"; const TASK_DIALOG_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; ${Object.values(functions).map(compile).join("\n")}; return { readTaskDialogDraft, writeTaskDialogDraft, clearTaskDialogDraft };`);
+  const draftStorage = create(window, Date);
+  const draft = { title: "Draft", description: "Still editing", projectId: null, startDate: null, endDate: "2026-11-04" };
+  draftStorage.writeTaskDialogDraft("owner-1", "task-1", draft);
+  assert.deepEqual(draftStorage.readTaskDialogDraft("owner-1"), { version: 2, accountId: "owner-1", taskId: "task-1", savedAt: now, draft });
+  assert.equal(draftStorage.readTaskDialogDraft("owner-2"), null, "another account cannot restore this draft");
+  now += 24 * 60 * 60 * 1000 + 1;
+  assert.equal(draftStorage.readTaskDialogDraft("owner-1"), null, "expired drafts are discarded");
+  assert.equal(storage.size, 0);
+});
+
 for (const view of ["all", "important", "gantt", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
