@@ -12,12 +12,13 @@ import { GanttView } from "./gantt-view";
 import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-const TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v1:";
+const TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v2:";
+const TASK_DIALOG_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 type View = "gantt" | "all" | "important" | "project";
 type NavigationView = Exclude<View, "project">;
 type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
-type StoredTaskDialogDraft = { version: 1; accountId: string; taskId: string | null; draft: TaskDraft };
+type StoredTaskDialogDraft = { version: 2; accountId: string; taskId: string | null; savedAt: number; draft: TaskDraft };
 
 function validDraftDate(value: unknown): value is string | null {
   return value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value));
@@ -37,10 +38,16 @@ function taskDialogDraftKey(accountId: string) {
 }
 
 function readTaskDialogDraft(accountId: string): StoredTaskDialogDraft | null {
+  const key = taskDialogDraftKey(accountId);
   try {
-    const value = JSON.parse(window.sessionStorage.getItem(taskDialogDraftKey(accountId)) ?? "null") as Partial<StoredTaskDialogDraft> | null;
-    if (!value || value.version !== 1 || value.accountId !== accountId ||
-      !(value.taskId === null || typeof value.taskId === "string") || !validTaskDraft(value.draft)) return null;
+    const value = JSON.parse(window.localStorage.getItem(key) ?? "null") as Partial<StoredTaskDialogDraft> | null;
+    const now = Date.now();
+    if (!value || value.version !== 2 || value.accountId !== accountId || typeof value.savedAt !== "number" ||
+      value.savedAt > now + 60_000 || now - value.savedAt > TASK_DIALOG_DRAFT_MAX_AGE_MS ||
+      !(value.taskId === null || typeof value.taskId === "string") || !validTaskDraft(value.draft)) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
     return value as StoredTaskDialogDraft;
   } catch {
     return null;
@@ -49,15 +56,15 @@ function readTaskDialogDraft(accountId: string): StoredTaskDialogDraft | null {
 
 function writeTaskDialogDraft(accountId: string, taskId: string | null, draft: TaskDraft) {
   try {
-    window.sessionStorage.setItem(taskDialogDraftKey(accountId), JSON.stringify({ version: 1, accountId, taskId, draft } satisfies StoredTaskDialogDraft));
+    window.localStorage.setItem(taskDialogDraftKey(accountId), JSON.stringify({ version: 2, accountId, taskId, savedAt: Date.now(), draft } satisfies StoredTaskDialogDraft));
   } catch {
-    // Editing still works when browser session storage is unavailable.
+    // Editing still works when browser storage is unavailable.
   }
 }
 
 function clearTaskDialogDraft(accountId: string) {
-  try { window.sessionStorage.removeItem(taskDialogDraftKey(accountId)); }
-  catch { /* Closing and saving still work when browser session storage is unavailable. */ }
+  try { window.localStorage.removeItem(taskDialogDraftKey(accountId)); }
+  catch { /* Closing and saving still work when browser storage is unavailable. */ }
 }
 
 const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"];

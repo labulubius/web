@@ -128,10 +128,12 @@ test("task dialog reports unsubmitted field changes without normalizing dates", 
   assert.deepEqual(drafts, [{ title: "Draft title", description: "Draft description", projectId: "project-1", startDate: null, endDate: "2026-11-04" }]);
 });
 
-test("task dialog drafts are session-scoped, account-bound, restored, and cleared deliberately", () => {
-  assert.match(source, /TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v1:"/);
-  assert.match(source, /window\.sessionStorage\.setItem/);
-  assert.match(source, /window\.sessionStorage\.removeItem/);
+test("task dialog drafts survive tab reloads, remain account-bound, expire, and clear deliberately", () => {
+  assert.match(source, /TASK_DIALOG_DRAFT_KEY_PREFIX = "site-task-dialog-draft-v2:"/);
+  assert.match(source, /window\.localStorage\.setItem/);
+  assert.match(source, /window\.localStorage\.removeItem/);
+  assert.match(source, /TASK_DIALOG_DRAFT_MAX_AGE_MS/);
+  assert.match(source, /savedAt: Date\.now\(\)/);
   assert.match(source, /value\.accountId !== accountId/);
   assert.match(source, /current \?\? \{ task, draft: \{ \.\.\.stored\.draft, projectId \} \}/);
   assert.match(source, /if \(ok\) closeTaskDialog\(\)/);
