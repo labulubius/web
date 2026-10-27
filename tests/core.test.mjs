@@ -23,9 +23,10 @@ import { parseNewsFeedPreview, reviewWebSourcePreview, UnreliableNewsSource } fr
 import { NewsSourceProbeStore } from "../app/lib/news-source-probe-cache.ts";
 import nextConfig from "../next.config.ts";
 
-test("private Tasks shell is dynamically rendered so deployments cannot serve a stale client", async () => {
+test("Tasks uses a prerendered client shell like Navigator while private data stays behind its API", async () => {
   const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(home, /export const dynamic = "force-dynamic"/);
+  assert.doesNotMatch(home, /force-dynamic/);
+  assert.match(home, /<TaskManager \/>/);
 });
 
 test("PDF handoff carries a private structured reference into Agent", () => {
