@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
+import { OwnerAccess } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
 import type { Category, Site } from "./sites";
 
@@ -164,7 +165,7 @@ function SiteCard({
 }
 
 export function NavDirectory() {
-  const { supabase, isAdmin } = useSiteAuth();
+  const { supabase, isAdmin, loading: authLoading, authError, retryAuth } = useSiteAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [query, setQuery] = useState("");
@@ -218,9 +219,10 @@ export function NavDirectory() {
   }, [supabase]);
 
   useEffect(() => {
+    if (authLoading || !isAdmin) return;
     const initialLoad = window.setTimeout(() => void loadDirectory(), 0);
     return () => window.clearTimeout(initialLoad);
-  }, [isAdmin, loadDirectory]);
+  }, [authLoading, isAdmin, loadDirectory]);
 
   useEffect(() => {
     if (!hasLoadedCategories.current) return;
@@ -438,6 +440,10 @@ export function NavDirectory() {
     setMessage("");
     setDialog("site");
   }
+
+  if (authLoading) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Checking your account…" />;
+  if (authError) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Navigator is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
+  if (!isAdmin) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Sign in to continue." />;
 
   return (
     <div className="directory-view">

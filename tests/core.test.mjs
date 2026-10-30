@@ -246,6 +246,7 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   await assert.rejects(access(new URL("../app/news/page.tsx", import.meta.url)), { code: "ENOENT" });
   await access(new URL("../app/api/news/route.ts", import.meta.url));
   assert.match(page, /title: \{ absolute: "Feeds" \}/);
+  assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.match(page, /active="\/feeds" title="Feeds"/);
   assert.match(shell, /href: "\/feeds", label: "Feeds", icon: Rss/);
   assert.doesNotMatch(shell, /href: "\/news"|label: "News"|Newspaper/);
@@ -267,12 +268,13 @@ test("Feeds replaces the retired News page while preserving News APIs", async ()
   assert.match(styles, /-webkit-line-clamp: 2/);
   assert.match(newsTypes, /summary: string; source: string/);
   assert.match(minifluxBackend, /entry\.feed_id/);
-  assert.match(newsApi, /newsArticles\(selected, cursor, feeds\)/);
-  assert.match(newsApi, /const publicNewsHeaders = \{/);
-  assert.match(newsApi, /public, max-age=0, s-maxage=30, stale-while-revalidate=60/);
-  assert.equal((newsApi.match(/headers: publicNewsHeaders/g) || []).length, 2);
+  assert.match(newsApi, /newsArticles\(articleFeeds, cursor, feeds\)/);
+  assert.match(newsApi, /const auth = await newsAdmin\(request\)/);
+  assert.match(newsApi, /if \(!auth\) return Response\.json\(\{ error: "Unauthorized\." \}/);
+  assert.doesNotMatch(newsApi, /publicNewsHeaders|loadPublicNewsSelection|view\) === "sidebar"|view\) === "publicArticles"/);
   assert.match(newsApi, /headers: privateNewsHeaders/);
-  assert.doesNotMatch(reader, /publicArticles.*cache: "no-store"/);
+  assert.match(reader, /<OwnerAccess icon=\{<Rss size=\{32\} \/>\} title="Feeds"/);
+  assert.doesNotMatch(reader, /publicArticles|publicCursor|loadPublicArticles/);
   assert.doesNotMatch(reader, /className=\"news-(?:error|success)\"/);
   assert.doesNotMatch(styles, /\.news-error|\.news-success/);
   assert.match(reader, /className=\"form-error\" role=\"alert\"/);
@@ -302,6 +304,19 @@ test("sidebar controls render for the configured workspace pages", async () => {
   assert.match(shell, /hasSidebar && <button/);
   assert.match(home, /title="Home" hasSidebar/);
   await assert.rejects(access(new URL("../app/share/page.tsx", import.meta.url)), { code: "ENOENT" });
+});
+
+test("Navigator is owner-only at both the UI and database policy layers", async () => {
+  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const layout = await readFile(new URL("../app/nav/layout.tsx", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/202610220001_private_navigator.sql", import.meta.url), "utf8");
+
+  assert.match(directory, /if \(authLoading \|\| !isAdmin\) return;/);
+  assert.match(directory, /<OwnerAccess icon=\{<Compass size=\{32\} \/>\} title="Navigator"/);
+  assert.match(layout, /robots: \{ index: false, follow: false \}/);
+  assert.match(migration, /drop policy if exists "published navigator categories are public"/);
+  assert.match(migration, /drop policy if exists "published navigator sites are public"/);
+  assert.doesNotMatch(migration, /create policy/);
 });
 
 test("sidebar create and delete actions share a trailing axis", async () => {

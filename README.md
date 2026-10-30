@@ -1,6 +1,6 @@
 # Labulubius Workspace
 
-A personal web workspace with a KDE Breeze-inspired interface. The public pages organize links and reading sources; a Supabase-authenticated site administrator manages private tasks and feeds.
+A personal web workspace with a KDE Breeze-inspired interface. A Supabase-authenticated site administrator manages private tasks, links and reading sources; the About page remains public.
 
 All interface work must follow the scoped visual, interaction, accessibility and permission rules in [DESIGN.md](DESIGN.md).
 
@@ -9,8 +9,8 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | Route | Purpose | Data / access |
 | --- | --- | --- |
 | `/` | All tasks, project tasks and cross-month date-range Gantt chart | Administrator only; signed-out visitors see a generic Home screen |
-| `/nav` | Website directory, search, favorites and categories | Published entries are public; administrators edit entries and icons in the UI (Supabase) |
-| `/feeds` | Miniflux-backed feed reader for websites, feeds and community forums | Visitors can read the owner's selected, non-expired items; administrators manage sources, tags and Watchboards |
+| `/nav` | Website directory, search, favorites and categories | Administrator only; signed-out visitors see a generic Navigator screen |
+| `/feeds` | Miniflux-backed feed reader for websites, feeds and community forums | Administrator only; signed-out visitors see a generic Feeds screen |
 | `/about` | Project overview | Public |
 
 The navigator's canonical URL is `https://labulubius.com/nav`. Drive is retired: `/drive/**` and `/api/drive/**` return uncached `410 Gone`; the former `drive.labulubius.com` DNS record and Tunnel ingress are deleted, so that hostname no longer resolves (`NXDOMAIN`). Its files and public-link metadata are deleted; GitHub retains source history, not those files. Zotero WebDAV at `dav.labulubius.com` is independent and unchanged.
@@ -18,7 +18,7 @@ The navigator's canonical URL is `https://labulubius.com/nav`. Drive is retired:
 ## Architecture
 
 - Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data and icons use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
-- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel is the only public web entry point and sends `labulubius.com` and `www.labulubius.com` to Next.js and `agent.labulubius.com` to Agent. The gateway routes only the Tunnel's port `7844` traffic through the measured Hong Kong path. Cloudflare edge-caches the four public Next.js document routes and the two explicitly public News API views; private APIs, capability downloads, RSC requests and errors remain uncached. The custom `/feeds` UI and same-origin News APIs remain in Next.js. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted.
+- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel is the only public web entry point and sends `labulubius.com` and `www.labulubius.com` to Next.js and `agent.labulubius.com` to Agent. The gateway routes only the Tunnel's port `7844` traffic through the measured Hong Kong path. Cloudflare edge-caches the four static Next.js document shells; authenticated APIs, capability downloads, RSC requests and errors remain uncached. The custom `/feeds` UI and same-origin News APIs remain in Next.js. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted.
 - Personal task data and News preferences live **outside Git** on `web`. Private Miniflux and its PostgreSQL database run in Docker there. GitHub stores source history and CI results, not production data.
 
 ## Verification on VM100

@@ -1,34 +1,11 @@
 import { newsAdmin, newsArticles, newsCategories, newsFeeds, privateNewsHeaders, validNewsCursor } from "../../lib/news-server";
 import { InvalidNewsInput, manageNews } from "../../lib/news-management";
-import { loadNewsSelection, loadPublicNewsSelection, saveNewsSelection } from "../../lib/news-settings";
+import { loadNewsSelection, saveNewsSelection } from "../../lib/news-settings";
 import { loadWatchboards } from "../../lib/news-watchboards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const publicNewsHeaders = {
-  "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60",
-  "X-Content-Type-Options": "nosniff",
-};
-
-async function loadSidebarData() {
-  const [feeds, categories] = await Promise.all([newsFeeds(), newsCategories()]);
-  return { feeds, categories };
-}
-
-let sidebarCache: ReturnType<typeof loadSidebarData> | null = null;
-let sidebarExpires = 0;
-
-function invalidateSidebarData() { sidebarCache = null; sidebarExpires = 0; }
-
-function sidebarData() {
-  if (!sidebarCache || Date.now() >= sidebarExpires) {
-    sidebarExpires = Date.now() + 30_000;
-    sidebarCache = loadSidebarData().catch((error: unknown) => { sidebarCache = null; throw error; });
-  }
-  return sidebarCache;
-}
 
 function errorResponse() {
   return Response.json({ error: "News is temporarily unavailable." }, { status: 503, headers: privateNewsHeaders });
@@ -37,22 +14,6 @@ function errorResponse() {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    if (url.searchParams.get("view") === "sidebar") {
-      const [{ feeds, categories }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
-      const selected = new Set(selectedIds);
-      return Response.json({
-        categories: categories.map(({ name }) => ({ name })),
-        // Keep feed IDs/URLs private; checked state reflects the owner's selection.
-        feeds: feeds.map(({ id, title, category }, key) => ({ key, title: title === id ? "Untitled source" : title, category, checked: selected.has(id) })),
-      }, { headers: publicNewsHeaders });
-    }
-    if (url.searchParams.get("view") === "publicArticles") {
-      const cursor = url.searchParams.get("cursor");
-      if (cursor && !validNewsCursor(cursor)) return Response.json({ error: "Invalid cursor." }, { status: 400, headers: privateNewsHeaders });
-      const [{ feeds }, selectedIds] = await Promise.all([sidebarData(), loadPublicNewsSelection()]);
-      const selected = selectedIds.filter((id) => feeds.some((feed) => feed.id === id));
-      return Response.json(await newsArticles(selected, cursor, feeds), { headers: publicNewsHeaders });
-    }
     const auth = await newsAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: privateNewsHeaders });
     const feeds = await newsFeeds();
@@ -94,7 +55,6 @@ export async function POST(request: Request) {
     try {
       result = await manageNews(body, auth.user.id);
     } finally {
-      invalidateSidebarData();
       // Also reconcile after a partially completed category deletion.
       if (deleting) {
         const ids = new Set((await newsFeeds()).map((feed) => feed.id));

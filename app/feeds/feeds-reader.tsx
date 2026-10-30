@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, Folder, Pencil, Plus, Rss, Search, Tags, Trash2, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
+import { OwnerAccess } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
 import type { NewsArticle, NewsFeed } from "../lib/news-server-types";
 import { orderSourcesByWatchboards, orderTagsBySourceCount } from "./feed-order";
@@ -119,7 +120,6 @@ export function FeedsReader() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const requestId = useRef(0);
-  const publicRequestId = useRef(0);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -148,12 +148,7 @@ export function FeedsReader() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceProbe, setSourceProbe] = useState<SourceProbe | null>(null);
   const [sourceQuery, setSourceQuery] = useState("");
-  const [publicArticles, setPublicArticles] = useState<NewsArticle[]>([]);
-  const [publicCursor, setPublicCursor] = useState<string | null>(null);
-  const [publicArticlesBusy, setPublicArticlesBusy] = useState(true);
-  const [publicArticlesError, setPublicArticlesError] = useState(false);
   const articleLoaderRef = useRef<HTMLDivElement>(null);
-  const publicArticleLoaderRef = useRef<HTMLDivElement>(null);
   const sourceUrlInputRef = useRef<HTMLInputElement>(null);
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
   const watchboardSensors = useSensors(
@@ -246,42 +241,6 @@ export function FeedsReader() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [cursor, busy, saving, panel, loadArticles]);
-
-  const invalidatePublicRequests = useCallback(() => { publicRequestId.current++; }, []);
-
-  const loadPublicArticles = useCallback(async (nextCursor: string | null = null) => {
-    const currentRequest = ++publicRequestId.current;
-    setPublicArticlesBusy(true); setPublicArticlesError(false);
-    if (!nextCursor) { setPublicArticles([]); setPublicCursor(null); }
-    try {
-      const response = await fetch(`/api/news?view=publicArticles${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ""}`);
-      if (!response.ok) throw new Error("Items unavailable.");
-      const data = await response.json() as { articles: NewsArticle[]; continuation: string | null };
-      if (!Array.isArray(data.articles)) throw new Error("Invalid items.");
-      if (currentRequest !== publicRequestId.current) return;
-      setPublicArticles((previous) => mergeArticles(nextCursor ? previous : [], data.articles));
-      setPublicCursor(data.continuation === nextCursor ? null : data.continuation);
-    } catch { if (currentRequest === publicRequestId.current) setPublicArticlesError(true); }
-    finally { if (currentRequest === publicRequestId.current) setPublicArticlesBusy(false); }
-  }, []);
-
-  useEffect(() => {
-    if (loading || isAdmin) { invalidatePublicRequests(); return; }
-    const timer = window.setTimeout(() => { void loadPublicArticles(); }, 0);
-    return () => { window.clearTimeout(timer); invalidatePublicRequests(); };
-  }, [loading, isAdmin, loadPublicArticles, invalidatePublicRequests]);
-
-  useEffect(() => {
-    const target = publicArticleLoaderRef.current;
-    if (!target || !publicCursor || publicArticlesBusy || isAdmin) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      observer.disconnect();
-      void loadPublicArticles(publicCursor);
-    }, { rootMargin: "400px 0px" });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [publicCursor, publicArticlesBusy, isAdmin, loadPublicArticles]);
 
   const visible = articles;
 
@@ -459,25 +418,9 @@ export function FeedsReader() {
     }
   }
 
-  if (loading) return <div className="news-access">Checking your account…</div>;
-  if (authError) return <div className="news-access"><p role="alert">{authError}</p><button type="button" onClick={retryAuth}>Retry account check</button></div>;
-  if (!isAdmin) {
-    return <div className="news-layout">
-      <aside className="news-sidebar" id="page-sidebar" aria-label="Feeds navigation">
-        <div className="news-sidebar-heading"><h2>Watchboards</h2></div>
-        <div className="news-sidebar-heading"><h2>Settings</h2></div>
-        <div className="news-category-row"><button type="button" disabled><Rss size={16} /><span>Sources</span></button></div>
-        <div className="news-category-row"><button type="button" disabled><Tags size={16} /><span>Tags</span></button></div>
-      </aside>
-      <section className="news-content">
-        <header className="news-heading"><div><p className="section-label">PERSONAL WORKSPACE</p><h1>Feeds</h1><p>Your selected sources, powered by Miniflux.</p></div></header>
-        {publicArticlesBusy && <p className="news-empty">Loading items…</p>}
-        {!publicArticlesBusy && !publicArticlesError && !publicArticles.length && <p className="news-empty">No items here yet.</p>}
-        <div className="news-articles">{publicArticles.map((article) => <NewsArticleItem article={article} key={article.id} />)}</div>
-        {(publicCursor || (publicArticlesBusy && publicArticles.length > 0)) && <div className="news-auto-loader" ref={publicArticleLoaderRef} role="status">{publicArticlesBusy ? "Loading…" : ""}</div>}
-      </section>
-    </div>;
-  }
+  if (loading) return <OwnerAccess icon={<Rss size={32} />} title="Feeds" description="Checking your account…" />;
+  if (authError) return <OwnerAccess icon={<Rss size={32} />} title="Feeds" description="Feeds is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
+  if (!isAdmin) return <OwnerAccess icon={<Rss size={32} />} title="Feeds" description="Sign in to continue." />;
 
   const editedFeed = dialog?.kind === "feed" ? feeds.find((feed) => feed.id === dialog.id) : undefined;
   const editedTag = dialog?.kind === "tag" ? watchboards.tags.find((tag) => tag.id === dialog.id) : undefined;
