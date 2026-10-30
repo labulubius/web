@@ -306,17 +306,23 @@ test("sidebar controls render for the configured workspace pages", async () => {
   await assert.rejects(access(new URL("../app/share/page.tsx", import.meta.url)), { code: "ENOENT" });
 });
 
-test("Navigator is owner-only at both the UI and database policy layers", async () => {
+test("Navigator is owner-only and has no obsolete guest visibility controls", async () => {
   const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const types = await readFile(new URL("../app/nav/sites.ts", import.meta.url), "utf8");
   const layout = await readFile(new URL("../app/nav/layout.tsx", import.meta.url), "utf8");
-  const migration = await readFile(new URL("../supabase/migrations/202610220001_private_navigator.sql", import.meta.url), "utf8");
+  const privateMigration = await readFile(new URL("../supabase/migrations/202610220001_private_navigator.sql", import.meta.url), "utf8");
+  const cleanupMigration = await readFile(new URL("../supabase/migrations/202610300001_remove_navigator_visibility.sql", import.meta.url), "utf8");
 
   assert.match(directory, /if \(authLoading \|\| !isAdmin\) return;/);
   assert.match(directory, /<OwnerAccess icon=\{<Compass size=\{32\} \/>\} title="Navigator"/);
+  assert.doesNotMatch(directory, /Visible to guests|supportsCategoryVisibility|is_published/);
+  assert.doesNotMatch(types, /is_published/);
   assert.match(layout, /robots: \{ index: false, follow: false \}/);
-  assert.match(migration, /drop policy if exists "published navigator categories are public"/);
-  assert.match(migration, /drop policy if exists "published navigator sites are public"/);
-  assert.doesNotMatch(migration, /create policy/);
+  assert.match(privateMigration, /drop policy if exists "published navigator categories are public"/);
+  assert.match(privateMigration, /drop policy if exists "published navigator sites are public"/);
+  assert.doesNotMatch(privateMigration, /create policy/);
+  assert.match(cleanupMigration, /alter table public\.navigator_categories\s+drop column if exists is_published/);
+  assert.match(cleanupMigration, /alter table public\.navigator_sites\s+drop column if exists is_published/);
 });
 
 test("sidebar create and delete actions share a trailing axis", async () => {

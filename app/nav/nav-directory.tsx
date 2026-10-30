@@ -255,7 +255,6 @@ export function NavDirectory() {
   }, [categories, categoryId, query, sites]);
 
   const canReorderSites = isAdmin && query.trim() === "";
-  const supportsCategoryVisibility = categories.some((category) => typeof category.is_published === "boolean");
   const supportsFavoriteOrder = sites.some((site) => site.favorite_sort_order !== undefined);
 
   function closeDialog() {
@@ -294,7 +293,6 @@ export function NavDirectory() {
       url: String(form.get("url") ?? "").trim(),
       description: String(form.get("description") ?? "").trim(),
       category_id: String(form.get("category_id") ?? ""),
-      is_published: form.get("is_published") === "on",
     };
     const categorySiteCount = sites.filter((site) => site.category_id === values.category_id).length;
     const siteValues = editingSite && editingSite.category_id !== values.category_id
@@ -328,9 +326,7 @@ export function NavDirectory() {
     setMessage("");
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") ?? "").trim();
-    const values = supportsCategoryVisibility
-      ? { name, is_published: form.get("is_published") === "on" }
-      : { name };
+    const values = { name };
     const result = editingCategory
       ? await supabase.from("navigator_categories").update(values).eq("id", editingCategory.id)
       : await supabase.from("navigator_categories").insert({ ...values, sort_order: categories.length });
@@ -551,7 +547,6 @@ export function NavDirectory() {
             {dialog === "category" && (
               <form onSubmit={handleCategorySave}>
                 <label>Group name<input name="name" defaultValue={editingCategory?.name ?? ""} maxLength={60} autoFocus required /></label>
-                {supportsCategoryVisibility && <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingCategory?.is_published ?? true} /> Visible to guests</label>}
                 {message && <p className="form-error" role="alert">{message}</p>}
                 <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
               </form>
@@ -566,7 +561,6 @@ export function NavDirectory() {
                 <label>Website URL<input name="url" type="url" placeholder="https://example.com" defaultValue={editingSite?.url ?? ""} required /></label>
                 <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={editingSite?.description ?? ""} /></label>
                 <label>Custom icon URL <small>(optional)</small><input name="icon_url" type="url" placeholder="Automatically uses the website favicon" defaultValue={editingSite?.icon_url ?? ""} /></label>
-                <label className="checkbox-label"><input name="is_published" type="checkbox" defaultChecked={editingSite?.is_published ?? true} /> Visible to guests</label>
                 {message && <p className="form-error" role="alert">{message}</p>}
                 <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save website"}</button></footer>
               </form>

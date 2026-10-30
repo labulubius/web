@@ -2,7 +2,6 @@ export type Category = {
   id: string;
   name: string;
   sort_order: number;
-  is_published?: boolean;
 };
 
 export type Site = {
@@ -13,7 +12,6 @@ export type Site = {
   url: string;
   icon_url: string | null;
   sort_order: number;
-  is_published: boolean;
   is_favorite: boolean;
   favorite_sort_order?: number | null;
 };
