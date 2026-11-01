@@ -226,6 +226,7 @@ async function discoverIcon(siteUrl: string, customSource: string | null) {
     new URL("/favicon.ico", origin).href,
     new URL("/favicon.svg", origin).href,
     new URL("/apple-touch-icon.png", origin).href,
+    `https://icons.duckduckgo.com/ip3/${new URL(finalSiteUrl).hostname}.ico`,
   );
 
   for (const candidate of [...new Set(candidates)]) {

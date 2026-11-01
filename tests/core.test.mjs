@@ -325,6 +325,15 @@ test("Navigator is owner-only and has no obsolete guest visibility controls", as
   assert.match(cleanupMigration, /alter table public\.navigator_sites\s+drop column if exists is_published/);
 });
 
+test("Navigator icon imports use a public fallback without exposing managed URLs as custom sources", async () => {
+  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const iconRoute = await readFile(new URL("../app/api/nav/icon/route.ts", import.meta.url), "utf8");
+
+  assert.match(iconRoute, /https:\/\/icons\.duckduckgo\.com\/ip3\/\$\{new URL\(finalSiteUrl\)\.hostname\}\.ico/);
+  assert.match(directory, /Custom icon source URL/);
+  assert.doesNotMatch(directory, /name="icon_url"[^>]*defaultValue=/);
+});
+
 test("sidebar create and delete actions share a trailing axis", async () => {
   const tasks = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
   const navigator = await readFile(new URL("../app/nav/nav.css", import.meta.url), "utf8");

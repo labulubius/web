@@ -560,7 +560,7 @@ export function NavDirectory() {
                 </div>
                 <label>Website URL<input name="url" type="url" placeholder="https://example.com" defaultValue={editingSite?.url ?? ""} required /></label>
                 <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={editingSite?.description ?? ""} /></label>
-                <label>Custom icon URL <small>(optional)</small><input name="icon_url" type="url" placeholder="Automatically uses the website favicon" defaultValue={editingSite?.icon_url ?? ""} /></label>
+                <label>Custom icon source URL <small>(optional)</small><input name="icon_url" type="url" placeholder="Leave blank to find the website favicon automatically" /></label>
                 {message && <p className="form-error" role="alert">{message}</p>}
                 <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save website"}</button></footer>
               </form>
