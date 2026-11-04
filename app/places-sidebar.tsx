@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Compass, Home, Info, Rss, Star } from "lucide-react";
+import { Bot, Compass, Home, Info, Star } from "lucide-react";
 import Link from "next/link";
 
 export function PlacesSidebar({ active }: { active: string }) {
@@ -14,7 +14,6 @@ export function PlacesSidebar({ active }: { active: string }) {
         <Link className={active === "/nav" ? "selected" : ""} href="/nav">
           <Compass size={16} /> Navigator
         </Link>
-        <Link href="/feeds"><Rss size={16} /> Feeds</Link>
         <Link href="/agent"><Bot size={16} /> Agent</Link>
         <Link className={active === "/about" ? "selected" : ""} href="/about">
           <Info size={16} /> About

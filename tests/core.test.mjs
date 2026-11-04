@@ -2,25 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
-import { conciseSummary } from "../app/lib/concise-summary.ts";
-import { normalizeNewsArticleUrl } from "../app/lib/news-article-url.ts";
-import {
-  bbcNewsFeed,
-  discoverNewsFeedDetails,
-  discourseLatestFeed,
-  nativeCommunityFeed,
-  NewsFeedDiscoveryError,
-  withNewsFeedFallback,
-} from "../app/lib/news-feed-discovery.ts";
 import { GET as health } from "../app/api/health/route.ts";
 import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, validTimelineRange } from "../app/tasks/task-calendar.ts";
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
-import { reorderByExactIds } from "../app/lib/watchboard-order.ts";
-import { orderSourcesByWatchboards, orderTagsBySourceCount, sourceWatchboardCount } from "../app/feeds/feed-order.ts";
-import { canonicalCsisTopicUrl, filterFutureWebSourceItems, parseCsisTopicPage, renderWebSourceRss, retainRecentWebSourceItems } from "../app/lib/news-web-source-feed.ts";
-import { canonicalHtml2rssSourceUrl, normalizeHtml2rssFeed } from "../app/lib/news-html2rss-feed.ts";
-import { parseNewsFeedPreview, reviewWebSourcePreview, UnreliableNewsSource } from "../app/lib/news-source-preview.ts";
-import { NewsSourceProbeStore } from "../app/lib/news-source-probe-cache.ts";
 import nextConfig from "../next.config.ts";
 
 test("Tasks uses a prerendered client shell like Navigator while private data stays behind its API", async () => {
@@ -114,23 +98,6 @@ test("task Gantt calendar supports inclusive custom ranges across months", () =>
   assert.equal(validTimelineRange("2026-10-05", "2026-12-05"), false);
 });
 
-test("news article URLs decode feed entities without allowing unsafe schemes", () => {
-  const expected = "https://example.com/article?view=full&id=8036284171743232";
-  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&amp;id=")), expected);
-  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&amp;amp;id=")), expected);
-  assert.equal(normalizeNewsArticleUrl(expected.replace("&id=", "&#38;id=")), expected);
-  assert.equal(normalizeNewsArticleUrl("javascript:alert(1)"), "");
-  assert.equal(normalizeNewsArticleUrl("not a URL"), "");
-});
-
-test("news summaries contain no more than two short sentences", () => {
-  assert.equal(conciseSummary("第一句话。第二句话！第三句话不应显示。"), "第一句话。第二句话！");
-  assert.equal(conciseSummary("A short description of the article."), "A short description of the article.");
-  const longChinese = conciseSummary(`这是一个没有句号的超长摘要${"内容".repeat(120)}`);
-  assert.ok(longChinese.length <= 220);
-  assert.match(longChinese, /…$/);
-});
-
 test("health response is minimal and not cached", async () => {
   const response = health();
   assert.equal(response.status, 200);
@@ -145,8 +112,10 @@ test("production health checks distinguish retired Drive from live services", as
   assert.match(script, /RETIRED_DRIVE_HOSTNAME/);
   assert.doesNotMatch(script, /RETIRED_DRIVE_ORIGIN/);
   assert.match(script, /NXDOMAIN/);
-  assert.match(script, /status.*410/);
+  assert.match(script, /status.*404/);
   assert.match(script, /AGENT_ORIGIN:-https:\/\/agent\.labulubius\.com/);
+  assert.match(script, /\$main_origin\/feeds/);
+  assert.match(script, /\$main_origin\/api\/news/);
   assert.doesNotMatch(script, /FEEDS_ORIGIN/);
 });
 
@@ -233,61 +202,6 @@ test("owner-only destinations remain visible and show access guidance", async ()
   assert.doesNotMatch(shell, /href: "\/(?:share|note)"/);
 });
 
-test("Feeds replaces the retired News page while preserving News APIs", async () => {
-  const page = await readFile(new URL("../app/feeds/page.tsx", import.meta.url), "utf8");
-  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
-  const styles = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
-  const newsTypes = await readFile(new URL("../app/lib/news-server-types.ts", import.meta.url), "utf8");
-  const minifluxBackend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
-  const newsApi = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
-  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
-  const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
-
-  await assert.rejects(access(new URL("../app/news/page.tsx", import.meta.url)), { code: "ENOENT" });
-  await access(new URL("../app/api/news/route.ts", import.meta.url));
-  assert.match(page, /title: \{ absolute: "Feeds" \}/);
-  assert.match(page, /robots: \{ index: false, follow: false \}/);
-  assert.match(page, /active="\/feeds" title="Feeds"/);
-  assert.match(shell, /href: "\/feeds", label: "Feeds", icon: Rss/);
-  assert.doesNotMatch(shell, /href: "\/news"|label: "News"|Newspaper/);
-  assert.match(sidebar, /href="\/feeds"><Rss size=\{16\} \/> Feeds/);
-  assert.doesNotMatch(sidebar, /href="\/news"|> News</);
-  assert.match(reader, /aria-label="Feeds navigation"/);
-  assert.doesNotMatch(reader, /<span>All items<\/span>|board\.name} \(\{matches\(board\)\}\)/);
-  assert.match(reader, /site-news-location/);
-  assert.match(reader, /source:\$\{id\}/);
-  assert.match(reader, /showFallbackSidebar/);
-  assert.match(reader, /title=\{article\.source\}>\{article\.source\}/);
-  assert.ok(reader.indexOf("title={article.source}") < reader.indexOf("<time dateTime="), "source must precede the published date");
-  assert.match(reader, /className="news-article-copy"/);
-  assert.match(styles, /\.news-article-content \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(90px, 24%\)/);
-  assert.match(styles, /\.news-article-meta \{[^}]*flex-direction: column[^}]*text-align: right/);
-  assert.match(styles, /\.news-article-meta span \{[^}]*max-width: 100%[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
-  assert.match(styles, /@media \(max-width: 760px\)/);
-  assert.match(styles, /\.news-article-content \{ gap: 10px; grid-template-columns: minmax\(0, 1fr\) clamp\(78px, 24vw, 108px\)/);
-  assert.match(styles, /-webkit-line-clamp: 2/);
-  assert.match(newsTypes, /summary: string; source: string/);
-  assert.match(minifluxBackend, /entry\.feed_id/);
-  assert.match(newsApi, /newsArticles\(articleFeeds, cursor, feeds\)/);
-  assert.match(newsApi, /const auth = await newsAdmin\(request\)/);
-  assert.match(newsApi, /if \(!auth\) return Response\.json\(\{ error: "Unauthorized\." \}/);
-  assert.doesNotMatch(newsApi, /publicNewsHeaders|loadPublicNewsSelection|view\) === "sidebar"|view\) === "publicArticles"/);
-  assert.match(newsApi, /headers: privateNewsHeaders/);
-  assert.match(reader, /<OwnerAccess icon=\{<Rss size=\{32\} \/>\} title="Feeds"/);
-  assert.doesNotMatch(reader, /publicArticles|publicCursor|loadPublicArticles/);
-  assert.doesNotMatch(reader, /className=\"news-(?:error|success)\"/);
-  assert.doesNotMatch(styles, /\.news-error|\.news-success/);
-  assert.match(reader, /className=\"form-error\" role=\"alert\"/);
-  assert.match(reader, /Loading items…|Loading your subscriptions…/);
-  assert.match(reader, /No items here yet\./);
-  assert.match(reader, /<th>In All items<\/th>/);
-  assert.ok(reader.indexOf('className="news-heading-search"') < reader.indexOf('className="news-add-action"'), "source search must precede the add button");
-  assert.match(reader, /aria-label="Search sources"/);
-  assert.doesNotMatch(reader, /<label>Search sources|news-table-controls/);
-  assert.match(styles, /\.news-heading-search/);
-  assert.doesNotMatch(reader, /News navigation|<span>All articles<\/span>|Articles are temporarily unavailable|No articles here yet|<th>In Articles<\/th>/);
-});
-
 test("retired Note route and navigation stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
@@ -337,13 +251,11 @@ test("Navigator icon imports use a public fallback without exposing managed URLs
 test("sidebar create and delete actions share a trailing axis", async () => {
   const tasks = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
   const navigator = await readFile(new URL("../app/nav/nav.css", import.meta.url), "utf8");
-  const news = await readFile(new URL("../app/feeds/feeds.css", import.meta.url), "utf8");
   const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
 
-  for (const stylesheet of [tasks, navigator, news]) assert.match(stylesheet, /margin: 8px 4px 5px 9px/);
+  for (const stylesheet of [tasks, navigator]) assert.match(stylesheet, /margin: 8px 4px 5px 9px/);
   assert.match(tasks, /\.tasks-project-list > div \{[^}]*min-width: 0/);
   assert.match(navigator, /\.category-row \{[^}]*min-width: 0/);
-  assert.match(news, /\.news-category-row \{[^}]*min-width: 0/);
   assert.match(directory, /isAdmin \? <Folder size=\{16\}/);
   assert.match(directory, /onDragStart=\{\(\) => \{ blockSiteOpen\.current = true; \}\}/);
   assert.match(directory, /onPointerDownCapture=\{\(\) => \{ blockSiteOpen\.current = false; \}\}/);
@@ -353,197 +265,19 @@ test("sidebar create and delete actions share a trailing axis", async () => {
   assert.doesNotMatch(directory, /blockSiteOpenUntil|didDrag|onPointerInteraction|shouldBlockOpen|GripVertical/);
 });
 
-test("Feeds watchboards persist only exact drag orders", async () => {
-  const boards = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }];
-  assert.deepEqual(reorderByExactIds(boards, ["c", "a", "b"]), [boards[2], boards[0], boards[1]]);
-  assert.equal(reorderByExactIds(boards, ["a", "a", "b"]), null);
-  assert.equal(reorderByExactIds(boards, ["a", "b"]), null);
-  assert.equal(reorderByExactIds(boards, ["a", "b", "unknown"]), null);
-
-  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
-  const watchboards = await readFile(new URL("../app/lib/news-watchboards.ts", import.meta.url), "utf8");
-  assert.match(reader, /KeyboardSensor/);
-  assert.match(reader, /PointerSensor/);
-  assert.match(reader, /TouchSensor/);
-  assert.match(reader, /<Folder size=\{16\}/);
-  assert.match(reader, /SortableWatchboardRow/);
-  assert.match(reader, /className=\{`news-watchboard-select/);
-  assert.doesNotMatch(reader, /news-watchboard-drag|GripVertical|setActivatorNodeRef/);
-  assert.match(reader, /action: "reorderWatchboards"/);
-  assert.match(watchboards, /case "reorderWatchboards"/);
-});
-
-test("Feeds Sources rank by matching Watchboards then subscription creation order", () => {
-  const boards = [{ tagIds: ["news"] }, { tagIds: ["news", "world"] }, { tagIds: ["tech"] }, { tagIds: [] }];
-  const sourceTags = {
-    "feed/10": ["news", "world"],
-    "feed/11": ["news"],
-    "feed/12": ["news", "news"],
-    "feed/13": [],
-  };
-  const sources = ["feed/10", "feed/11", "feed/12", "feed/13"].map((id) => ({ id }));
-
-  assert.equal(sourceWatchboardCount("feed/10", boards, sourceTags), 2);
-  assert.equal(sourceWatchboardCount("feed/13", boards, sourceTags), 0);
-  assert.deepEqual(orderSourcesByWatchboards(sources, boards, sourceTags).map(({ id }) => id), [
-    "feed/10", "feed/12", "feed/11", "feed/13",
-  ]);
-  assert.deepEqual(orderSourcesByWatchboards([sources[1], sources[2]], boards, sourceTags).map(({ id }) => id), ["feed/12", "feed/11"]);
-});
-
-test("Feeds Tags rank by distinct Source count then creation order", () => {
-  const tags = ["old", "middle", "new"].map((id) => ({ id }));
-  const ranked = orderTagsBySourceCount(tags, {
-    first: ["old", "middle", "middle"],
-    second: ["old", "new"],
-  });
-
-  assert.deepEqual(ranked.map(({ tag, count }) => [tag.id, count]), [
-    ["old", 2], ["new", 1], ["middle", 1],
-  ]);
-  assert.deepEqual(orderTagsBySourceCount(tags, {}).map(({ tag }) => tag.id), ["new", "middle", "old"]);
-});
-
-test("Feeds resolves BBC News pages to their published feeds", () => {
-  assert.equal(bbcNewsFeed("https://www.bbc.com/news/us-canada"), "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml");
-  assert.equal(bbcNewsFeed("https://bbc.co.uk/news/us-canada/?ref=nav"), "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml");
-  assert.equal(bbcNewsFeed("https://www.bbc.com/news"), "https://feeds.bbci.co.uk/news/rss.xml");
-  assert.equal(bbcNewsFeed("https://example.com/news/us-canada"), null);
-  assert.equal(bbcNewsFeed("https://www.bbc.com/news/europe"), null);
-});
-
-test("Feeds resolves Discourse homepages to latest-topic feeds", async () => {
-  const html = '<meta name="generator" content="Discourse 3.4.0 - https://github.com/discourse/discourse">';
-  assert.equal(discourseLatestFeed(html, "https://forum.obsidian.md/"), "https://forum.obsidian.md/latest.rss");
-  assert.equal(discourseLatestFeed(html, "https://example.com/community/"), "https://example.com/community/latest.rss");
-  assert.equal(discourseLatestFeed("<title>ordinary site</title>", "https://example.com/"), null);
-
-  const proxy = await readFile(new URL("../app/lib/news-feed-proxy.ts", import.meta.url), "utf8");
-  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
-  const api = await readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8");
-  assert.match(proxy, /discoverNewsFeedDetails\(value, fetchPinnedNewsResource, readLimitedNewsResource\)/);
-  assert.match(management, /Source already exists\./);
-  assert.match(api, /selected, \.\.\.result/);
-});
-
-const testFeedBody = '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Feed</title></feed>';
-const testResourceReader = async (response) => new Uint8Array(await response.arrayBuffer());
-const testResource = (body, finalUrl, status = 200) => ({ response: new Response(body, { status }), finalUrl });
-
-test("Feeds maps only explicit native community pages", () => {
-  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/"), "https://www.reddit.com/r/German/.rss");
-  assert.equal(nativeCommunityFeed("https://reddit.com/r/German/new"), "https://www.reddit.com/r/German/new/.rss");
-  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/top/?t=week"), "https://www.reddit.com/r/German/top/.rss?t=week");
-  assert.equal(nativeCommunityFeed("https://www.reddit.com/r/German/controversial?t=month"), "https://www.reddit.com/r/German/controversial/.rss?t=month");
-  assert.equal(nativeCommunityFeed("https://www.v2ex.com/"), "https://www.v2ex.com/index.xml");
-  assert.equal(nativeCommunityFeed("https://www.v2ex.com/?tab=tech"), "https://www.v2ex.com/feed/tab/tech.xml");
-  assert.equal(nativeCommunityFeed("https://www.v2ex.com/go/python"), "https://www.v2ex.com/feed/python.xml");
-  assert.equal(nativeCommunityFeed("https://linux.do/"), "https://linux.do/latest.rss");
-  assert.equal(nativeCommunityFeed("https://linux.do/latest/"), "https://linux.do/latest.rss");
-  assert.equal(nativeCommunityFeed("https://linux.do/c/develop/4"), "https://linux.do/c/develop/4.rss");
-  assert.equal(nativeCommunityFeed("https://linux.do/t/example-topic/123"), "https://linux.do/t/example-topic/123.rss");
-
-  for (const value of [
-    "https://www.reddit.com/r/German/.rss",
-    "https://www.v2ex.com/index.xml",
-    "https://www.v2ex.com/feed/tab/tech.xml",
-    "https://linux.do/latest.rss",
-    "https://www.reddit.com/r/German/comments/123/post",
-    "https://www.reddit.com/search?q=German",
-    "https://www.reddit.com/r/German?sort=new",
-    "https://www.reddit.com/r/German/top?t=week&after=token",
-    "https://www.v2ex.com/t/123",
-    "https://www.v2ex.com/?q=python",
-    "https://linux.do/latest?order=created",
-    "https://old.reddit.com/r/German/",
-    "https://community.linux.do/",
-    "http://www.v2ex.com/",
-    "https://user:pass@www.v2ex.com/",
-    "https://www.v2ex.com:444/",
-  ]) assert.equal(nativeCommunityFeed(value), null, value);
-});
-
-test("Feeds tries native mappings before an unavailable community page", async () => {
-  const calls = [];
-  const found = await discoverNewsFeedDetails("https://www.reddit.com/r/German/", async (url) => {
-    calls.push(url);
-    if (url.endsWith("/.rss")) return testResource(testFeedBody, url);
-    return testResource("blocked", url, 403);
-  }, testResourceReader);
-  assert.deepEqual(found, { url: "https://www.reddit.com/r/German/.rss", method: "native" });
-  assert.deepEqual(calls, ["https://www.reddit.com/r/German/.rss"]);
-});
-
-test("Feeds leaves already-feed URLs direct", async () => {
-  const url = "https://www.reddit.com/r/German/.rss";
-  const calls = [];
-  const found = await discoverNewsFeedDetails(url, async (value) => {
-    calls.push(value);
-    return testResource(testFeedBody, value);
-  }, testResourceReader);
-  assert.deepEqual(found, { url, method: "direct" });
-  assert.deepEqual(calls, [url]);
-});
-
-test("Feeds continues past malformed and failed declared feed candidates", async () => {
-  const page = "https://example.org/news";
-  const html = [
-    '<link rel="alternate" type="application/rss+xml" href="http://[invalid">',
-    '<link rel="alternate" type="application/rss+xml" href="/failed.xml">',
-    '<link rel="alternate" type="application/atom+xml" href="/valid.xml">',
-  ].join("");
-  const calls = [];
-  const found = await discoverNewsFeedDetails(page, async (url) => {
-    calls.push(url);
-    if (url === page) return testResource(html, url);
-    if (url.endsWith("failed.xml")) return testResource("unavailable", url, 500);
-    return testResource(testFeedBody, url);
-  }, testResourceReader);
-  assert.deepEqual(found, { url: "https://example.org/valid.xml", method: "html" });
-  assert.deepEqual(calls, [page, "https://example.org/failed.xml", "https://example.org/valid.xml"]);
-});
-
-test("Feeds deduplicates and caps declared feed candidates", async () => {
-  const page = "https://example.org/news";
-  const links = ["/feed-0.xml", "/feed-0.xml", ...Array.from({ length: 20 }, (_, index) => `/feed-${index + 1}.xml`)];
-  const html = links.map((href) => `<link rel="alternate" type="application/rss+xml" href="${href}">`).join("");
-  const calls = [];
-  await assert.rejects(() => discoverNewsFeedDetails(page, async (url) => {
-    calls.push(url);
-    return testResource(url === page ? html : "not a feed", url);
-  }, testResourceReader), /No RSS or Atom feed/);
-  assert.equal(calls.filter((url) => url.endsWith("feed-0.xml")).length, 1);
-  assert.equal(calls.length, 17, "one page plus at most sixteen candidates");
-});
-
-test("Feeds preserves safe protected-source errors and skips webpage fallback", async () => {
-  for (const [status, message] of [
-    [403, "This source does not allow feed access."],
-    [429, "This source is rate limiting feed requests. Try again later."],
-  ]) {
-    let fallbackCalled = false;
-    await assert.rejects(
-      () => withNewsFeedFallback(
-        () => discoverNewsFeedDetails("https://linux.do/", async (url) => testResource("blocked", url, status), testResourceReader),
-        async () => { fallbackCalled = true; return null; },
-      ),
-      (error) => error instanceof NewsFeedDiscoveryError && error.status === status && error.message === message,
-    );
-    assert.equal(fallbackCalled, false);
+test("retired Feeds route, API, navigation, and modules stay absent", async () => {
+  const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
+  const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
+  const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const proxy = await readFile(new URL("../proxy.ts", import.meta.url), "utf8");
+  for (const name of ["app/feeds", "app/api/news", "app/lib/news-server.ts", "app/lib/news-watchboards.ts", "app/lib/concise-summary.ts", "app/lib/watchboard-order.ts", "NEWS.md", "deploy/miniflux", "deploy/html2rss"]) {
+    await assert.rejects(access(new URL(`../${name}`, import.meta.url)), { code: "ENOENT" });
   }
-
-  let fallbackCalled = false;
-  await assert.rejects(
-    () => withNewsFeedFallback(
-      () => discoverNewsFeedDetails("https://www.v2ex.com/", async (url) => testResource("unavailable", url, 500), testResourceReader),
-      async () => { fallbackCalled = true; return null; },
-    ),
-    (error) => error instanceof NewsFeedDiscoveryError && error.message === "This community's native feed is unavailable.",
-  );
-  assert.equal(fallbackCalled, false);
-  assert.equal(await withNewsFeedFallback(async () => { throw new Error("ordinary discovery failure"); }, async () => "fallback"), "fallback");
+  assert.doesNotMatch(shell, /\/feeds|Rss/);
+  assert.doesNotMatch(sidebar, /\/feeds|Rss/);
+  assert.doesNotMatch(globals, /news-/);
+  assert.doesNotMatch(proxy, /retired-drive|isRetiredDriveRequest/);
 });
-
 
 test("retired Forums route, API, navigation, and parser stay absent", async () => {
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
@@ -557,209 +291,4 @@ test("retired Forums route, API, navigation, and parser stay absent", async () =
   assert.doesNotMatch(sidebar, /\/forums|MessagesSquare/);
   assert.doesNotMatch(globals, /forums-/);
   assert.doesNotMatch(packageJson, /fast-xml-parser/);
-});
-
-
-test("Feeds converts supported CSIS topic pages into stable RSS items", async () => {
-  const html = await readFile(new URL("./fixtures/csis-topic.html", import.meta.url), "utf8");
-  const url = "https://www.csis.org/topics/artificial-intelligence";
-  const source = parseCsisTopicPage(html, url);
-
-  assert.equal(canonicalCsisTopicUrl("https://csis.org/topics/artificial-intelligence/"), url);
-  assert.equal(canonicalCsisTopicUrl(`${url}?page=1`), null);
-  assert.equal(canonicalCsisTopicUrl("https://example.com/topics/artificial-intelligence"), null);
-  assert.equal(source.title, "Artificial Intelligence & Policy | CSIS");
-  assert.equal(source.description, "Research & analysis about AI.");
-  assert.deepEqual(source.items.map(({ title, url: itemUrl }) => [title, itemUrl]), [
-    ["AI & Public Policy", "https://www.csis.org/analysis/example-ai-report"],
-    ["Podcast episode", "https://www.csis.org/podcasts/ai-policy-podcast/example-episode"],
-  ]);
-  assert.equal(source.items[0].summary, "A concise & useful summary.");
-  assert.equal(source.items[0].published, Date.parse("October 7, 2026 12:00:00 UTC"));
-
-  const rss = renderWebSourceRss(
-    url, source, Date.parse("October 8, 2026 12:00:00 UTC"), Date.parse("October 7, 2026 23:59:59 UTC"),
-  );
-  assert.match(rss, /<rss version="2.0">/);
-  assert.match(rss, /Artificial Intelligence &amp; Policy/);
-  assert.match(rss, /<guid isPermaLink="true">https:\/\/www\.csis\.org\/analysis\/example-ai-report<\/guid>/);
-  assert.equal((rss.match(/<item>/g) || []).length, 2);
-});
-
-test("Feeds excludes future web-source items after the current UTC day", () => {
-  const now = Date.parse("October 7, 2026 10:30:00 UTC");
-  const item = (id, published) => ({ id, title: id, url: `https://example.com/${id}`, published, summary: "Summary" });
-  const source = {
-    title: "Example",
-    description: "Example articles",
-    items: [
-      item("tomorrow", Date.parse("October 8, 2026 00:00:00 UTC")),
-      item("today-end", Date.parse("October 7, 2026 23:59:59.999 UTC")),
-      item("today-start", Date.parse("October 7, 2026 00:00:00 UTC")),
-    ],
-  };
-
-  assert.deepEqual(filterFutureWebSourceItems(source, now).items.map(({ id }) => id), ["today-end", "today-start"]);
-  const rss = renderWebSourceRss("https://example.com/articles", source, now, now);
-  assert.doesNotMatch(rss, /tomorrow/);
-  assert.equal((rss.match(/<item>/g) || []).length, 2);
-});
-
-test("Feeds source preview parses RSS and Atom articles, dates, summaries, and warnings", () => {
-  const now = Date.parse("2026-10-10T12:00:00Z");
-  const rss = new TextEncoder().encode(`<?xml version="1.0"?><rss version="2.0"><channel><title>Example &amp; News</title>
-    <item><title>First &amp; best</title><link>/first#fragment</link><pubDate>Fri, 09 Oct 2026 00:00:00 GMT</pubDate><description>A useful summary.</description></item>
-    <item><title>Repeated headline</title><link>https://example.org/repeated</link><pubDate>Thu, 08 Oct 2026 00:00:00 GMT</pubDate><description>Repeated headline</description></item>
-    <item><title>No date</title><link>https://example.org/no-date</link><description>Still an article.</description></item>
-  </channel></rss>`);
-  const checked = parseNewsFeedPreview(rss, "https://example.org/feed.xml", now);
-  assert.equal(checked.title, "Example & News");
-  assert.equal(checked.itemCount, 3);
-  assert.equal(checked.items[0].url, "https://example.org/first");
-  assert.equal(checked.items[0].summary, "A useful summary.");
-  assert.equal(checked.items[2].published, null);
-  assert.equal(checked.warnings.length, 2);
-
-  const atom = new TextEncoder().encode(`<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom source</title><entry><title>Atom item</title><link rel="alternate" href="/atom-item"/><published>2026-10-09T10:00:00Z</published><summary>Atom summary</summary></entry></feed>`);
-  const atomChecked = parseNewsFeedPreview(atom, "https://example.org/atom.xml", now);
-  assert.equal(atomChecked.items[0].url, "https://example.org/atom-item");
-  assert.equal(atomChecked.items[0].published, Date.parse("2026-10-09T10:00:00Z"));
-});
-
-test("Feeds source preview blocks unreliable dates but only warns about weak summaries", () => {
-  const now = Date.parse("2026-10-10T12:00:00Z");
-  const undated = new TextEncoder().encode(`<rss><channel><title>Bad</title><item><title>Navigation</title><link>https://example.org/nav</link><description>Navigation</description></item></channel></rss>`);
-  assert.throws(() => parseNewsFeedPreview(undated, "https://example.org/feed", now), UnreliableNewsSource);
-  const source = { title: "Web", description: "", items: [
-    { id: "one", title: "One", url: "https://example.org/one", published: now, publishedReliable: true, summary: "One" },
-    { id: "two", title: "Two", url: "https://example.org/two", published: now, publishedReliable: true, summary: "" },
-  ] };
-  const reviewed = reviewWebSourcePreview(source, now);
-  assert.equal(reviewed.itemCount, 2);
-  assert.match(reviewed.warnings[0], /no independent summary/);
-  assert.throws(() => reviewWebSourcePreview({ ...source, items: source.items.map((item) => ({ ...item, publishedReliable: false })) }, now), /No trustworthy publication dates/);
-  assert.throws(() => reviewWebSourcePreview({ ...source, items: source.items.map((item) => ({ ...item, published: Date.parse("2100-01-01T00:00:00Z") })) }, now), /No trustworthy publication dates/);
-});
-
-test("Feeds source checks are bounded, owner-bound, URL-bound, expiring, and one-use", () => {
-  let now = 1_000;
-  let serial = 0;
-  const store = new NewsSourceProbeStore(2, 100, () => now, () => `token-${++serial}`);
-  const first = store.stage("owner-a", "https://example.org/a", { id: 1 });
-  assert.equal(store.consume("owner-b", "https://example.org/a", first), null);
-  assert.equal(store.consume("owner-a", "https://example.org/a", first), null, "a mismatched attempt consumes the opaque token");
-  const second = store.stage("owner-a", "https://example.org/a", { id: 2 });
-  assert.equal(store.consume("owner-a", "https://example.org/b", second), null);
-  const expiring = store.stage("owner-a", "https://example.org/a", { id: 3 });
-  now += 100;
-  assert.equal(store.consume("owner-a", "https://example.org/a", expiring), null);
-  const oldest = store.stage("owner-a", "https://example.org/1", { id: 4 });
-  const kept = store.stage("owner-a", "https://example.org/2", { id: 5 });
-  const newest = store.stage("owner-a", "https://example.org/3", { id: 6 });
-  assert.equal(store.consume("owner-a", "https://example.org/1", oldest), null, "capacity evicts the oldest check");
-  assert.deepEqual(store.consume("owner-a", "https://example.org/2", kept), { id: 5 });
-  assert.deepEqual(store.consume("owner-a", "https://example.org/3", newest), { id: 6 });
-  assert.equal(store.consume("owner-a", "https://example.org/3", newest), null);
-});
-
-test("Feeds web sources stay private, cached, revocable, and Miniflux-backed", async () => {
-  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
-  const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
-  const token = await readFile(new URL("../app/lib/news-web-source-token.ts", import.meta.url), "utf8");
-  const route = await readFile(new URL("../app/api/news/generated/[token]/route.ts", import.meta.url), "utf8");
-  const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
-  const minifluxBackend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
-  const reader = await readFile(new URL("../app/feeds/feeds-reader.tsx", import.meta.url), "utf8");
-
-  assert.match(management, /case "probeFeed"/);
-  assert.match(management, /createPreparedWebSource\(userId, prepared\.web\)/);
-  assert.match(management, /consumeProbe\(userId, url, probeToken\)/);
-  assert.match(management, /new NewsSourceProbeStore<PreparedNewsSource>/);
-  assert.match(minifluxBackend, /feed_url:url/);
-  assert.match(management, /deleteWebSource\(userId, source\.url\)/);
-  assert.match(sources, /fetchPinnedNewsResource\(url\)/);
-  assert.match(sources, /CACHE_TTL = 29 \* 60 \* 1000/);
-  assert.match(sources, /if \(!cached\.updatedAt \|\| !cached\.source\.items\.length\) throw error/);
-  assert.match(sources, /mode: 0o600/);
-  assert.match(token, /createHmac\("sha256"/);
-  assert.match(token, /timingSafeEqual/);
-  assert.match(route, /Cache-Control": "private, no-store"/);
-  assert.match(server, /newsReaderBackend\(\)\.feeds/);
-  assert.match(minifluxBackend, /originalWebSourceUrl\(originalNewsFeedUrl/);
-  assert.match(reader, /Check source/);
-  assert.match(reader, /Supported webpage/);
-  assert.match(reader, /sourceProbe\.items\.map/);
-});
-
-test("Feeds normalizes generic html2rss items with stable first-seen dates", () => {
-  const now = Date.parse("October 7, 2026 10:30:00 UTC");
-  const url = "https://example.org/articles/";
-  const payload = {
-    title: "Example &amp; updates",
-    description: "Recent entries",
-    items: [
-      { id: "backend-id", url: "/first#fragment", title: "First <b>entry</b>", summary: "A &amp; B" },
-      { id: "dated", url: "https://example.org/dated", title: "Dated", date_published: "2026-10-06T12:00:00Z" },
-      { id: "unsafe", url: "javascript:alert(1)", title: "Unsafe" },
-    ],
-  };
-  const first = normalizeHtml2rssFeed(payload, url, now);
-  assert.equal(canonicalHtml2rssSourceUrl("https://EXAMPLE.org/articles#x"), null);
-  assert.equal(canonicalHtml2rssSourceUrl("https://EXAMPLE.org/articles"), "https://example.org/articles");
-  assert.deepEqual(first.items.map(({ id, title, published }) => [id, title, published]), [
-    ["https://example.org/first", "First entry", now],
-    ["https://example.org/dated", "Dated", Date.parse("2026-10-06T12:00:00Z")],
-  ]);
-  assert.equal(first.items[0].summary, "A & B");
-  assert.equal(first.items[0].publishedReliable, false);
-  assert.equal(first.items[1].publishedReliable, true);
-  const refreshed = normalizeHtml2rssFeed(payload, url, now + 60_000, first);
-  assert.equal(refreshed.items[0].published, now);
-  assert.equal(refreshed.items[0].publishedReliable, false);
-});
-
-test("Feeds retains generated webpage items for exactly five days and rejects future UTC dates", () => {
-  const now = Date.parse("October 7, 2026 10:30:00 UTC");
-  const item = (id, published) => ({ id, title: id, url: `https://example.com/${id}`, published, summary: "" });
-  const source = { title: "Example", description: "", items: [
-    item("expired", now - 5 * 24 * 60 * 60 * 1000 - 1),
-    item("boundary", now - 5 * 24 * 60 * 60 * 1000),
-    item("today", now),
-    item("tomorrow", Date.parse("October 8, 2026 00:00:00 UTC")),
-  ] };
-  assert.deepEqual(retainRecentWebSourceItems(source, now).items.map(({ id }) => id), ["boundary", "today"]);
-});
-
-test("Feeds keeps html2rss private and behind higher-precision discovery", async () => {
-  const client = await readFile(new URL("../app/lib/news-html2rss.ts", import.meta.url), "utf8");
-  const sources = await readFile(new URL("../app/lib/news-web-sources.ts", import.meta.url), "utf8");
-  assert.match(client, /HTML2RSS_ACCESS_TOKEN/);
-  assert.match(client, /api\.hostname !== "127\.0\.0\.1"/);
-  assert.match(client, /AbortSignal\.timeout\(HTML2RSS_REQUEST_TIMEOUT_MS\)/);
-  assert.match(sources, /adapter: "csis-topic-v1" \| "html2rss-v1"/);
-  assert.ok(sources.indexOf("canonicalCsisTopicUrl(value)") < sources.indexOf("canonicalHtml2rssSourceUrl(value)"));
-  assert.match(sources, /abnormally small batch/);
-});
-
-test("Feeds routes reader operations through a backend boundary", async () => {
-  const boundary = await readFile(new URL("../app/lib/news-reader-backend.ts", import.meta.url), "utf8");
-  const server = await readFile(new URL("../app/lib/news-server.ts", import.meta.url), "utf8");
-  const management = await readFile(new URL("../app/lib/news-management.ts", import.meta.url), "utf8");
-  assert.match(boundary, /interface NewsReaderBackend/);
-  for (const operation of ["categories", "feeds", "articles", "createCategory", "renameCategory", "deleteCategory", "subscribe", "editFeed", "unsubscribe"]) {
-    assert.match(boundary, new RegExp(`${operation}\\(`));
-  }
-  assert.match(server, /newsReaderBackend\(\)\.articles/);
-  assert.match(management, /newsReaderBackend\(\)\.subscribe/);
-  assert.match(boundary, /return minifluxReaderBackend/);
-});
-
-test("Miniflux backend keeps the five-day dashboard contract", async () => {
-  const backend = await readFile(new URL("../app/lib/news-miniflux-backend.ts", import.meta.url), "utf8");
-  assert.match(backend, /api\.hostname !== "127\.0\.0\.1"/);
-  assert.match(backend, /published_after=\$\{cutoff\}/);
-  assert.match(backend, /published_before=\$\{tomorrow\}/);
-  assert.match(backend, /X-Auth-Token/);
-  assert.doesNotMatch(backend, /is_read|starred|notification/);
-  assert.match(backend, /id: `feed\/\$\{feed\.id\}`/);
 });

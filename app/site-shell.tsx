@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Rss, Sun } from "lucide-react";
+import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -21,7 +21,6 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
-  { href: "/feeds", label: "Feeds", icon: Rss },
   { href: "/agent", label: "Agent", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];

@@ -1,6 +1,6 @@
 # Drive sharing — retired
 
-The owner has retired the custom Drive service and requested deletion of its files and share metadata. All former `/drive/file/<UUID>` and `/drive/file/<UUID>/download` links return uncached `410 Gone`. Creation, listing and revocation APIs under `/api/drive/**` are also retired.
+The owner has retired the custom Drive service and requested deletion of its files and share metadata. All former `/drive/file/<UUID>` and `/drive/file/<UUID>/download` links return `404 Not Found`. Creation, listing and revocation APIs under `/api/drive/**` are also retired.
 
 There is no replacement public sharing service. Zotero WebDAV is private and unchanged; it does not become public when Drive is removed. Previously downloaded copies cannot be recalled.
 

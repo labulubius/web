@@ -13,10 +13,11 @@ agent_origin="${AGENT_ORIGIN:-https://agent.labulubius.com}"
 curl --fail --silent --show-error --location --max-redirs 3 --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null "$agent_origin"
 echo "ok $agent_origin"
 
-for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired"; do
+# Retired features are removed, not answered with a tombstone.
+for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired" "$main_origin/feeds" "$main_origin/api/news"; do
   status=$(curl --silent --show-error --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null --write-out '%{http_code}' "$url")
-  if [[ "$status" != "410" ]]; then
-    echo "Expected retired Drive to return 410: $url (received $status)" >&2
+  if [[ "$status" != "404" ]]; then
+    echo "Expected retired path to return 404: $url (received $status)" >&2
     exit 1
   fi
   echo "retired $url"

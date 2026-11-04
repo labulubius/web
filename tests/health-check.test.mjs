@@ -23,7 +23,7 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
   const response = responses[type] ?? { Status: 3 };
   process.stdout.write(typeof response === "string" ? response : JSON.stringify(response));
 } else if (args.includes("--write-out")) {
-  process.stdout.write(process.env.MOCK_DRIVE_HTTP_STATUS || "410");
+  process.stdout.write(process.env.MOCK_RETIRED_HTTP_STATUS || "404");
 } else if (args.some((arg) => arg.endsWith("/api/health"))) {
   process.stdout.write('{"status":"ok"}');
 }
@@ -58,7 +58,11 @@ test("health requires DNS NXDOMAIN for every old-host record type, not an HTTP t
       assert.ok(dns.some((args) => args.includes(`type=${type}`) && args.includes("name=retired.example")));
     }
     assert.ok(requests.every((args) => !args.some((arg) => arg.startsWith("https://retired.example"))));
-    assert.equal(requests.filter((args) => args.includes("--write-out")).length, 3);
+    const probed = requests.filter((args) => args.includes("--write-out")).map((args) => args[args.length - 1]);
+    assert.equal(probed.length, 5);
+    for (const pathname of ["/drive", "/api/drive", "/drive/file/retired", "/feeds", "/api/news"]) {
+      assert.ok(probed.some((url) => url === `https://main.example${pathname}`), pathname);
+    }
   });
 });
 
@@ -86,7 +90,7 @@ test("health fails closed on DNS transport errors and old main-site Drive reviva
   await withMockCurl({ MOCK_DNS_TRANSPORT_FAIL: "1" }, async (execute) => {
     await assert.rejects(execute, { code: 22 });
   });
-  await withMockCurl({ MOCK_DRIVE_HTTP_STATUS: "200" }, async (execute) => {
-    await assert.rejects(execute, /Expected retired Drive to return 410/);
+  await withMockCurl({ MOCK_RETIRED_HTTP_STATUS: "200" }, async (execute) => {
+    await assert.rejects(execute, /Expected retired path to return 404/);
   });
 });

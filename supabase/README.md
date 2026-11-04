@@ -1,6 +1,6 @@
 # Supabase setup
 
-Supabase supplies authentication, the site-wide administrator role, and the navigator database and icon storage. Drive, Share and Feeds persistent server files are **not** stored in Supabase; see the root [README](../README.md) and the feature-specific documents for their deployment and backups.
+Supabase supplies authentication, the site-wide administrator role, and the navigator database and icon storage. Drive and Share persistent server files are **not** stored in Supabase; see the root [README](../README.md) and the feature-specific documents for their deployment and backups.
 
 ## New project
 
@@ -17,4 +17,4 @@ Supabase supplies authentication, the site-wide administrator role, and the navi
 4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the `web` deployment `.env.local`. Use the publishable key, **never** a service-role/secret key in a `NEXT_PUBLIC_` variable. Do not commit `.env.local`.
 5. Sign in as the owner and add navigator categories and websites using `/nav`; `app/nav/sites.ts` contains TypeScript types, not seed data. Confirm that signed-out and non-admin visitors cannot read Navigator entries and administrators can view and edit them.
 
-Supabase Row Level Security governs navigator access. `site_is_admin()` is the site-wide role check also used by server-side Drive, Share and Feeds authorization. Site-admin records are not publicly readable. Store backups of server-side data separately; applying SQL migrations alone does not restore files, Feeds preferences or Miniflux data.
+Supabase Row Level Security governs navigator access. `site_is_admin()` is the site-wide role check also used by server-side task authorization. Site-admin records are not publicly readable. Store backups of server-side data separately; applying SQL migrations alone does not restore those files.

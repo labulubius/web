@@ -4,19 +4,19 @@
 
 `GET /api/health` is an unauthenticated liveness check. It returns only `{"status":"ok"}` with `Cache-Control: no-store`; it intentionally does not disclose dependency, disk, version, path, or credential details.
 
-Run `scripts/health-check.sh` to check the main Next.js service and Agent hostname, require `410 Gone` for retired Drive page/API/share paths on the main origin, and require DNS `NXDOMAIN` for the former Drive hostname (A, AAAA and CNAME via Cloudflare DNS-over-HTTPS). The script requires curl and Python 3. Override `MAIN_ORIGIN`, `RETIRED_DRIVE_HOSTNAME`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor Miniflux and other dependency failures through authenticated application checks and systemd/container logs rather than expanding the public response.
+Run `scripts/health-check.sh` to check the main Next.js service and Agent hostname, require `404 Not Found` for retired Drive and Feeds paths on the main origin, and require DNS `NXDOMAIN` for the former Drive hostname (A, AAAA and CNAME via Cloudflare DNS-over-HTTPS). The script requires curl and Python 3. Override `MAIN_ORIGIN`, `RETIRED_DRIVE_HOSTNAME`, `AGENT_ORIGIN`, or `HEALTH_TIMEOUT` for staging. Monitor dependency failures through authenticated application checks and systemd logs rather than expanding the public response.
 
 ## Production host routing
 
-Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `www.labulubius.com` to Next.js on `127.0.0.1:3000` and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The workspace reader is at `https://labulubius.com/feeds`; Miniflux remains private on `127.0.0.1:8083`. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted. Drive must no longer resolve; an HTTP 410-only hostname is not full retirement. Do not recreate the Drive DNS record or ingress. Its application-level 410 guard remains only as defense for stale/direct-origin traffic. The Drive DNS/configuration audit snapshots are root-only on VM100 under `/var/backups/labulubius/drive-dns-retirement-20261015T060051Z`. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
+Cloudflare Tunnel is the only public web entry point. It sends `labulubius.com` and `www.labulubius.com` to Next.js on `127.0.0.1:3000` and `agent.labulubius.com` to Agent. These services and WebDAV remain bound to loopback; do not add a public port forward. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted. Drive must no longer resolve. Do not recreate the Drive DNS record or ingress. The Drive DNS/configuration audit snapshots are root-only on VM100 under `/var/backups/labulubius/drive-dns-retirement-20261015T060051Z`. Keep the Tunnel's final `http_status:404` fallback so an unconfigured hostname cannot reach another origin.
 
 The ImmortalWrt gateway's Nikki configuration routes only Cloudflare Tunnel destination port `7844` through Hong Kong `Node-1`; the active Tunnel should register at an HKG edge. This rule must not capture VM100's other outbound traffic or other LAN clients. The route improves the origin-to-Cloudflare leg but cannot control the Anycast edge selected for visitors, so clients in China may still enter Cloudflare through LAX. The 2026-10-06 comparison measured median total times of 2.783 seconds through Hong Kong, 5.219 seconds by direct domestic egress, and 6.899 seconds through the former RackNerd route. Gateway and VM100 rollback material is under `/root/backups/nikki-route-cutover-20261006T132639Z` on the gateway and `/var/backups/labulubius/network-route-cutover-20261006T132639Z` on VM100.
 
 ## Cloudflare performance and cache boundaries
 
-The active Cloudflare Cache Rule edge-caches ordinary HTML document requests for the exact paths `/`, `/about`, `/nav`, and `/feeds` for one hour. The HTML rule requires `GET` or `HEAD`, an empty query string, an `Accept` header containing `text/html`, no `Authorization` header, and no React Server Component header. These responses are static document shells; private workspace data is loaded only after browser-side administrator verification. News API responses are private and must not be edge-cached.
+The active Cloudflare Cache Rule edge-caches ordinary HTML document requests for the exact paths `/`, `/about`, and `/nav` for one hour. The HTML rule requires `GET` or `HEAD`, an empty query string, an `Accept` header containing `text/html`, no `Authorization` header, and no React Server Component header. These responses are static document shells; private workspace data is loaded only after browser-side administrator verification.
 
-Never broaden these rules to `/api/**`, `/drive/file/**`, authenticated requests, Agent responses, WebDAV, errors, mutations, or capability URLs. Invalid cursors, authorization failures, health checks and private APIs must remain `DYNAMIC` or `BYPASS` with `private, no-store` or `no-store`. After every deployment, purge the four cached HTML URLs so clients cannot receive an old Next.js asset manifest, then verify a cold request (`MISS` or `EXPIRED`) followed by `HIT`. Also repeat the exclusion checks before considering the deployment complete.
+Never broaden these rules to `/api/**`, authenticated requests, Agent responses, WebDAV, errors, mutations, or capability URLs. Authorization failures, health checks and private APIs must remain `DYNAMIC` or `BYPASS` with `private, no-store` or `no-store`. After every deployment, purge the three cached HTML URLs so clients cannot receive an old Next.js asset manifest, then verify a cold request (`MISS` or `EXPIRED`) followed by `HIT`. Also repeat the exclusion checks before considering the deployment complete.
 
 HTTP/3, TLS 1.3 with 0-RTT, Brotli/Zstandard compression, Early Hints and Smart Tiered Cache are enabled. Always Online remains disabled because the workspace includes owner-only and time-sensitive surfaces. A same-path seven-request sample on 2026-10-06 measured a 1.002-second median TTFB for cached HTML versus 2.255 seconds for an uncached health request; this is an operational comparison, not a guarantee for every visitor.
 
@@ -33,7 +33,7 @@ npm test
 npm run build
 ```
 
-Commit and push the verified revision to GitHub, restart `labulubius-web.service`, purge the cached HTML URLs `/`, `/about`, `/nav` and `/feeds` through the Cloudflare API, then run `scripts/health-check.sh`. Confirm the new GitHub Actions run succeeds and validate `MISS → HIT` for the document shells. Recheck that RSC requests, `/api/health`, all News views, authorization failures, invalid cursors and `/drive/file/**` are not cached. GitHub is the source history and CI remote; it is not a deployment target. Never use `git clean` or a destructive reset on the production checkout without separately checking ignored environment files and the persistent data directories. Roll back by checking out or reverting to a known-good Git revision, rebuilding, restarting the service, purging the affected cache entries and repeating the health and cache-boundary checks.
+Commit and push the verified revision to GitHub, restart `labulubius-web.service`, purge the cached HTML URLs `/`, `/about` and `/nav` through the Cloudflare API, then run `scripts/health-check.sh`. Confirm the new GitHub Actions run succeeds and validate `MISS → HIT` for the document shells. Recheck that RSC requests, `/api/health`, authorization failures and `/feeds` are not cached. GitHub is the source history and CI remote; it is not a deployment target. Never use `git clean` or a destructive reset on the production checkout without separately checking ignored environment files and the persistent data directories. Roll back by checking out or reverting to a known-good Git revision, rebuilding, restarting the service, purging the affected cache entries and repeating the health and cache-boundary checks.
 
 ## WebDAV file storage
 
@@ -54,18 +54,15 @@ Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and pro
 Back up these independent data sets together at a documented point in time:
 
 - `${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}`, including `tasks.json` when tasks have been created;
-- `${NEWS_DATA_DIR}` preferences and Watchboards;
-- a consistent Miniflux PostgreSQL backup;
 - Supabase data using the provider's supported export/backup mechanism.
 
-Generate and retain checksums with the backup. Drive has been retired and its live data deleted by owner request; do not restore `DRIVE_DATA_DIR` as an active service. Its empty directory remains solely for the independent PDF-to-EPUB cleanup sandbox; do not remove that directory without reviewing the dependent unit. Article-bearing Miniflux backups must follow the same five-day retention policy as the live Miniflux database.
+Generate and retain checksums with the backup. Drive has been retired and its live data deleted by owner request; do not restore `DRIVE_DATA_DIR` as an active service. Its empty directory remains solely for the independent PDF-to-EPUB cleanup sandbox; do not remove that directory without reviewing the dependent unit.
 
 Perform periodic restores into isolated directories, never over live data. Before starting an isolated service, run:
 
 ```bash
 node scripts/verify-backup.mjs \
-  --tasks /restore/tasks \
-  --news /restore/news
+  --tasks /restore/tasks
 ```
 
-The verifier is read-only. It rejects symlinks and malformed task or News JSON. Optional `--drive LEGACY_DIR` verifies an independently retained historical Drive backup, if one exists; it is not required for current backups. Restore and validate the Miniflux database separately with PostgreSQL tooling. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.
+The verifier is read-only. It rejects symlinks and malformed task JSON. Optional `--drive LEGACY_DIR` verifies an independently retained historical Drive backup, if one exists; it is not required for current backups. Passing structural checks is not a substitute for opening files and exercising an isolated restored application.

@@ -79,3 +79,12 @@ The owner clarified that retirement requires removal from Cloudflare, not a live
 Cloudflare and Google public DNS-over-HTTPS both returned `NXDOMAIN` with no answers for A, AAAA and CNAME. Main-site health and Agent remained available; Zotero DAV kept its unauthenticated 401 boundary. `/drive/**` and `/api/drive/**` on the main hostname retain their defensive 410 responses. No UI, authentication, CSP, persistent data or other DNS records changed in this correction.
 
 The health script now checks DNS NXDOMAIN rather than making HTTP requests to the retired hostname. Audit snapshots of DNS before/after and the pre-change Tunnel configuration are root-only under `/var/backups/labulubius/drive-dns-retirement-20261015T060051Z` on VM100; they contain configuration, not deleted Drive files. Recreating Drive DNS or ingress requires a new explicit owner decision.
+
+
+## Superseded — 2026-11-04
+
+The owner removed the application-level retirement guard. `/drive`, `/api/drive`, `/api/drive/**` and the former
+`/drive/file/**` links now return the framework's plain `404 Not Found`; `app/lib/retired-drive.ts`, the `proxy.ts`
+host/path matchers and the `410` health assertions were deleted. The DNS and Tunnel retirement described above is
+unchanged, and `scripts/health-check.sh` now asserts `404` for retired Drive and Feeds paths. The `410` descriptions
+earlier in this historical report describe the state at the time of the original acceptance run.
