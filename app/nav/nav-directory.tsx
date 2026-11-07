@@ -196,7 +196,7 @@ export function NavDirectory() {
 
     const error = categoryResult.error ?? siteResult.error;
     if (error) {
-      setMessage(error.message.includes("navigator_") ? "Navigator database has not been initialized yet." : error.message);
+      setMessage(error.message.includes("navigator_") ? "Nav database has not been initialized yet." : error.message);
     } else {
       const availableCategories = (categoryResult.data ?? []) as Category[];
       setCategories(availableCategories);
@@ -437,9 +437,9 @@ export function NavDirectory() {
     setDialog("site");
   }
 
-  if (authLoading) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Checking your account…" />;
-  if (authError) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Navigator is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
-  if (!isAdmin) return <OwnerAccess icon={<Compass size={32} />} title="Navigator" description="Sign in to continue." />;
+  if (authLoading) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Checking your account…" />;
+  if (authError) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Nav is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
+  if (!isAdmin) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Sign in to continue." />;
 
   return (
     <div className="directory-view">

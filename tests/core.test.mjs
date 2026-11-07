@@ -228,7 +228,7 @@ test("Navigator is owner-only and has no obsolete guest visibility controls", as
   const cleanupMigration = await readFile(new URL("../supabase/migrations/202610300001_remove_navigator_visibility.sql", import.meta.url), "utf8");
 
   assert.match(directory, /if \(authLoading \|\| !isAdmin\) return;/);
-  assert.match(directory, /<OwnerAccess icon=\{<Compass size=\{32\} \/>\} title="Navigator"/);
+  assert.match(directory, /<OwnerAccess icon=\{<Compass size=\{32\} \/>\} title="Nav"/);
   assert.doesNotMatch(directory, /Visible to guests|supportsCategoryVisibility|is_published/);
   assert.doesNotMatch(types, /is_published/);
   assert.match(layout, /robots: \{ index: false, follow: false \}/);

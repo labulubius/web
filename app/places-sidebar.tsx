@@ -12,7 +12,7 @@ export function PlacesSidebar({ active }: { active: string }) {
           <Home size={16} /> Home
         </Link>
         <Link className={active === "/nav" ? "selected" : ""} href="/nav">
-          <Compass size={16} /> Navigator
+          <Compass size={16} /> Nav
         </Link>
         <Link href="/pi"><Bot size={16} /> Pi</Link>
         <Link className={active === "/about" ? "selected" : ""} href="/about">
