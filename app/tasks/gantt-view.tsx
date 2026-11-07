@@ -16,10 +16,11 @@ function DayCell({ rowId, date, today, onCreate }: { rowId: string; date: string
   return <button ref={setNodeRef} type="button" className={`gantt-day-cell${date === today ? " is-today" : ""}${weekend ? " is-weekend" : ""}${monthStart ? " is-month-start" : ""}${isOver ? " is-over" : ""}`} aria-label={`Create task on ${longDate(date)}`} onClick={onCreate} />;
 }
 
-function GanttBar({ task, dates, projects, onComplete, onResize }: {
+function GanttBar({ task, dates, projects, disabled, onComplete, onResize }: {
   task: PersonalTask;
   dates: string[];
   projects: TaskProject[];
+  disabled: boolean;
   onComplete: () => void;
   onResize: (startDate: string, endDate: string) => void;
 }) {
@@ -64,16 +65,17 @@ function GanttBar({ task, dates, projects, onComplete, onResize }: {
   return <div ref={setNodeRef} className={`gantt-bar${isDragging ? " is-dragging" : ""}`} style={{ gridColumn: `${startIndex + 2} / span ${span}`, transform: CSS.Translate.toString(transform) }}>
     {range.startDate >= dates[0] && <button className="gantt-resize gantt-resize-start" type="button" aria-label={`Change start date for ${task.title}`} title="Drag to change start date" onPointerDown={(event) => resizeStart(event, "start")} />}
     <button ref={setActivatorNodeRef} className="gantt-bar-main" type="button" title={`${task.title}, ${shortDate(range.startDate)} to ${shortDate(range.endDate)}`} {...listeners} {...attributes}><GripVertical size={12} aria-hidden="true" /><span>{task.title}{project ? <small>{project}</small> : null}</span></button>
-    <button className="task-card-complete" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" onClick={(event) => { event.stopPropagation(); onComplete(); }}><Check size={12} /></button>
+    <button className="task-card-complete" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" disabled={disabled} onClick={(event) => { event.stopPropagation(); onComplete(); }}><Check size={12} /></button>
     {range.endDate <= dates.at(-1)! && <button className="gantt-resize gantt-resize-end" type="button" aria-label={`Change end date for ${task.title}`} title="Drag to change end date" onPointerDown={(event) => resizeStart(event, "end")} />}
   </div>;
 }
 
-export function GanttView({ timelineStart, timelineEnd, tasks, projects, onOpen, onComplete, onResize }: {
+export function GanttView({ timelineStart, timelineEnd, tasks, projects, disabled, onOpen, onComplete, onResize }: {
   timelineStart: string;
   timelineEnd: string;
   tasks: PersonalTask[];
   projects: TaskProject[];
+  disabled: boolean;
   onOpen: (value: TaskDialogValue) => void;
   onComplete: (task: PersonalTask) => void;
   onResize: (task: PersonalTask, startDate: string, endDate: string) => void;
@@ -101,7 +103,7 @@ export function GanttView({ timelineStart, timelineEnd, tasks, projects, onOpen,
         {scheduled.map((task) => <div className="gantt-row" key={task.id}>
           <div className="gantt-task-label"><strong title={task.title}>{task.title}</strong><span>{shortDate(task.startDate!)} – {shortDate(task.endDate!)}</span><button className="gantt-task-edit" type="button" onClick={() => onOpen({ task })} aria-label={`Edit ${task.title}`} title="Edit task"><Pencil size={14} /></button></div>
           {dates.map((date) => <DayCell key={date} rowId={task.id} date={date} today={today} onCreate={() => createOn(date)} />)}
-          <GanttBar task={task} dates={dates} projects={projects} onComplete={() => onComplete(task)} onResize={(startDate, endDate) => onResize(task, startDate, endDate)} />
+          <GanttBar task={task} dates={dates} projects={projects} disabled={disabled} onComplete={() => onComplete(task)} onResize={(startDate, endDate) => onResize(task, startDate, endDate)} />
         </div>)}
       </div>
     </div>

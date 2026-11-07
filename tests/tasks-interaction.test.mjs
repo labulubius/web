@@ -71,6 +71,9 @@ test("task body is inert and edit, delete, complete stay separate", () => {
   assert.deepEqual(calls, [["delete", task], ["edit", { task }], ["complete", task], ["important", task]]);
   const actionLabels = all.filter((n) => n.props.className?.includes?.("task-important") || ["Edit task", "Delete task"].includes(n.props.title)).map((n) => n.props.title);
   assert.deepEqual(actionLabels, ["Add to Important", "Edit task", "Delete task"]);
+  assert.equal(all.find((n) => n.props.className === "task-check").props.disabled, false, "complete stays clickable while idle");
+  const busy = nodes(renderRow({ task, projectName: "Uncategorized", disabled: true, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {} }));
+  assert.equal(busy.find((n) => n.props.className === "task-check").props.disabled, true, "complete is locked while a save is in flight");
   const renderList = new Function("h", "CheckCircle2", `${compile(list)}; return TaskList;`)(h, "check");
   assert.ok(nodes(renderList({ tasks: [], projects: [], empty: "Empty" })).some((n) => n.props.className === "task-empty"));
 });
@@ -82,6 +85,8 @@ test("Gantt title and draggable bar do not activate editing", () => {
   assert.match(gantt, /className="gantt-task-edit"[^\n]*onClick=\{\(\) => onOpen\(\{ task \}\)\}/);
   assert.match(gantt, /ref=\{setActivatorNodeRef\}/);
   assert.match(gantt, /\{\.\.\.listeners\} \{\.\.\.attributes\}/);
+  assert.match(gantt, /className="task-card-complete"[^\n]*disabled=\{disabled\}/, "gantt complete is locked while a save is in flight");
+  assert.match(gantt, /projects=\{projects\} disabled=\{disabled\}/, "gantt rows inherit the save state");
 });
 
 const dialogSource = readFileSync("app/tasks/task-dialogs.tsx", "utf8");
