@@ -16,7 +16,7 @@ function readMetadata(path) {
 const pages = [
   ["app/page.tsx", "Home"],
   ["app/nav/layout.tsx", "Navigator"],
-  ["app/agent/page.tsx", "Pi Agent"],
+  ["app/pi/page.tsx", "Pi Agent"],
   ["app/about/page.tsx", "About"],
 ];
 

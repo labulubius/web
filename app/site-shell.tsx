@@ -21,7 +21,7 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Navigator", icon: Compass },
-  { href: "/agent", label: "Agent", icon: Bot },
+  { href: "/pi", label: "Pi", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];
 

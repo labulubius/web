@@ -23,7 +23,7 @@ test("Drive UI, storage handlers and public download implementations are removed
   for (const name of ["app/site-shell.tsx", "app/places-sidebar.tsx"]) {
     const source = await readFile(new URL(`../${name}`, import.meta.url), "utf8");
     assert.doesNotMatch(source, /["'\x27]\/drive[\x27"]|HardDrive/);
-    assert.match(source, /\/agent/);
+    assert.match(source, /\/pi/);
   }
 });
 

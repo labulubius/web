@@ -36,7 +36,7 @@ test("toolbar shell icons share an 18px size without changing navigation", () =>
   const sizes = [...shell.matchAll(/size=\{(\d+)\}/g)].map((match) => Number(match[1]));
   assert.equal(sizes.length, 4);
   assert.ok(sizes.every((size) => size === 18));
-  for (const route of ["/", "/nav", "/agent", "/about"]) assert.ok(shell.includes(`href: "${route}"`));
+  for (const route of ["/", "/nav", "/pi", "/about"]) assert.ok(shell.includes(`href: "${route}"`));
   assert.match(shell, /aria-current=\{active === href \? "page" : undefined\}/);
 });
 

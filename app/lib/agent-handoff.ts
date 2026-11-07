@@ -14,5 +14,5 @@ export function pdfToEpubHandoff(
 }
 
 export function agentHandoffPath(prompt: string): string {
-  return `/agent?handoff=${encodeURIComponent(prompt)}`;
+  return `/pi?handoff=${encodeURIComponent(prompt)}`;
 }

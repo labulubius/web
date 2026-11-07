@@ -2,11 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { AgentFrame } from "./agent/agent-frame";
+import { AgentFrame } from "./pi/agent-frame";
 
 export function PersistentAgent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isAgentRoute = pathname === "/agent";
+  const isAgentRoute = pathname === "/pi";
   const [agentMounted, setAgentMounted] = useState(isAgentRoute);
   const shouldMountAgent = agentMounted || isAgentRoute;
 

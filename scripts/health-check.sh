@@ -9,7 +9,7 @@ if [[ "$body" != '{"status":"ok"}' ]]; then
 fi
 echo "ok $main_origin"
 
-agent_origin="${AGENT_ORIGIN:-https://agent.labulubius.com}"
+agent_origin="${AGENT_ORIGIN:-https://pi.labulubius.com}"
 curl --fail --silent --show-error --location --max-redirs 3 --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null "$agent_origin"
 echo "ok $agent_origin"
 

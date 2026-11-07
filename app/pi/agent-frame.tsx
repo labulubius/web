@@ -5,7 +5,7 @@ import { SiteShell } from "../site-shell";
 import { useSiteAuth } from "../site-auth";
 import "./agent.css";
 
-const AGENT_ORIGIN = "https://agent.labulubius.com";
+const AGENT_ORIGIN = "https://pi.labulubius.com";
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 const AGENT_SESSION_HINT_KEY = "pi-agent-session-established";
 
@@ -137,7 +137,7 @@ export function AgentFrame() {
 
   if (connection !== "ready") {
     const message = connection === "connecting" ? "Connecting securely to the Mac mini…" : error || "Agent connection is unavailable.";
-    return <SiteShell active="/agent" title="Pi Agent"><main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p role={connection === "error" ? "alert" : "status"}>{message}</p>{connection === "error" && <button type="button" onClick={() => void connect()}>Retry connection</button>}</div></main></SiteShell>;
+    return <SiteShell active="/pi" title="Pi Agent"><main className="agent-gate"><div className="agent-gate-card"><h1>Pi Agent</h1><p role={connection === "error" ? "alert" : "status"}>{message}</p>{connection === "error" && <button type="button" onClick={() => void connect()}>Retry connection</button>}</div></main></SiteShell>;
   }
 
   return null;
