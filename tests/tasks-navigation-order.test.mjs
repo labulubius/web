@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -79,14 +79,21 @@ test("malformed, oversized, permissive, and symlinked preference files fail safe
   await assert.rejects(api.saveNavigationOrder(userA, defaults), /Invalid task navigation preference file/);
 });
 
-test("serialized writes leave one complete atomic preference", async (t) => {
+test("concurrent writes leave one complete atomic preference", async (t) => {
   const api = await fixture(t);
   const first = ["gantt", "all", "important"];
   const second = ["important", "all", "gantt"];
-  await Promise.all([api.saveNavigationOrder(userA, first), api.saveNavigationOrder(userA, second)]);
-  assert.deepEqual(await api.loadNavigationOrder(userA), second);
-  const entries = await import("node:fs/promises").then(({ readdir }) => readdir(path.join(api.root, "preferences")));
-  assert.deepEqual(entries, [`${userA}.navigation.json`]);
+  // Both writes start before either finishes, so lock acquisition order is not
+  // guaranteed. The store promises mutual exclusion and a whole-file rename,
+  // not that the last request wins: whichever order lands last must be complete.
+  const written = await Promise.all([api.saveNavigationOrder(userA, first), api.saveNavigationOrder(userA, second)]);
+  assert.deepEqual(written, [first, second], "each write reports the order it committed");
+  const stored = await api.loadNavigationOrder(userA);
+  assert.ok([first, second].some((order) => JSON.stringify(order) === JSON.stringify(stored)),
+    `stored order must be one complete write, received ${JSON.stringify(stored)}`);
+  const preferences = path.join(api.root, "preferences");
+  assert.deepEqual(JSON.parse(await readFile(path.join(preferences, `${userA}.navigation.json`), "utf8")), { version: 1, order: stored });
+  assert.deepEqual(await readdir(preferences), [`${userA}.navigation.json`], "no temporary file survives the race");
 });
 
 test("task preference storage rejects a symlink directory", async (t) => {
