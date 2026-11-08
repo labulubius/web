@@ -9,12 +9,12 @@ if [[ "$body" != '{"status":"ok"}' ]]; then
 fi
 echo "ok $main_origin"
 
-agent_origin="${AGENT_ORIGIN:-https://pi.labulubius.com}"
+agent_origin="${AGENT_ORIGIN:-https://pi-web.labulubius.com}"
 curl --fail --silent --show-error --location --max-redirs 3 --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null "$agent_origin"
 echo "ok $agent_origin"
 
 # Retired features are removed, not answered with a tombstone.
-for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired" "$main_origin/feeds" "$main_origin/api/news"; do
+for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired" "$main_origin/feeds" "$main_origin/api/news" "$main_origin/pi" "$main_origin/pi/session" "$main_origin/pi-web"; do
   status=$(curl --silent --show-error --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null --write-out '%{http_code}' "$url")
   if [[ "$status" != "404" ]]; then
     echo "Expected retired path to return 404: $url (received $status)" >&2
@@ -24,7 +24,7 @@ for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/fil
 done
 
 # The old hostname is removed, not kept online to serve an HTTP tombstone.
-retired_hostname="${RETIRED_DRIVE_HOSTNAME:-drive.labulubius.com}"
+for retired_hostname in "${RETIRED_DRIVE_HOSTNAME:-drive.labulubius.com}" "${RETIRED_AGENT_HOSTNAME:-pi.labulubius.com}"; do
 for dns_type in A AAAA CNAME; do
   dns_body=$(curl --fail --silent --show-error --max-time "${HEALTH_TIMEOUT:-15}" \
     --header 'Accept: application/dns-json' --get \
@@ -35,8 +35,9 @@ import json, sys
 response = json.load(sys.stdin)
 sys.exit(0 if response.get("Status") == 3 and not response.get("Answer") else 1)
 '; then
-    echo "Expected retired Drive DNS NXDOMAIN: $retired_hostname ($dns_type)" >&2
+    echo "Expected retired DNS NXDOMAIN: $retired_hostname ($dns_type)" >&2
     exit 1
   fi
 done
 echo "retired DNS $retired_hostname (NXDOMAIN)"
+done

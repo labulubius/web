@@ -20,8 +20,11 @@ test("PDF handoff carries a private structured reference into Agent", () => {
   assert.match(prompt, /"source":"drive"/);
   assert.match(prompt, /"remote":"Books\/中文扫描.pdf"/);
   const path = agentHandoffPath(prompt);
-  assert.ok(path.startsWith("/pi?handoff="));
-  assert.equal(decodeURIComponent(path.split("=", 2)[1]), prompt);
+  const destination = new URL(path);
+  assert.equal(destination.origin, "https://pi-web.labulubius.com");
+  assert.equal(destination.pathname, "/");
+  assert.equal(destination.searchParams.get("prompt"), prompt);
+  assert.equal(destination.searchParams.get("cwd"), "/Users/labulubius/Pi/workspace");
   assert.throws(() => pdfToEpubHandoff("drive", "", "book.pdf", 1), /Invalid/);
 });
 
@@ -113,7 +116,9 @@ test("production health checks distinguish retired Drive from live services", as
   assert.doesNotMatch(script, /RETIRED_DRIVE_ORIGIN/);
   assert.match(script, /NXDOMAIN/);
   assert.match(script, /status.*404/);
-  assert.match(script, /AGENT_ORIGIN:-https:\/\/pi\.labulubius\.com/);
+  assert.match(script, /AGENT_ORIGIN:-https:\/\/pi-web\.labulubius\.com/);
+  assert.match(script, /\$main_origin\/pi/);
+  assert.match(script, /RETIRED_AGENT_HOSTNAME:-pi\.labulubius\.com/);
   assert.match(script, /\$main_origin\/feeds/);
   assert.match(script, /\$main_origin\/api\/news/);
   assert.doesNotMatch(script, /FEEDS_ORIGIN/);
@@ -123,8 +128,8 @@ test("global headers include baseline browser protections", async () => {
   const rules = await nextConfig.headers();
   const headers = new Map(rules[0].headers.map(({ key, value }) => [key.toLowerCase(), value]));
   assert.match(headers.get("content-security-policy"), /frame-ancestors 'none'/);
-  assert.match(headers.get("content-security-policy"), /frame-src https:\/\/pi\.labulubius\.com/);
-  assert.match(headers.get("content-security-policy"), /connect-src[^;]*https:\/\/pi\.labulubius\.com/);
+  assert.match(headers.get("content-security-policy"), /frame-src 'none'/);
+  assert.doesNotMatch(headers.get("content-security-policy"), /pi\.labulubius\.com/);
   assert.doesNotMatch(headers.get("content-security-policy"), /share\.labulubius\.com/);
   assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.equal(headers.get("x-frame-options"), "DENY");
@@ -135,68 +140,26 @@ test("global headers include baseline browser protections", async () => {
   assert.equal(homeHeaders.get("clear-site-data"), '"cache"');
 });
 
-test("agent page exchanges the Supabase bearer token without putting it in the iframe URL", async () => {
-  const source = await readFile(new URL("../app/pi/agent-frame.tsx", import.meta.url), "utf8");
-  assert.match(source, /\/api\/owner-auth/);
-  assert.match(source, /Authorization: `Bearer \$\{token\}`/);
-  assert.match(source, /credentials: "include"/);
-  assert.match(source, /function PiWebFrame/);
-  assert.match(source, /src=\{src\}/);
-  assert.match(source, /src=\{frameUrl\}/);
-  assert.doesNotMatch(source, /src=.*access_token/);
-  assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
-});
-
-test("agent session restore and refresh keep the live iframe mounted", async () => {
-  const source = await readFile(new URL("../app/pi/agent-frame.tsx", import.meta.url), "utf8");
-  const readyGate = source.indexOf('if (connection === "ready" && user && isAdmin)');
-  const loadingGate = source.indexOf("if (loading || authError || !user || !isAdmin)");
-
-  assert.notEqual(readyGate, -1);
-  assert.ok(readyGate < loadingGate, "the ready iframe must survive background auth loading");
-  assert.match(source, /hasAgentSessionHint\(\) \? "ready" : "idle"/);
-  assert.match(source, /cache: "no-store"/);
-  assert.match(source, /if \(loading \|\| !user \|\| !isAdmin\) return;/);
-  assert.match(source, /rememberAgentSession\(true\)/);
-  assert.match(source, /<PiWebFrame generation=\{frameGeneration\} src=\{frameUrl\} \/>/);
-  assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "connecting"\)/);
-  assert.match(source, /setConnection\(\(current\) => current === "ready" \? current : "error"\)/);
-});
-
-test("agent sign-out clears both the hint and remote owner session", async () => {
-  const source = await readFile(new URL("../app/pi/agent-frame.tsx", import.meta.url), "utf8");
-  assert.match(source, /if \(loading \|\| user \|\| authError \|\| !hasAgentSessionHint\(\)\) return;/);
-  assert.match(source, /rememberAgentSession\(false\)/);
-  assert.match(source, /method: "DELETE"/);
-});
-
-test("agent iframe stays mounted across workspace route changes", async () => {
+test("retired embedded Agent route is removed without a redirect or background iframe", async () => {
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-  const keeper = await readFile(new URL("../app/persistent-agent.tsx", import.meta.url), "utf8");
-  const page = await readFile(new URL("../app/pi/page.tsx", import.meta.url), "utf8");
-
-  assert.match(layout, /<PersistentAgent>\{children\}<\/PersistentAgent>/);
-  assert.match(keeper, /const shouldMountAgent = agentMounted \|\| isAgentRoute/);
-  assert.match(keeper, /hidden=\{!isAgentRoute\}/);
-  assert.match(keeper, /<AgentFrame \/>/);
-  assert.doesNotMatch(page, /<AgentFrame \/>/);
+  for (const path of ["../app/pi", "../app/persistent-agent.tsx"]) {
+    await assert.rejects(access(new URL(path, import.meta.url)), { code: "ENOENT" });
+  }
+  assert.doesNotMatch(layout, /PersistentAgent|AgentFrame/);
+  const redirects = await nextConfig.redirects();
+  assert.ok(redirects.every(({ source }) => source !== "/pi" && !source.startsWith("/pi/")));
 });
 
-test("owner-only destinations remain visible and show access guidance", async () => {
+test("Pi Web navigation uses the independent hostname and preserves site account controls", async () => {
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
-  const agent = await readFile(new URL("../app/pi/agent-frame.tsx", import.meta.url), "utf8");
   const access = await readFile(new URL("../app/owner-access.tsx", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
 
-  assert.doesNotMatch(sidebar, /href="\/drive"/);
-  assert.doesNotMatch(sidebar, /href="\/share"/);
-  assert.match(sidebar, /href="\/pi"/);
-  assert.doesNotMatch(sidebar, /href="\/note"/);
-  assert.doesNotMatch(sidebar, /isAdmin && <Link href="\/(?:drive|share|agent)"/);
-  assert.match(agent, /if \(loading \|\| authError \|\| !user \|\| !isAdmin\)/);
-  assert.match(agent, /return <PiWebFrame \/>/);
-  assert.doesNotMatch(agent, /Use Sign in in the top toolbar/);
-  assert.match(agent, /<SiteShell active="\/pi"/);
+  for (const source of [sidebar, shell]) {
+    assert.match(source, /https:\/\/pi-web\.labulubius\.com/);
+    assert.doesNotMatch(source, /["']\/pi["']|pi\.labulubius\.com/);
+  }
+  assert.doesNotMatch(sidebar, /href="\/(?:drive|share|note)"/);
   assert.doesNotMatch(access, /AccountControl/);
   assert.match(shell, /<AccountControl \/>/);
   assert.doesNotMatch(shell, /href: "\/(?:share|note)"/);

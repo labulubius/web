@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Sans_Mono } from "next/font/google";
 import "./globals.css";
-import { PersistentAgent } from "./persistent-agent";
 import { SiteAuthProvider } from "./site-auth";
 
 const notoSans = Noto_Sans({
@@ -41,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head>
-      <body><SiteAuthProvider><PersistentAgent>{children}</PersistentAgent></SiteAuthProvider></body>
+      <body><SiteAuthProvider>{children}</SiteAuthProvider></body>
     </html>
   );
 }

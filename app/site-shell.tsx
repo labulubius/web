@@ -21,7 +21,7 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Nav", icon: Compass },
-  { href: "/pi", label: "Pi", icon: Bot },
+  { href: "https://pi-web.labulubius.com", label: "Pi Web", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];
 

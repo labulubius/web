@@ -20,7 +20,9 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
   if (process.env.MOCK_DNS_TRANSPORT_FAIL === "1") process.exit(22);
   const type = args.find((arg) => arg.startsWith("type="))?.slice(5);
   const responses = JSON.parse(process.env.MOCK_DNS_RESPONSES || "{}");
-  const response = responses[type] ?? { Status: 3 };
+  const hostname = args.find((arg) => arg.startsWith("name="))?.slice(5);
+  const hostResponses = JSON.parse(process.env.MOCK_DNS_HOST_RESPONSES || "{}");
+  const response = hostResponses[hostname]?.[type] ?? responses[type] ?? { Status: 3 };
   process.stdout.write(typeof response === "string" ? response : JSON.stringify(response));
 } else if (args.includes("--write-out")) {
   process.stdout.write(process.env.MOCK_RETIRED_HTTP_STATUS || "404");
@@ -37,6 +39,7 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
         MAIN_ORIGIN: "https://main.example",
         AGENT_ORIGIN: "https://agent.example",
         RETIRED_DRIVE_HOSTNAME: "retired.example",
+        RETIRED_AGENT_HOSTNAME: "retired-agent.example",
         MOCK_CURL_LOG: log,
         ...overrides,
       },
@@ -53,14 +56,17 @@ test("health requires DNS NXDOMAIN for every old-host record type, not an HTTP t
     assert.match(stdout, /retired DNS retired\.example \(NXDOMAIN\)/);
     const requests = await calls();
     const dns = requests.filter((args) => args.includes("https://cloudflare-dns.com/dns-query"));
-    assert.equal(dns.length, 3);
-    for (const type of ["A", "AAAA", "CNAME"]) {
-      assert.ok(dns.some((args) => args.includes(`type=${type}`) && args.includes("name=retired.example")));
+    assert.equal(dns.length, 6);
+    for (const hostname of ["retired.example", "retired-agent.example"]) {
+      assert.match(stdout, new RegExp(`retired DNS ${hostname.replaceAll(".", "\\.")} \\(NXDOMAIN\\)`));
+      for (const type of ["A", "AAAA", "CNAME"]) {
+        assert.ok(dns.some((args) => args.includes(`type=${type}`) && args.includes(`name=${hostname}`)));
+      }
     }
     assert.ok(requests.every((args) => !args.some((arg) => arg.startsWith("https://retired.example"))));
     const probed = requests.filter((args) => args.includes("--write-out")).map((args) => args[args.length - 1]);
-    assert.equal(probed.length, 5);
-    for (const pathname of ["/drive", "/api/drive", "/drive/file/retired", "/feeds", "/api/news"]) {
+    assert.equal(probed.length, 8);
+    for (const pathname of ["/drive", "/api/drive", "/drive/file/retired", "/feeds", "/api/news", "/pi", "/pi/session", "/pi-web"]) {
       assert.ok(probed.some((url) => url === `https://main.example${pathname}`), pathname);
     }
   });
@@ -80,10 +86,16 @@ test("health rejects resolvable, empty-success, failing or malformed DNS replies
   for (const [name, type, response] of cases) {
     await t.test(name, async () => {
       await withMockCurl({ MOCK_DNS_RESPONSES: JSON.stringify({ [type]: response }) }, async (execute) => {
-        await assert.rejects(execute, /Expected retired Drive DNS NXDOMAIN/);
+        await assert.rejects(execute, /Expected retired DNS NXDOMAIN/);
       });
     });
   }
+});
+
+test("health also rejects an old Agent hostname that still resolves", async () => {
+  await withMockCurl({ MOCK_DNS_HOST_RESPONSES: JSON.stringify({ "retired-agent.example": { A: { Status: 0, Answer: [{ type: 1, data: "192.0.2.1" }] } } }) }, async (execute) => {
+    await assert.rejects(execute, /Expected retired DNS NXDOMAIN: retired-agent\.example/);
+  });
 });
 
 test("health fails closed on DNS transport errors and old main-site Drive revival", async () => {
