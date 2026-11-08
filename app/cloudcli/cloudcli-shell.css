@@ -1,0 +1,40 @@
+.cloudcli-viewport {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.cloudcli-placeholder {
+  color: var(--text-muted);
+  margin: 0;
+  padding: 24px;
+}
+
+.cloudcli-viewport[data-cloudcli-ready="true"] > .cloudcli-placeholder {
+  display: none;
+}
+
+/* Route-owned geometry also works with a previously cached root shell.
+   Keep the same iframe DOM node: reparenting it would reset its browsing context. */
+html:has(.cloudcli-viewport) .cloudcli-page {
+  height: var(--cloudcli-slot-height, 0px);
+  inset: auto;
+  left: var(--cloudcli-slot-left, 0px);
+  top: var(--cloudcli-slot-top, 0px);
+  visibility: var(--cloudcli-slot-visibility, hidden);
+  width: var(--cloudcli-slot-width, 0px);
+  z-index: 1;
+}
+
+html:has(.cloudcli-viewport) .cloudcli-status {
+  color: var(--foreground);
+}
+
+html:has(.cloudcli-viewport) .cloudcli-status button {
+  background: var(--view);
+  border-color: var(--separator);
+  color: var(--foreground);
+}

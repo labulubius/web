@@ -9,6 +9,12 @@
 - No extra main-site/Supabase authentication gate. CloudCLI's native authentication is retained; hosted platform mode is explicitly disabled. Signing out of the main site does not sign out of this independent application.
 - Claude credentials, provider settings and existing Remote Control services are not changed by deployment. Changes made later inside CloudCLI may affect the same provider configuration used by the native CLIs.
 
+## Main-site shell integration
+
+The `/cloudcli` page reuses `SiteShell`, preserving the main toolbar, active navigation, account/theme controls and status bar. The existing persistent iframe remains mounted outside the route subtree, while a route-owned content slot measures its actual viewport and bounds the frame to that rectangle. ResizeObserver, window and visual-viewport events keep it aligned without hard-coded toolbar heights, iframe reparenting, changing its URL or remounting it on navigation. ARIA ownership links the persistent workspace to the visible content slot. Unmounting the slot clears only its geometry, observers and listeners.
+
+The route-owned `cloudcli-shell.css` overrides are gated by the content-slot marker. Shared shell/layout/authentication files and the original iframe component stay unchanged. Loading this fresh route from an older cached main-site shell still applies the content-area layout; Pi Web remains independent. Main-site theme/account controls govern the main site, not CloudCLI's independent account or internal theme settings.
+
 ## Process and data separation
 
 Mac mini service scripts and private logs are under `/Users/labulubius/CloudCLI`, mode 0700; scripts are `run.sh`, `run-tunnel.sh`, `start.py`, and `watchdog.py`.

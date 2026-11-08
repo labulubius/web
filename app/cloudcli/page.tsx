@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { SiteShell } from "../site-shell";
+import { CloudCLIViewport } from "./cloudcli-viewport";
+import "./cloudcli-shell.css";
 
 export const metadata: Metadata = {
   title: { absolute: "CloudCLI" },
@@ -7,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function CloudCLIPage() {
-  return null;
+  return (
+    <SiteShell active="/cloudcli" title="CloudCLI">
+      <CloudCLIViewport />
+    </SiteShell>
+  );
 }
