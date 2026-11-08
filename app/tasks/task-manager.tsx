@@ -3,7 +3,7 @@
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, type Modifier, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle2, Circle, Folder, Home, Inbox, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Folder, Home, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { shortDate } from "./task-calendar";
@@ -11,13 +11,12 @@ import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs"
 import { TASK_ARCHIVE_PROJECT_ID, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-type View = "important" | "uncategorized" | "project";
+type View = "important" | "project";
 type StoredLocation = { version: 2; view: View; projectId: string | null };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
 
 const NAVIGATION_VIEWS = {
   important: { label: "Important", icon: Star },
-  uncategorized: { label: "Uncategorized", icon: Inbox },
 } as const;
 
 function restrictTaskListDrag(list: HTMLUListElement | null, { active, draggingNodeRect, transform }: Parameters<Modifier>[0]) {
@@ -122,10 +121,9 @@ function readLocation(projects: TaskProject[]): StoredLocation | null {
     if ((value.view === "project" || value.view === "archive") && projectId && projects.some((project) => project.id === projectId)) {
       return { version: 2, view: "project", projectId };
     }
-    if (value.view === "all" || value.view === "inbox" || value.view === "uncategorized" || value.view === "project" || value.view === "archive") {
-      return { version: 2, view: "uncategorized", projectId: null };
+    if (["all", "inbox", "uncategorized", "project", "archive", "important", "gantt"].includes(value.view ?? "")) {
+      return { version: 2, view: "important", projectId: null };
     }
-    if (value.view === "important" || value.view === "gantt") return { version: 2, view: "important", projectId: null };
     return null;
   } catch {
     return null;
@@ -293,9 +291,9 @@ export function TaskManager() {
   }
 
   async function deleteProject(project: TaskProject) {
-    if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and keep their dates.`)) return;
+    if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and keep their dates. Tasks not marked Important will no longer appear in the sidebar.`)) return;
     const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" });
-    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("uncategorized"); } }
+    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("important"); } }
   }
 
   async function quickAdd(event: FormEvent<HTMLFormElement>) {
@@ -323,7 +321,6 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
-  const uncategorizedTasks = useMemo(() => data?.tasks.filter((task) => task.projectId === null) ?? [], [data]);
   const importantTasks = useMemo(() => {
     const baseOrder = new Map((data?.tasks ?? []).map((task, index) => [task.id, index]));
     return (data?.tasks.filter((task) => task.isImportant) ?? []).sort((a, b) =>
@@ -333,7 +330,7 @@ export function TaskManager() {
   }, [data]);
   const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
   const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
-  const visibleTasks = view === "uncategorized" ? uncategorizedTasks : view === "important" ? importantTasks : projectTasks;
+  const visibleTasks = view === "important" ? importantTasks : projectTasks;
 
   async function taskListDragEnd(event: DragEndEvent) {
     if (!data || !event.over || event.active.id === event.over.id || saving) return;
@@ -360,8 +357,8 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
-  const title = view === "important" ? "Important" : view === "uncategorized" ? "Uncategorized" : selectedProject?.name ?? "Project";
-  const description = view === "important" ? "Starred tasks from every project, including Archive." : view === "uncategorized" ? "Tasks without a project." : "Scheduled and unscheduled tasks in this project.";
+  const title = view === "important" ? "Important" : selectedProject?.name ?? "Project";
+  const description = view === "important" ? "Starred tasks from every project." : "Scheduled and unscheduled tasks in this project.";
 
   const readyForAccount = Boolean(data && accountId && dataAccountId === accountId && isAdmin);
   if (loading && !readyForAccount) return <HomeAccess description="Opening home…" />;
@@ -394,7 +391,7 @@ export function TaskManager() {
         </header>
         <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : view === "important" ? "Add an important task…" : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
         {error && <p className="task-error" role="alert">{error}</p>}
-        <TaskList tasks={visibleTasks} empty={view === "uncategorized" ? "There are no uncategorized tasks." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />
+        <TaskList tasks={visibleTasks} empty={view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={closeTaskDialog} onDraftChange={rememberTaskDraft} onSave={saveTask} />}

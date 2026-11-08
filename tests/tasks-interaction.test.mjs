@@ -143,7 +143,7 @@ test("a remounted task dialog prefers its in-memory draft over saved task values
   assert.equal(all.find((node) => node.props.name === "endDate").props.defaultValue, draft.endDate);
 });
 
-for (const view of ["important", "uncategorized", "project"]) {
+for (const view of ["important", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
       const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
@@ -165,7 +165,7 @@ test("quick add ignores blank titles without opening a dialog", async () => {
   const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
   const unexpected = () => assert.fail("Blank title must not submit, reset, or open a dialog");
   const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-    class { get() { return "   "; } }, "uncategorized", null, unexpected, unexpected,
+    class { get() { return "   "; } }, "important", null, unexpected, unexpected,
   );
   await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
@@ -180,13 +180,12 @@ test("uncategorized tasks retain dates in the list", () => {
   assert.ok(nodes(tree).some((n) => n.tag === "span" && n.children.includes("2026-10-10 – 2026-10-15")));
 });
 
-test("Archive remains an ordinary project and Uncategorized keeps orphaned tasks accessible", () => {
+test("Archive remains an ordinary project without its former All tasks filter", () => {
   assert.doesNotMatch(source, /<span>Archive<\/span>|ArchiveIcon/);
-  assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.projectId === null\)/);
   assert.match(source, /items=\{data\.projects\.map/);
   assert.match(source, /data\.projects\.map\(\(project\) => <SortableProjectRow/);
   assert.match(source, /value\.view === "archive" \? TASK_ARCHIVE_PROJECT_ID/);
-  assert.match(source, /setView\("uncategorized"\)/);
+  assert.match(source, /setView\("important"\)/);
 });
 
 test("Archive is available in the task editor and another project can restore a task", () => {
@@ -204,10 +203,10 @@ test("Archive is available in the task editor and another project can restore a 
 });
 
 
-test("Important navigation includes starred Archive tasks", () => {
+test("Important navigation includes starred tasks from every project", () => {
   assert.match(source, /important: \{ label: "Important"/);
   assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.isImportant\)/);
-  assert.match(source, /Starred tasks from every project, including Archive/);
+  assert.match(source, /Starred tasks from every project\./);
   assert.match(source, /view === "important" \? importantTasks/);
 });
 
@@ -239,20 +238,19 @@ test("retired browser locations restore to active task views", () => {
   const projects = [{ id: archiveProjectId, name: "Archive" }, { id: "project-1", name: "Course" }];
   for (const view of ["all", "inbox", "uncategorized"]) {
     storage.value = { version: 1, view, projectId: null };
-    assert.deepEqual(restore(projects), { version: 2, view: "uncategorized", projectId: null });
+    assert.deepEqual(restore(projects), { version: 2, view: "important", projectId: null });
   }
   storage.value = { version: 1, view: "gantt", projectId: null };
   assert.deepEqual(restore(projects), { version: 2, view: "important", projectId: null });
   storage.value = { version: 1, view: "archive", projectId: null };
   assert.deepEqual(restore(projects), { version: 2, view: "project", projectId: archiveProjectId });
   storage.value = { version: 2, view: "project", projectId: "missing" };
-  assert.deepEqual(restore(projects), { version: 2, view: "uncategorized", projectId: null });
+  assert.deepEqual(restore(projects), { version: 2, view: "important", projectId: null });
 });
 
-test("home offers only Important, Uncategorized and project task views", () => {
+test("home offers only Important and project task views", () => {
   assert.match(source, /important: \{ label: "Important"/);
-  assert.match(source, /uncategorized: \{ label: "Uncategorized"/);
-  assert.doesNotMatch(source, /label: "All tasks"|label: "Gantt"|<GanttView|task-range-form/);
+  assert.doesNotMatch(source, /label: "All tasks"|label: "Gantt"|label: "Uncategorized"|<GanttView|task-range-form/);
   assert.match(source, /useState<View>\("important"\)/);
 });
 

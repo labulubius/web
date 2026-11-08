@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Inbox } from "lucide-react";
 import ts from "typescript";
 
 const require = createRequire(new URL("../app/site-shell.tsx", import.meta.url));
@@ -92,10 +91,8 @@ for (const collapsed of [false, true]) {
   });
 }
 
-test("task navigation uses Important and Uncategorized icons", () => {
+test("task navigation retains only the Important icon", () => {
   const tasks = source("app/tasks/task-manager.tsx");
   assert.match(tasks, /important: \{ label: "Important", icon: Star \}/);
-  assert.match(tasks, /uncategorized: \{ label: "Uncategorized", icon: Inbox \}/);
-  assert.doesNotMatch(tasks, /ChartGantt|label: "All tasks"/);
-  sizedIcon(renderToStaticMarkup(createElement(Inbox, { size: 16 })), "inbox", 16);
+  assert.doesNotMatch(tasks, /Inbox|ChartGantt|label: "All tasks"|label: "Uncategorized"/);
 });

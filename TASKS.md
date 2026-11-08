@@ -4,9 +4,9 @@ The root route `/` is a private, administrator-only task manager. Signed-out and
 
 ## Views and behavior
 
-The sidebar offers Important, Uncategorized and the ordered Projects list. Important shows starred tasks from every project, including Archive. Uncategorized shows tasks without a project. Each project view shows tasks assigned to that project. The initial view is Important. The browser remembers the selected view or project; saved All tasks and Gantt locations migrate to Uncategorized and Important, respectively.
+The sidebar offers Important and the ordered Projects list. Important shows starred tasks from every project, including Archive. Each project view shows tasks assigned to that project. Archive tasks have no special visibility rule. The initial view is Important. The browser remembers the selected view or project; saved All tasks, Gantt and Uncategorized locations now open Important.
 
-Archive is an ordinary project row with the same selection, quick-add, rename, delete and drag-order interactions as other projects. Its reserved ID still marks archived tasks in persistent data for compatibility. Assigning a task to another project restores it to that project's list. Deleting a project makes its tasks Uncategorized while retaining their dates.
+Archive is an ordinary project row with the same selection, quick-add, rename, delete and drag-order interactions as other projects. Its reserved ID remains in persistent data for compatibility. Deleting a project makes its tasks Uncategorized while retaining their dates. Tasks without a project have no separate sidebar view; starred ones remain visible in Important. The delete confirmation states this visibility change.
 
 Tasks have a title, optional short description, optional project, optional inclusive start and end dates, and an Important flag. Dates remain visible and editable in list and dialog views. Completing a task permanently deletes it. There is no completed-task history or restore view. List rows have explicit edit and confirmed Delete actions. Projects and tasks can be reordered by dragging; Important has its own order. The task editor contains Cancel and Save.
 
@@ -43,4 +43,4 @@ node scripts/verify-backup.mjs \
   --drive /restore/drive
 ```
 
-Restore only while the application is stopped or into an isolated directory. Do not edit `tasks.json` manually. After restoration, verify Important, Uncategorized and project lists, task dates, completion deletion and confirmed deletion with the administrator account.
+Restore only while the application is stopped or into an isolated directory. Do not edit `tasks.json` manually. After restoration, verify Important and project lists, task dates, completion deletion and confirmed deletion with the administrator account.

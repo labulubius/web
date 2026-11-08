@@ -52,7 +52,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(manager, /site-tasks-location-v1/);
   assert.doesNotMatch(manager, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(server, /id === TASK_ARCHIVE_PROJECT_ID/);
-  assert.match(manager, /value\.view === "inbox"/);
+  assert.match(manager, /"inbox", "uncategorized"/);
   assert.match(manager, /aria-label={`Edit \$\{task\.title\}`}/);
   assert.match(manager, /aria-label={`Delete \$\{task\.title\}`}/);
   assert.doesNotMatch(manager, /completedAt|view === "completed"/);
@@ -63,7 +63,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(manager, /task-range-shift|This month|moveRange/);
   assert.doesNotMatch(types, /notes:/);
   assert.match(manager, /SortableProjectRow/);
-  assert.match(manager, /uncategorizedTasks/);
+  assert.doesNotMatch(manager, /uncategorizedTasks|label: "Uncategorized"/);
   assert.doesNotMatch(manager, /<GanttView|label: "All tasks"/);
   assert.match(projectsApi, /reorderProjects/);
   assert.match(server, /value\.version === 1/);
