@@ -370,7 +370,7 @@ export function TaskManager() {
   return <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[taskListModifier]} onDragEnd={(event) => void taskListDragEnd(event)}>
     <div className="task-layout">
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
-        <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
+        <div className="tasks-sidebar-heading"><h2>Tasks</h2></div>
         <nav aria-label="Task navigation">
           <div className="tasks-navigation-list">{Object.entries(NAVIGATION_VIEWS).map(([id, { label, icon: Icon }]) =>
             <button key={id} className={view === id ? "selected" : ""} aria-current={view === id ? "page" : undefined} type="button" onClick={() => select(id as Exclude<View, "project">)}>
