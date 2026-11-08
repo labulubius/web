@@ -43,6 +43,12 @@ function HomeAccess({ description, status, action }: { description: string; stat
   </section>;
 }
 
+function taskDateLabel(task: PersonalTask) {
+  const start = task.startDate ? "Starts " + shortDate(task.startDate) : "";
+  const due = task.endDate ? "Due " + shortDate(task.endDate) : "";
+  return [start, due].filter(Boolean).join(" · ") || "Not scheduled";
+}
+
 function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onImportant, onDelete }: {
   task: PersonalTask;
   projectName: string;
@@ -57,7 +63,7 @@ function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onIm
   return <li ref={setNodeRef} className={`reorderable${disabled ? " disabled" : ""}${isDragging ? " dragging" : ""}`} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }} {...listeners}>
     <button className="task-check" type="button" aria-label={`Complete ${task.title}`} title="Complete and remove task" disabled={disabled} onPointerDown={stopDragStart} onTouchStart={stopDragStart} onKeyDown={stopDragStart} onClick={onComplete}><Circle size={15} /></button>
     <div ref={setActivatorNodeRef} className="task-list-main" aria-label={`Reorder ${task.title}`} {...attributes}>
-      <strong>{task.title}</strong><span>{projectName} · {task.startDate && task.endDate ? `${shortDate(task.startDate)} – ${shortDate(task.endDate)}` : "Not scheduled"}</span>
+      <strong>{task.title}</strong><span>{projectName} · {taskDateLabel(task)}</span>
     </div>
     <span className="task-list-actions" onPointerDown={stopDragStart} onTouchStart={stopDragStart} onKeyDown={stopDragStart}>
       <button className={task.isImportant ? "task-important active" : "task-important"} type="button" disabled={disabled} onClick={onImportant} aria-label={`${task.isImportant ? "Remove" : "Add"} ${task.title} ${task.isImportant ? "from" : "to"} Important`} title={task.isImportant ? "Remove from Important" : "Add to Important"}><Star size={14} fill={task.isImportant ? "currentColor" : "none"} /></button>

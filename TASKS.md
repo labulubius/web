@@ -8,7 +8,7 @@ The sidebar offers Important and the ordered Projects list. Important shows star
 
 Archive is an ordinary project row with the same selection, quick-add, rename, delete and drag-order interactions as other projects. Its reserved ID remains in persistent data for compatibility. Deleting a project makes its tasks Uncategorized while retaining their dates. Tasks without a project have no separate sidebar view; starred ones remain visible in Important. The delete confirmation states this visibility change.
 
-Tasks have a title, optional short description, optional project, optional inclusive start and end dates, and an Important flag. Dates remain visible and editable in list and dialog views. Completing a task permanently deletes it. There is no completed-task history or restore view. List rows have explicit edit and confirmed Delete actions. Projects and tasks can be reordered by dragging; Important has its own order. The task editor contains Cancel and Save.
+Tasks have a title, optional short description, optional project, independently optional start and due dates, and an Important flag. Dates remain visible and editable in list and dialog views. Completing a task permanently deletes it. There is no completed-task history or restore view. List rows have explicit edit and confirmed Delete actions. Projects and tasks can be reordered by dragging; Important has its own order. The task editor contains Cancel and Save.
 
 The current version excludes dependencies, progress percentages, milestones, recurrence, reminders, labels, priority levels, nested projects, collaboration and external calendar synchronization.
 
@@ -25,13 +25,13 @@ ${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}/preferences/<account-uuid>.na
 
 `TASKS_DATA_DIR`, when set, must be an absolute real directory outside the repository. The service creates task and preference directories with owner-only permissions. Writes are serialized within the web process and committed through an exclusive temporary file, `fsync`, and atomic rename. Reads and writes reject symbolic links. Task IDs and project IDs are opaque UUIDs. Project order is the validated order of the `projects` array and is saved atomically with task data.
 
-Version 6 stores task descriptions, Important state and its independent order, optional inclusive `startDate` and `endDate` values as local `YYYY-MM-DD` dates, and ordinary ordered projects including Archive. Versions 1–5 migrate atomically on first authenticated read. Historical completed tasks are discarded and old notes are removed. Existing task navigation preference files are retained for compatibility but the current homepage does not read or write them.
+Version 6 stores task descriptions, Important state and its independent order, independently optional `startDate` and `endDate` values as local `YYYY-MM-DD` dates (`endDate` is the due date), and ordinary ordered projects including Archive. Versions 1–5 migrate atomically on first authenticated read. Historical completed tasks are discarded and old notes are removed. Existing task navigation preference files are retained for compatibility but the current homepage does not read or write them.
 
 ## API and security
 
 The management API is under `/api/tasks` and `/api/tasks/projects`; the projects collection PATCH endpoint saves a complete validated project order. The legacy `/api/tasks/navigation-order` endpoint remains available for existing clients but is unused by the homepage. Every read and mutation requires a server-verified Supabase bearer token and a successful `site_is_admin` check. Responses use private, no-store caching headers. Browser UI state and client-supplied identity are not treated as authorization.
 
-The API validates request size, UUIDs, field lengths, real calendar dates, ordered date ranges and project references. Completion uses the authenticated task DELETE endpoint and leaves no completed record.
+The API validates request size, UUIDs, field lengths, real calendar dates, a due date no earlier than the start date when both are set and project references. Completion uses the authenticated task DELETE endpoint and leaves no completed record.
 
 ## Backup and restore
 

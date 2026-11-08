@@ -72,7 +72,8 @@ function commonTask(value: unknown, legacy: boolean) {
 function storedRange(task: Record<string, unknown>) {
   const startDate = task.startDate;
   const endDate = task.endDate;
-  if (!((startDate === null && endDate === null) || (validDate(startDate) && validDate(endDate) && startDate <= endDate))) {
+  if (!((startDate === null || validDate(startDate)) && (endDate === null || validDate(endDate)) &&
+      !(typeof startDate === "string" && typeof endDate === "string" && startDate > endDate))) {
     throw new Error("Stored task data is invalid.");
   }
   return { startDate: startDate as string | null, endDate: endDate as string | null };
@@ -229,7 +230,7 @@ function optionalDate(value: unknown) {
 function taskRange(startValue: unknown, endValue: unknown) {
   const startDate = optionalDate(startValue);
   const endDate = optionalDate(endValue);
-  if ((startDate === null) !== (endDate === null) || (startDate && endDate && startDate > endDate)) throw new Error("Invalid task date range.");
+  if (startDate && endDate && startDate > endDate) throw new Error("Invalid task dates: due date cannot be before start date.");
   return { startDate, endDate };
 }
 

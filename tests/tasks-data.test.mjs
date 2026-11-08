@@ -51,6 +51,31 @@ test("uncategorized task descriptions and dates survive create, update and reloa
   assert.equal(data.tasks[0].startDate, null);
 });
 
+test("start and due dates persist independently through create and update", async (t) => {
+  const api = await fixture(t);
+  let data = await api.createTask({ title: "Deadline", endDate: "2026-11-04" });
+  const id = data.tasks[0].id;
+  assert.equal(data.tasks[0].startDate, null);
+  assert.equal(data.tasks[0].endDate, "2026-11-04");
+  assert.deepEqual(await api.loadTaskData(), data);
+
+  data = await api.updateTask(id, { startDate: "2026-11-01" });
+  assert.equal(data.tasks[0].startDate, "2026-11-01");
+  assert.equal(data.tasks[0].endDate, "2026-11-04");
+  data = await api.updateTask(id, { endDate: null });
+  assert.equal(data.tasks[0].startDate, "2026-11-01");
+  assert.equal(data.tasks[0].endDate, null);
+  assert.deepEqual(await api.loadTaskData(), data);
+
+  data = await api.updateTask(id, { startDate: null, endDate: "2026-11-06" });
+  assert.equal(data.tasks[0].startDate, null);
+  assert.equal(data.tasks[0].endDate, "2026-11-06");
+  data = await api.createTask({ title: "Started", startDate: "2026-11-02" });
+  assert.equal(data.tasks[0].startDate, "2026-11-02");
+  assert.equal(data.tasks[0].endDate, null);
+  assert.deepEqual(await api.loadTaskData(), data);
+});
+
 test("moving out of or deleting a project preserves task descriptions and dates", async (t) => {
   const api = await fixture(t);
   let data = await api.createProject({ name: "Course" });
@@ -70,13 +95,13 @@ test("moving out of or deleting a project preserves task descriptions and dates"
   assert.deepEqual(await api.loadTaskData(), data);
 });
 
-test("invalid descriptions and date ranges never overwrite existing data", async (t) => {
+test("invalid descriptions and date ordering never overwrite existing data", async (t) => {
   const api = await fixture(t);
   const data = await api.createTask({ title: "Original", description: "x".repeat(300), ...range });
   const id = data.tasks[0].id;
   const invalid = [
     { description: "x".repeat(301) }, { description: null }, { description: 12 },
-    { startDate: "2026-02-30" }, { endDate: "2026-10-09" }, { startDate: null },
+    { startDate: "2026-02-30" }, { endDate: "2026-10-09" }, { startDate: "2026-10-16" },
   ];
   for (const patch of invalid) {
     await assert.rejects(api.updateTask(id, patch), /Invalid/);

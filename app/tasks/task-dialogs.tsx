@@ -27,11 +27,11 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
     title: value.draft?.title ?? task?.title ?? value.defaults?.title ?? "",
     description: value.draft?.description ?? task?.description ?? value.defaults?.description ?? "",
     projectId: value.draft?.projectId ?? task?.projectId ?? value.defaults?.projectId ?? null,
-    startDate: value.draft?.startDate ?? task?.startDate ?? value.defaults?.startDate ?? null,
-    endDate: value.draft?.endDate ?? task?.endDate ?? value.defaults?.endDate ?? null,
+    startDate: value.draft ? value.draft.startDate : task?.startDate ?? value.defaults?.startDate ?? null,
+    endDate: value.draft ? value.draft.endDate : task?.endDate ?? value.defaults?.endDate ?? null,
   }), [task, value.defaults, value.draft]);
 
-  function readDraft(formElement: HTMLFormElement, normalizeDates: boolean): TaskDraft {
+  function readDraft(formElement: HTMLFormElement): TaskDraft {
     const form = new FormData(formElement);
     const projectId = String(form.get("projectId") ?? "") || null;
     const enteredStart = String(form.get("startDate") ?? "") || null;
@@ -40,20 +40,20 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
       title: String(form.get("title") ?? ""),
       description: String(form.get("description") ?? ""),
       projectId,
-      startDate: normalizeDates ? enteredStart ?? enteredEnd : enteredStart,
-      endDate: normalizeDates ? enteredEnd ?? enteredStart : enteredEnd,
+      startDate: enteredStart,
+      endDate: enteredEnd,
     };
   }
 
   useEffect(() => { onDraftChange?.(initial); }, [initial, onDraftChange]);
 
   function changeDraft(event: FormEvent<HTMLFormElement>) {
-    onDraftChange?.(readDraft(event.currentTarget, false));
+    onDraftChange?.(readDraft(event.currentTarget));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onSave(readDraft(event.currentTarget, true));
+    await onSave(readDraft(event.currentTarget));
   }
 
   return <AccessibleDialog labelledBy="task-dialog-title" busy={busy} onClose={onClose} className="task-dialog">
@@ -66,7 +66,7 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
       <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={initial.description} /></label>
       <div className="task-form-row">
         <label>Start date<input name="startDate" type="date" defaultValue={initial.startDate ?? ""} /></label>
-        <label>End date<input name="endDate" type="date" defaultValue={initial.endDate ?? ""} /></label>
+        <label>Due date<input name="endDate" type="date" defaultValue={initial.endDate ?? ""} /></label>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       <footer className="task-dialog-footer">

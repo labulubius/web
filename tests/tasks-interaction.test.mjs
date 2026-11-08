@@ -9,6 +9,7 @@ const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
 const row = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableTaskRow");
+const dateLabel = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "taskDateLabel");
 const compile = (node) => ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" } }).outputText;
 const archiveProjectId = "00000000-0000-4000-8000-000000000001";
 const task = { id: "task-1", title: "A long task title", projectId: null, isImportant: false, importantSortOrder: null };
@@ -43,7 +44,7 @@ function nodes(tree) { return tree && typeof tree === "object" ? [tree, ...tree.
 test("task body is inert and edit, delete, complete stay separate", () => {
   const calls = [];
   const dragStart = () => {};
-  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", compile(dateLabel) + ";" + compile(row) + "; return SortableTaskRow;")(
     h, () => ({ attributes: { role: "button", tabIndex: 0 }, listeners: { onPointerDown: dragStart, onKeyDown: dragStart }, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
     { Transform: { toString: () => undefined } }, "circle", "star", "pencil", "trash", (date) => date,
   );
@@ -106,6 +107,17 @@ for (const editing of [false, true]) {
   });
 }
 
+test("task dialog saves a start date or due date without filling the other", async () => {
+  for (const [startDate, endDate] of [["", "2026-11-04"], ["2026-11-03", ""]]) {
+    const calls = [];
+    const tree = renderDialog({ value: {}, projects: [], busy: false, onClose() {}, onSave: async (draft) => calls.push(draft) });
+    const form = nodes(tree).find((node) => node.tag === "form");
+    form.props.onSubmit({ preventDefault() {}, currentTarget: { title: "Task", description: "", projectId: "", startDate, endDate } });
+    await Promise.resolve();
+    assert.deepEqual(calls, [{ title: "Task", description: "", projectId: null, startDate: startDate || null, endDate: endDate || null }]);
+  }
+});
+
 test("task dialog keeps saving and errors accessible", () => {
   const tree = renderDialog({ value: {}, projects: [], busy: true, error: "Cannot save", onClose() {}, onSave() {} });
   assert.equal(tree.props.busy, true);
@@ -143,6 +155,15 @@ test("a remounted task dialog prefers its in-memory draft over saved task values
   assert.equal(all.find((node) => node.props.name === "endDate").props.defaultValue, draft.endDate);
 });
 
+test("a remounted task dialog keeps a cleared start date empty", () => {
+  const saved = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
+  const draft = { title: "Task", description: "", projectId: null, startDate: null, endDate: "2026-11-04" };
+  const tree = renderDialog({ value: { task: saved, draft }, projects: [], busy: false, onClose() {}, onSave() {} });
+  const all = nodes(tree);
+  assert.equal(all.find((node) => node.props.name === "startDate").props.defaultValue, "");
+  assert.equal(all.find((node) => node.props.name === "endDate").props.defaultValue, "2026-11-04");
+});
+
 for (const view of ["important", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
@@ -170,14 +191,23 @@ test("quick add ignores blank titles without opening a dialog", async () => {
   await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
 
-test("uncategorized tasks retain dates in the list", () => {
-  const scheduled = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
-  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
+test("task rows show start and due dates independently", () => {
+  const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", compile(dateLabel) + ";" + compile(row) + "; return SortableTaskRow;")(
     h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
     { Transform: { toString: () => undefined } }, "circle", "star", "pencil", "trash", (date) => date,
   );
-  const tree = renderRow({ task: scheduled, projectName: "Uncategorized", disabled: false, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {} });
-  assert.ok(nodes(tree).some((n) => n.tag === "span" && n.children.includes("2026-10-10 – 2026-10-15")));
+  for (const [startDate, endDate, expected] of [
+    ["2026-10-10", "2026-10-15", "Starts 2026-10-10 · Due 2026-10-15"],
+    ["2026-10-10", null, "Starts 2026-10-10"],
+    [null, "2026-10-15", "Due 2026-10-15"],
+    [null, null, "Not scheduled"],
+  ]) {
+    const tree = renderRow({
+      task: { ...task, startDate, endDate }, projectName: "Uncategorized",
+      disabled: false, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {},
+    });
+    assert.ok(nodes(tree).some((node) => node.tag === "span" && node.children.includes(expected)), expected);
+  }
 });
 
 test("Archive remains an ordinary project without its former All tasks filter", () => {
