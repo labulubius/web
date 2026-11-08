@@ -21,8 +21,8 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Nav", icon: Compass },
-  { href: "/pi-web", label: "Pi Web", icon: Bot },
-  { href: "/cloudcli", label: "CloudCLI", icon: Terminal },
+  { href: "/pi-web", label: "Pi Web", icon: Terminal },
+  { href: "/cloudcli", label: "CloudCLI", icon: Bot },
   { href: "/about", label: "About", icon: Info },
 ];
 

@@ -14,8 +14,8 @@ export function PlacesSidebar({ active }: { active: string }) {
         <Link className={active === "/nav" ? "selected" : ""} href="/nav">
           <Compass size={16} /> Nav
         </Link>
-        <Link href="/pi-web"><Bot size={16} /> Pi Web</Link>
-        <Link href="/cloudcli"><Terminal size={16} /> CloudCLI</Link>
+        <Link href="/pi-web"><Terminal size={16} /> Pi Web</Link>
+        <Link href="/cloudcli"><Bot size={16} /> CloudCLI</Link>
         <Link className={active === "/about" ? "selected" : ""} href="/about">
           <Info size={16} /> About
         </Link>
