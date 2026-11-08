@@ -20,11 +20,10 @@ test("PDF handoff carries a private structured reference into Agent", () => {
   assert.match(prompt, /"source":"drive"/);
   assert.match(prompt, /"remote":"Books\/中文扫描.pdf"/);
   const path = agentHandoffPath(prompt);
-  const destination = new URL(path);
-  assert.equal(destination.origin, "https://pi-web.labulubius.com");
-  assert.equal(destination.pathname, "/");
-  assert.equal(destination.searchParams.get("prompt"), prompt);
-  assert.equal(destination.searchParams.get("cwd"), "/Users/labulubius/Pi/workspace");
+  const destination = new URL(path, "https://labulubius.com");
+  assert.equal(destination.origin, "https://labulubius.com");
+  assert.equal(destination.pathname, "/pi-web");
+  assert.equal(destination.searchParams.get("handoff"), prompt);
   assert.throws(() => pdfToEpubHandoff("drive", "", "book.pdf", 1), /Invalid/);
 });
 
@@ -128,7 +127,8 @@ test("global headers include baseline browser protections", async () => {
   const rules = await nextConfig.headers();
   const headers = new Map(rules[0].headers.map(({ key, value }) => [key.toLowerCase(), value]));
   assert.match(headers.get("content-security-policy"), /frame-ancestors 'none'/);
-  assert.match(headers.get("content-security-policy"), /frame-src 'none'/);
+  assert.match(headers.get("content-security-policy"), /frame-src https:\/\/pi-web\.labulubius\.com/);
+  assert.match(headers.get("content-security-policy"), /connect-src[^;]*https:\/\/pi-web\.labulubius\.com/);
   assert.doesNotMatch(headers.get("content-security-policy"), /pi\.labulubius\.com/);
   assert.doesNotMatch(headers.get("content-security-policy"), /share\.labulubius\.com/);
   assert.equal(headers.get("x-content-type-options"), "nosniff");
@@ -140,24 +140,21 @@ test("global headers include baseline browser protections", async () => {
   assert.equal(homeHeaders.get("clear-site-data"), '"cache"');
 });
 
-test("retired embedded Agent route is removed without a redirect or background iframe", async () => {
-  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-  for (const path of ["../app/pi", "../app/persistent-agent.tsx"]) {
-    await assert.rejects(access(new URL(path, import.meta.url)), { code: "ENOENT" });
-  }
-  assert.doesNotMatch(layout, /PersistentAgent|AgentFrame/);
+test("old /pi stays removed while the embedded Pi Web lives at /pi-web without redirects", async () => {
+  await assert.rejects(access(new URL("../app/pi", import.meta.url)), { code: "ENOENT" });
+  await access(new URL("../app/pi-web/page.tsx", import.meta.url));
   const redirects = await nextConfig.redirects();
-  assert.ok(redirects.every(({ source }) => source !== "/pi" && !source.startsWith("/pi/")));
+  assert.ok(redirects.every(({ source }) => source !== "/pi" && source !== "/pi-web" && !source.startsWith("/pi/")));
 });
 
-test("Pi Web navigation uses the independent hostname and preserves site account controls", async () => {
+test("Pi Web navigation stays on the main-site /pi-web route and preserves account controls", async () => {
   const sidebar = await readFile(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
   const access = await readFile(new URL("../app/owner-access.tsx", import.meta.url), "utf8");
   const shell = await readFile(new URL("../app/site-shell.tsx", import.meta.url), "utf8");
 
   for (const source of [sidebar, shell]) {
-    assert.match(source, /https:\/\/pi-web\.labulubius\.com/);
-    assert.doesNotMatch(source, /["']\/pi["']|pi\.labulubius\.com/);
+    assert.match(source, /["']\/pi-web["']/);
+    assert.doesNotMatch(source, /["']\/pi["']|https:\/\/pi(?:-web)?\.labulubius\.com/);
   }
   assert.doesNotMatch(sidebar, /href="\/(?:drive|share|note)"/);
   assert.doesNotMatch(access, /AccountControl/);

@@ -14,6 +14,5 @@ export function pdfToEpubHandoff(
 }
 
 export function agentHandoffPath(prompt: string): string {
-  const query = new URLSearchParams({ cwd: "/Users/labulubius/Pi/workspace", prompt });
-  return `https://pi-web.labulubius.com/?${query}`;
+  return `/pi-web?handoff=${encodeURIComponent(prompt)}`;
 }

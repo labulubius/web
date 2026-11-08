@@ -11,11 +11,11 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | `/` | All tasks, project tasks and cross-month date-range Gantt chart | Administrator only; signed-out visitors see a generic Home screen |
 | `/nav` | Website directory, search, favorites and categories | Administrator only; signed-out visitors see a generic Navigator screen |
 | `/about` | Project overview | Public |
-| `https://pi-web.labulubius.com` | Independent Pi Web interface | Existing Pi Web password authentication |
+| `/pi-web` | Embedded Pi Web interface, keeping the main-site address | Administrator session exchange; backend retains Pi Web authentication |
 
 The navigator's canonical URL is `https://labulubius.com/nav`. Drive is retired: `/drive/**` and `/api/drive/**` return `404 Not Found`; the former `drive.labulubius.com` DNS record and Tunnel ingress are deleted, so that hostname no longer resolves (`NXDOMAIN`). Its files and public-link metadata are deleted; GitHub retains source history, not those files. Zotero WebDAV at `dav.labulubius.com` is independent and unchanged.
 
-Pi Web is independent at `https://pi-web.labulubius.com`. The former `/pi` embedded page returns `404 Not Found`, and `pi.labulubius.com` has no DNS record or Tunnel ingress. Neither old address redirects. Main-site navigation opens Pi Web directly; its password and session files are unchanged, but the new hostname requires a new browser login.
+Pi Web's user-facing entry is `https://labulubius.com/pi-web`, not a redirect. The main site embeds `https://pi-web.labulubius.com` as its backend and exchanges the signed-in administrator's token for a backend session without putting the token in a URL. The frame stays mounted when navigating between main-site pages. The former `/pi` page remains `404 Not Found`, and `pi.labulubius.com` has no DNS record or Tunnel ingress; neither old address redirects. Pi Web passwords, projects and session files are unchanged.
 
 ## Architecture
 

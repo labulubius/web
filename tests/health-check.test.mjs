@@ -25,7 +25,8 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
   const response = hostResponses[hostname]?.[type] ?? responses[type] ?? { Status: 3 };
   process.stdout.write(typeof response === "string" ? response : JSON.stringify(response));
 } else if (args.includes("--write-out")) {
-  process.stdout.write(process.env.MOCK_RETIRED_HTTP_STATUS || "404");
+  const entry = args.includes("https://main.example/pi-web");
+  process.stdout.write(entry ? (process.env.MOCK_AGENT_ENTRY_STATUS || "200") : (process.env.MOCK_RETIRED_HTTP_STATUS || "404"));
 } else if (args.some((arg) => arg.endsWith("/api/health"))) {
   process.stdout.write('{"status":"ok"}');
 }
@@ -96,6 +97,14 @@ test("health also rejects an old Agent hostname that still resolves", async () =
   await withMockCurl({ MOCK_DNS_HOST_RESPONSES: JSON.stringify({ "retired-agent.example": { A: { Status: 0, Answer: [{ type: 1, data: "192.0.2.1" }] } } }) }, async (execute) => {
     await assert.rejects(execute, /Expected retired DNS NXDOMAIN: retired-agent\.example/);
   });
+});
+
+test("health requires the main-site Pi Web entry to be a real page, not a redirect", async () => {
+  for (const status of ["404", "307", "308", "500"]) {
+    await withMockCurl({ MOCK_AGENT_ENTRY_STATUS: status }, async (execute) => {
+      await assert.rejects(execute, /Expected embedded Pi Web entry to return 200/);
+    });
+  }
 });
 
 test("health fails closed on DNS transport errors and old main-site Drive revival", async () => {

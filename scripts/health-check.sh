@@ -13,8 +13,15 @@ agent_origin="${AGENT_ORIGIN:-https://pi-web.labulubius.com}"
 curl --fail --silent --show-error --location --max-redirs 3 --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null "$agent_origin"
 echo "ok $agent_origin"
 
+entry_status=$(curl --silent --show-error --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null --write-out '%{http_code}' "$main_origin/pi-web")
+if [[ "$entry_status" != "200" ]]; then
+  echo "Expected embedded Pi Web entry to return 200: $main_origin/pi-web (received $entry_status)" >&2
+  exit 1
+fi
+echo "ok $main_origin/pi-web"
+
 # Retired features are removed, not answered with a tombstone.
-for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired" "$main_origin/feeds" "$main_origin/api/news" "$main_origin/pi" "$main_origin/pi/session" "$main_origin/pi-web"; do
+for url in "$main_origin/drive" "$main_origin/api/drive" "$main_origin/drive/file/retired" "$main_origin/feeds" "$main_origin/api/news" "$main_origin/pi" "$main_origin/pi/session"; do
   status=$(curl --silent --show-error --max-time "${HEALTH_TIMEOUT:-15}" --output /dev/null --write-out '%{http_code}' "$url")
   if [[ "$status" != "404" ]]; then
     echo "Expected retired path to return 404: $url (received $status)" >&2
