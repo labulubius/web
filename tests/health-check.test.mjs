@@ -26,7 +26,11 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
   process.stdout.write(typeof response === "string" ? response : JSON.stringify(response));
 } else if (args.includes("--write-out")) {
   const entry = args.includes("https://main.example/pi-web");
-  process.stdout.write(entry ? (process.env.MOCK_AGENT_ENTRY_STATUS || "200") : (process.env.MOCK_RETIRED_HTTP_STATUS || "404"));
+  const cloudcliEntry = args.includes("https://main.example/cloudcli");
+  const cloudcliApi = args.includes("https://cloudcli.example/api/projects");
+  process.stdout.write(entry ? (process.env.MOCK_AGENT_ENTRY_STATUS || "200") : cloudcliEntry ? (process.env.MOCK_CLOUDCLI_ENTRY_STATUS || "200") : cloudcliApi ? (process.env.MOCK_CLOUDCLI_API_STATUS || "401") : (process.env.MOCK_RETIRED_HTTP_STATUS || "404"));
+} else if (args.includes("https://cloudcli.example/health")) {
+  process.stdout.write(process.env.MOCK_CLOUDCLI_HEALTH || '{"status":"ok"}');
 } else if (args.some((arg) => arg.endsWith("/api/health"))) {
   process.stdout.write('{"status":"ok"}');
 }
@@ -39,6 +43,7 @@ if (args.includes("https://cloudflare-dns.com/dns-query")) {
         PATH: `${root}${path.delimiter}${process.env.PATH}`,
         MAIN_ORIGIN: "https://main.example",
         AGENT_ORIGIN: "https://agent.example",
+        CLOUDCLI_ORIGIN: "https://cloudcli.example",
         RETIRED_DRIVE_HOSTNAME: "retired.example",
         RETIRED_AGENT_HOSTNAME: "retired-agent.example",
         MOCK_CURL_LOG: log,
@@ -66,7 +71,9 @@ test("health requires DNS NXDOMAIN for every old-host record type, not an HTTP t
     }
     assert.ok(requests.every((args) => !args.some((arg) => arg.startsWith("https://retired.example"))));
     const probed = requests.filter((args) => args.includes("--write-out")).map((args) => args[args.length - 1]);
-    assert.equal(probed.length, 8);
+    assert.equal(probed.length, 10);
+    assert.ok(probed.includes("https://main.example/cloudcli"));
+    assert.ok(probed.includes("https://cloudcli.example/api/projects"));
     for (const pathname of ["/drive", "/api/drive", "/drive/file/retired", "/feeds", "/api/news", "/pi", "/pi/session", "/pi-web"]) {
       assert.ok(probed.some((url) => url === `https://main.example${pathname}`), pathname);
     }
@@ -105,6 +112,21 @@ test("health requires the main-site Pi Web entry to be a real page, not a redire
       await assert.rejects(execute, /Expected embedded Pi Web entry to return 200/);
     });
   }
+});
+
+test("health requires a real CloudCLI entry and healthy native backend", async () => {
+  await withMockCurl({ MOCK_CLOUDCLI_ENTRY_STATUS: "307" }, async (execute) => {
+    await assert.rejects(execute, /Expected embedded CloudCLI entry to return 200/);
+  });
+  await withMockCurl({ MOCK_CLOUDCLI_HEALTH: '{"status":"failed"}' }, async (execute) => {
+    await assert.rejects(execute, /Unexpected CloudCLI health response/);
+  });
+});
+
+test("health fails closed if the native CloudCLI API loses authentication", async () => {
+  await withMockCurl({ MOCK_CLOUDCLI_API_STATUS: "200" }, async (execute) => {
+    await assert.rejects(execute, /Expected unauthenticated CloudCLI API to return 401/);
+  });
 });
 
 test("health fails closed on DNS transport errors and old main-site Drive revival", async () => {

@@ -1,0 +1,35 @@
+.cloudcli-page {
+  background: var(--view);
+  inset: 0;
+  overflow: hidden;
+  position: fixed;
+  z-index: 1000;
+}
+
+.cloudcli-frame {
+  background: var(--view);
+  border: 0;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.cloudcli-status {
+  align-content: center;
+  background: var(--view);
+  color: var(--text);
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 24px;
+  position: absolute;
+  text-align: center;
+}
+
+.cloudcli-status button {
+  background: var(--button);
+  border: 1px solid var(--frame);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 7px 10px;
+}

@@ -11,7 +11,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://drive.labulubius.com https://pi-web.labulubius.com",
-  "frame-src https://pi-web.labulubius.com",
+  "frame-src https://pi-web.labulubius.com https://cloudcli.labulubius.com",
   "media-src 'self'",
   "worker-src 'self' blob:",
 ].join("; ");

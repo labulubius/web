@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Sun } from "lucide-react";
+import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Sun, Terminal } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -22,6 +22,7 @@ const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Nav", icon: Compass },
   { href: "/pi-web", label: "Pi Web", icon: Bot },
+  { href: "/cloudcli", label: "CloudCLI", icon: Terminal },
   { href: "/about", label: "About", icon: Info },
 ];
 

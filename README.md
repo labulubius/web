@@ -12,15 +12,18 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | `/nav` | Website directory, search, favorites and categories | Administrator only; signed-out visitors see a generic Navigator screen |
 | `/about` | Project overview | Public |
 | `/pi-web` | Embedded Pi Web interface, keeping the main-site address | Administrator session exchange; backend retains Pi Web authentication |
+| `/cloudcli` | Embedded CloudCLI interface, keeping the main-site address | CloudCLI's own account and login; no extra main-site authentication gate |
 
 The navigator's canonical URL is `https://labulubius.com/nav`. Drive is retired: `/drive/**` and `/api/drive/**` return `404 Not Found`; the former `drive.labulubius.com` DNS record and Tunnel ingress are deleted, so that hostname no longer resolves (`NXDOMAIN`). Its files and public-link metadata are deleted; GitHub retains source history, not those files. Zotero WebDAV at `dav.labulubius.com` is independent and unchanged.
 
 Pi Web's user-facing entry is `https://labulubius.com/pi-web`, not a redirect. The main site embeds `https://pi-web.labulubius.com` as its backend and exchanges the signed-in administrator's token for a backend session without putting the token in a URL. The frame stays mounted when navigating between main-site pages. The former `/pi` page remains `404 Not Found`, and `pi.labulubius.com` has no DNS record or Tunnel ingress; neither old address redirects. Pi Web passwords, projects and session files are unchanged.
 
+CloudCLI's user-facing entry is `https://labulubius.com/cloudcli`. The toolbar and Places links use that main-site path; `https://cloudcli.labulubius.com` is only the iframe backend, not a navigation target. CloudCLI 1.37.7 runs separately on the Mac mini, retains its native authentication and existing data, and stays mounted across main-site navigation. Initial account creation is private; the public adapter rejects registration. See [deployment and initialization](deploy/cloudcli/README.md).
+
 ## Architecture
 
 - Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4) serves the UI. Supabase Auth and Row Level Security control administrator access. Navigator data and icons use Supabase; the navigator is managed in the UI, **not** in `app/nav/sites.ts` (which only defines types).
-- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel is the only public web entry point and sends `labulubius.com` and `www.labulubius.com` to Next.js and `pi-web.labulubius.com` to Pi Web. The gateway routes only the Tunnel's port `7844` traffic through the measured Hong Kong path. Cloudflare edge-caches the three static Next.js document shells; authenticated APIs, RSC requests and errors remain uncached. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted.
+- The application has one production deployment on VM 100 (`vm100`) of the M920Q Proxmox host. Cloudflare Tunnel is the only public web entry point and sends `labulubius.com` and `www.labulubius.com` to Next.js `pi-web.labulubius.com` to Pi Web, and `cloudcli.labulubius.com` to the private CloudCLI adapter. The gateway routes only the Tunnel's port `7844` traffic through the measured Hong Kong path. Cloudflare edge-caches the three static Next.js document shells; authenticated APIs, RSC requests and errors remain uncached. The former `drive.labulubius.com`, `rss.labulubius.com` and `share.labulubius.com` DNS records and Tunnel ingress rules are deleted.
 - Personal task data lives **outside Git** on `web`. GitHub stores source history and CI results, not production data.
 
 ## Verification on VM100
