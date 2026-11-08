@@ -3,7 +3,7 @@
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, type Modifier, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarRange, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
+import { ChartGantt, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
 import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
@@ -21,7 +21,7 @@ const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"]
 const NAVIGATION_VIEWS = {
   all: { label: "All tasks", icon: ListTodo },
   important: { label: "Important", icon: Star },
-  gantt: { label: "Gantt", icon: CalendarRange },
+  gantt: { label: "Gantt", icon: ChartGantt },
 } satisfies Record<NavigationView, { label: string; icon: typeof ListTodo }>;
 
 function validNavigationOrder(value: unknown): value is NavigationView[] {

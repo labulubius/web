@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Compass, Home, Info, Menu, Monitor, Moon, Sun, Terminal } from "lucide-react";
+import { Compass, Home, Info, Menu, MessageSquareCode, Monitor, Moon, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -21,8 +21,8 @@ function readSidebarCollapsed(page: string): boolean {
 const navigation = [
   { href: "/", label: "Home", icon: Home },
   { href: "/nav", label: "Nav", icon: Compass },
-  { href: "/pi-web", label: "Pi Web", icon: Terminal },
-  { href: "/cloudcli", label: "CloudCLI", icon: Bot },
+  { href: "/pi-web", label: "Pi Web", icon: MessageSquareCode },
+  { href: "/cloudcli", label: "CloudCLI", icon: PanelsTopLeft },
   { href: "/about", label: "About", icon: Info },
 ];
 
@@ -85,6 +85,7 @@ export function SiteShell({
   }
 
   const ThemeIcon = displayedThemeMode === "system" ? Monitor : displayedThemeMode === "light" ? Sun : Moon;
+  const SidebarIcon = displayedSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
     <div
@@ -119,7 +120,7 @@ export function SiteShell({
             aria-label={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
             title={displayedSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
           >
-            <Menu size={18} />
+            <SidebarIcon size={18} />
             <span>Sidebar</span>
           </button>}
           <nav aria-label="Main navigation">

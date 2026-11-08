@@ -40,12 +40,12 @@ test("toolbar shell icons share an 18px size without changing navigation", () =>
   assert.match(shell, /aria-current=\{active === href \? "page" : undefined\}/);
 });
 
-test("toolbar and Places exchange only the Pi Web and CloudCLI icon assignments", () => {
+test("toolbar and Places share semantic Pi Web and CloudCLI icons", () => {
   const places = readFileSync(new URL("../app/places-sidebar.tsx", import.meta.url), "utf8");
-  assert.match(shell, /\{ href: "\/pi-web", label: "Pi Web", icon: Terminal \}/);
-  assert.match(shell, /\{ href: "\/cloudcli", label: "CloudCLI", icon: Bot \}/);
-  assert.match(places, /href="\/pi-web"><Terminal size=\{16\} \/> Pi Web<\/Link>/);
-  assert.match(places, /href="\/cloudcli"><Bot size=\{16\} \/> CloudCLI<\/Link>/);
+  assert.match(shell, /\{ href: "\/pi-web", label: "Pi Web", icon: MessageSquareCode \}/);
+  assert.match(shell, /\{ href: "\/cloudcli", label: "CloudCLI", icon: PanelsTopLeft \}/);
+  assert.match(places, /href="\/pi-web"><MessageSquareCode size=\{16\} \/> Pi Web<\/Link>/);
+  assert.match(places, /href="\/cloudcli"><PanelsTopLeft size=\{16\} \/> CloudCLI<\/Link>/);
 });
 
 for (const [name, value, label, iconCount, disabled] of [
