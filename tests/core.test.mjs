@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import { agentHandoffPath, pdfToEpubHandoff } from "../app/lib/agent-handoff.ts";
 import { GET as health } from "../app/api/health/route.ts";
-import { addDays, dateRange, daysBetween, maximumRangeEnd, monthEnd, monthStart, shiftMonth, validTimelineRange } from "../app/tasks/task-calendar.ts";
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import nextConfig from "../next.config.ts";
 
@@ -32,7 +31,6 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   const api = await readFile(new URL("../app/api/tasks/route.ts", import.meta.url), "utf8");
   const manager = await readFile(new URL("../app/tasks/task-manager.tsx", import.meta.url), "utf8");
   const dialog = await readFile(new URL("../app/tasks/task-dialogs.tsx", import.meta.url), "utf8");
-  const gantt = await readFile(new URL("../app/tasks/gantt-view.tsx", import.meta.url), "utf8");
   const types = await readFile(new URL("../app/tasks/task-types.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
   const projectsApi = await readFile(new URL("../app/api/tasks/projects/route.ts", import.meta.url), "utf8");
@@ -52,10 +50,9 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(styles, /\.task-message/);
   assert.match(manager, /Delete project .*Its tasks will become Uncategorized and keep their dates/);
   assert.match(manager, /site-tasks-location-v1/);
-  assert.ok(manager.indexOf('label: "All tasks"') < manager.indexOf('label: "Gantt"'));
   assert.doesNotMatch(manager, /<span>Archive<\/span>|ArchiveIcon/);
   assert.match(server, /id === TASK_ARCHIVE_PROJECT_ID/);
-  assert.match(manager, /storedView === "inbox" \? "all"/);
+  assert.match(manager, /value\.view === "inbox"/);
   assert.match(manager, /aria-label={`Edit \$\{task\.title\}`}/);
   assert.match(manager, /aria-label={`Delete \$\{task\.title\}`}/);
   assert.doesNotMatch(manager, /completedAt|view === "completed"/);
@@ -65,12 +62,9 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(dialog, /task-form-primary/);
   assert.doesNotMatch(manager, /task-range-shift|This month|moveRange/);
   assert.doesNotMatch(types, /notes:/);
-  assert.doesNotMatch(gantt, /No tasks this month|gantt-empty-row/);
-  assert.match(gantt, /scheduled\.map/);
-  assert.match(styles, /task-gantt-view\.is-empty/);
   assert.match(manager, /SortableProjectRow/);
-  assert.doesNotMatch(manager, /allTasks.length/);
-  assert.match(manager, /view !== "gantt"/);
+  assert.match(manager, /uncategorizedTasks/);
+  assert.doesNotMatch(manager, /<GanttView|label: "All tasks"/);
   assert.match(projectsApi, /reorderProjects/);
   assert.match(server, /value\.version === 1/);
   assert.match(server, /value\.version === 2/);
@@ -85,19 +79,6 @@ test("task projects reorder only with an exact opaque-ID set", () => {
   assert.throws(() => reorderTaskProjects([first, second], [first.id, first.id]), /Invalid project order/);
   assert.throws(() => reorderTaskProjects([first, second], [first.id]), /Invalid project order/);
   assert.throws(() => reorderTaskProjects([first, second], [first.id, "33333333-3333-4333-8333-333333333333"]), /Invalid project order/);
-});
-
-test("task Gantt calendar supports inclusive custom ranges across months", () => {
-  const october = monthStart("2026-10-19");
-  assert.equal(october, "2026-10-01");
-  assert.equal(monthEnd(october), "2026-10-31");
-  assert.equal(shiftMonth("2026-01-31", 1), "2026-02-28");
-  assert.equal(addDays("2026-10-31", 1), "2026-11-01");
-  assert.equal(daysBetween("2026-10-05", "2026-11-05"), 31);
-  assert.deepEqual(dateRange("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
-  assert.equal(maximumRangeEnd("2026-10-05"), "2026-12-04");
-  assert.equal(validTimelineRange("2026-10-05", "2026-12-04"), true);
-  assert.equal(validTimelineRange("2026-10-05", "2026-12-05"), false);
 });
 
 test("health response is minimal and not cached", async () => {

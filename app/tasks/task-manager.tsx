@@ -3,32 +3,22 @@
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, type Modifier, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChartGantt, CheckCircle2, Circle, Folder, Home, ListTodo, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Folder, Home, Inbox, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSiteAuth } from "../site-auth";
-import { addDays, daysBetween, monthEnd, monthStart, shortDate, validTimelineRange } from "./task-calendar";
+import { shortDate } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
-import { GanttView } from "./gantt-view";
-import { TASK_ARCHIVE_PROJECT_ID, isArchivedTask, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
+import { TASK_ARCHIVE_PROJECT_ID, type PersonalTask, type TaskData, type TaskDraft, type TaskProject } from "./task-types";
 
 const LOCATION_KEY = "site-tasks-location-v1";
-type View = "gantt" | "all" | "important" | "project";
-type NavigationView = Exclude<View, "project">;
-type StoredLocation = { version: 1; view: View; projectId: string | null; timelineStart: string; timelineEnd: string };
+type View = "important" | "uncategorized" | "project";
+type StoredLocation = { version: 2; view: View; projectId: string | null };
 type TaskPatch = Partial<TaskDraft> & { isImportant?: boolean };
 
-const DEFAULT_NAVIGATION_ORDER: NavigationView[] = ["all", "important", "gantt"];
 const NAVIGATION_VIEWS = {
-  all: { label: "All tasks", icon: ListTodo },
   important: { label: "Important", icon: Star },
-  gantt: { label: "Gantt", icon: ChartGantt },
-} satisfies Record<NavigationView, { label: string; icon: typeof ListTodo }>;
-
-function validNavigationOrder(value: unknown): value is NavigationView[] {
-  return Array.isArray(value) && value.length === DEFAULT_NAVIGATION_ORDER.length &&
-    value.every((id) => typeof id === "string" && DEFAULT_NAVIGATION_ORDER.includes(id as NavigationView)) &&
-    new Set(value).size === DEFAULT_NAVIGATION_ORDER.length;
-}
+  uncategorized: { label: "Uncategorized", icon: Inbox },
+} as const;
 
 function restrictTaskListDrag(list: HTMLUListElement | null, { active, draggingNodeRect, transform }: Parameters<Modifier>[0]) {
   if (!String(active?.id).startsWith("list:") || !draggingNodeRect || !list) return transform;
@@ -52,21 +42,6 @@ function HomeAccess({ description, status, action }: { description: string; stat
     {status && <p className="owner-access-status" role="alert">{status}</p>}
     {action && <div className="owner-access-actions">{action}</div>}
   </section>;
-}
-
-function SortableNavigationRow({ id, active, disabled, onSelect }: {
-  id: NavigationView;
-  active: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: `view:${id}`, disabled });
-  const { label, icon: Icon } = NAVIGATION_VIEWS[id];
-  return <div ref={setNodeRef} className={`reorderable${disabled ? " disabled" : ""}${isDragging ? " dragging" : ""}`} style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}>
-    <button ref={setActivatorNodeRef} className={active ? "selected" : ""} aria-current={active ? "page" : undefined} type="button" onClick={onSelect} {...attributes} {...listeners}>
-      <Icon size={16} fill={id === "important" && active ? "currentColor" : "none"} /><span>{label}</span>
-    </button>
-  </div>;
 }
 
 function SortableTaskRow({ task, projectName, disabled, onOpen, onComplete, onImportant, onDelete }: {
@@ -140,13 +115,18 @@ function SortableProjectRow({ project, active, disabled, onSelect, onEdit, onDel
 
 function readLocation(projects: TaskProject[]): StoredLocation | null {
   try {
-    const value = JSON.parse(window.localStorage.getItem(LOCATION_KEY) ?? "null") as (Partial<StoredLocation> & { view?: View | "archive" | "inbox" }) | null;
-    const storedView = String(value?.view);
-    if (!value || value.version !== 1 || !["gantt", "all", "important", "archive", "inbox", "project"].includes(storedView) || !validTimelineRange(value.timelineStart, value.timelineEnd)) return null;
-    const savedView: View = storedView === "inbox" ? "all" : storedView === "archive" ? "project" : storedView as View;
-    const savedProjectId = storedView === "archive" ? TASK_ARCHIVE_PROJECT_ID : value.projectId ?? null;
-    if (savedView === "project" && (!savedProjectId || !projects.some((project) => project.id === savedProjectId))) return { ...value, view: "all", projectId: null } as StoredLocation;
-    return { version: 1, view: savedView, projectId: savedView === "project" ? savedProjectId : null, timelineStart: String(value.timelineStart), timelineEnd: String(value.timelineEnd) };
+    const value = JSON.parse(window.localStorage.getItem(LOCATION_KEY) ?? "null") as
+      { version?: number; view?: string; projectId?: string | null } | null;
+    if (!value || ![1, 2].includes(value.version ?? -1)) return null;
+    const projectId = value.view === "archive" ? TASK_ARCHIVE_PROJECT_ID : value.projectId ?? null;
+    if ((value.view === "project" || value.view === "archive") && projectId && projects.some((project) => project.id === projectId)) {
+      return { version: 2, view: "project", projectId };
+    }
+    if (value.view === "all" || value.view === "inbox" || value.view === "uncategorized" || value.view === "project" || value.view === "archive") {
+      return { version: 2, view: "uncategorized", projectId: null };
+    }
+    if (value.view === "important" || value.view === "gantt") return { version: 2, view: "important", projectId: null };
+    return null;
   } catch {
     return null;
   }
@@ -157,44 +137,28 @@ export function TaskManager() {
   const accountId = user?.id ?? null;
   const [data, setData] = useState<TaskData | null>(null);
   const [dataAccountId, setDataAccountId] = useState<string | null>(null);
-  const [view, setView] = useState<View>("gantt");
+  const [view, setView] = useState<View>("important");
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [timelineStart, setTimelineStart] = useState(() => monthStart());
-  const [timelineEnd, setTimelineEnd] = useState(() => monthEnd());
   const [locationReady, setLocationReady] = useState(false);
   const [taskDialog, setTaskDialog] = useState<TaskDialogValue | null>(null);
   const [projectDialog, setProjectDialog] = useState<TaskProject | "new" | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [navigationOrder, setNavigationOrder] = useState<NavigationView[]>(DEFAULT_NAVIGATION_ORDER);
-  const [navigationReadyAccountId, setNavigationReadyAccountId] = useState<string | null>(null);
-  const [navigationLoading, setNavigationLoading] = useState(false);
-  const [navigationSaving, setNavigationSaving] = useState(false);
-  const [navigationError, setNavigationError] = useState("");
-  const [navigationStatus, setNavigationStatus] = useState("");
   const [error, setError] = useState("");
   const accountIdRef = useRef(accountId);
   const requestGeneration = useRef(0);
-  const navigationLoadGeneration = useRef(0);
-  const navigationSaveGeneration = useRef(0);
-  const navigationSaveInFlight = useRef(false);
-  const navigationLoadAbort = useRef<AbortController | null>(null);
-  const navigationSaveAbort = useRef<AbortController | null>(null);
-  const navigationStatusTimer = useRef<number | null>(null);
   const locationRestored = useRef(false);
   const taskListRef = useRef<HTMLUListElement | null>(null);
   const taskListModifier = useCallback<Modifier>((args) => restrictTaskListDrag(taskListRef.current, args), []);
-  const navigationReady = Boolean(accountId && navigationReadyAccountId === accountId);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const authenticatedRequest = useCallback(async <T,>(url: string, options: RequestInit = {}, expectedAccountId?: string) => {
+  const authenticatedRequest = useCallback(async <T,>(url: string, options: RequestInit = {}) => {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw new Error("Session expired. Please sign in again.");
-    if (expectedAccountId && sessionData.session.user.id !== expectedAccountId) throw new Error("Account changed before the request started.");
     const response = await fetch(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${sessionData.session.access_token}` }, cache: "no-store" });
     const body = await response.json().catch(() => null) as ({ error?: string } & T) | null;
     if (!response.ok) throw new Error(`${body?.error ?? "Task request failed."} (HTTP ${response.status})`);
@@ -208,75 +172,31 @@ export function TaskManager() {
     return body.data;
   }, [authenticatedRequest]);
 
-  const navigationApi = useCallback(async (expectedAccountId: string, options: RequestInit = {}) => {
-    const body = await authenticatedRequest<{ order?: unknown }>("/api/tasks/navigation-order", options, expectedAccountId);
-    if (!validNavigationOrder(body.order)) throw new Error("Task navigation response was incomplete.");
-    return body.order;
-  }, [authenticatedRequest]);
-
-  const loadNavigationPreference = useCallback(async (requestedAccountId = accountId) => {
-    if (!isAdmin || !requestedAccountId) return false;
-    const generation = ++navigationLoadGeneration.current;
-    navigationLoadAbort.current?.abort();
-    const controller = new AbortController();
-    navigationLoadAbort.current = controller;
-    setNavigationLoading(true);
-    setNavigationError("");
-    try {
-      const order = await navigationApi(requestedAccountId, { signal: controller.signal });
-      if (generation !== navigationLoadGeneration.current || accountIdRef.current !== requestedAccountId) return false;
-      setNavigationOrder(order);
-      setNavigationReadyAccountId(requestedAccountId);
-      return true;
-    } catch {
-      if (generation !== navigationLoadGeneration.current || accountIdRef.current !== requestedAccountId) return false;
-      setNavigationReadyAccountId(null);
-      setNavigationError("Could not load task view order. The current order is shown, but sorting is unavailable.");
-      return false;
-    } finally {
-      if (generation === navigationLoadGeneration.current && accountIdRef.current === requestedAccountId) {
-        setNavigationLoading(false);
-        if (navigationLoadAbort.current === controller) navigationLoadAbort.current = null;
-      }
-    }
-  }, [accountId, isAdmin, navigationApi]);
-
   const load = useCallback(async () => {
     if (!isAdmin || !accountId) return;
     const requestedAccountId = accountId;
     const generation = ++requestGeneration.current;
     setLoadingData(true); setError("");
     try {
-      const [taskResult] = await Promise.allSettled([api("/api/tasks"), loadNavigationPreference(requestedAccountId)]);
-      if (taskResult.status === "rejected") throw taskResult.reason;
+      const next = await api("/api/tasks");
       if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) {
-        const next = taskResult.value;
         setData(next);
         setDataAccountId(requestedAccountId);
         if (!locationRestored.current) {
           locationRestored.current = true;
           const saved = readLocation(next.projects);
-          if (saved) { setView(saved.view); setProjectId(saved.projectId); setTimelineStart(saved.timelineStart); setTimelineEnd(saved.timelineEnd); }
+          if (saved) { setView(saved.view); setProjectId(saved.projectId); }
           setLocationReady(true);
         }
       }
     }
     catch (failure) { if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) setError(failure instanceof Error ? failure.message : "Could not load tasks."); }
     finally { if (generation === requestGeneration.current && accountIdRef.current === requestedAccountId) setLoadingData(false); }
-  }, [accountId, api, isAdmin, loadNavigationPreference]);
+  }, [accountId, api, isAdmin]);
 
   useLayoutEffect(() => {
     accountIdRef.current = accountId;
     requestGeneration.current++;
-    navigationLoadGeneration.current++;
-    navigationSaveGeneration.current++;
-    navigationLoadAbort.current?.abort();
-    navigationSaveAbort.current?.abort();
-    navigationLoadAbort.current = null;
-    navigationSaveAbort.current = null;
-    navigationSaveInFlight.current = false;
-    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
-    navigationStatusTimer.current = null;
     const reset = window.setTimeout(() => {
       if (accountIdRef.current !== accountId) return;
       setData(null);
@@ -286,12 +206,6 @@ export function TaskManager() {
       setProjectDialog(null);
       setLocationReady(false);
       locationRestored.current = false;
-      setNavigationOrder(DEFAULT_NAVIGATION_ORDER);
-      setNavigationReadyAccountId(null);
-      setNavigationLoading(false);
-      setNavigationSaving(false);
-      setNavigationError("");
-      setNavigationStatus("");
     }, 0);
     return () => window.clearTimeout(reset);
   }, [accountId]);
@@ -302,17 +216,11 @@ export function TaskManager() {
     return () => { window.clearTimeout(timer); generation.current++; };
   }, [load]);
 
-  useEffect(() => () => {
-    navigationLoadAbort.current?.abort();
-    navigationSaveAbort.current?.abort();
-    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
-  }, []);
-
   useEffect(() => {
     if (!locationReady) return;
-    try { window.localStorage.setItem(LOCATION_KEY, JSON.stringify({ version: 1, view, projectId, timelineStart, timelineEnd } satisfies StoredLocation)); }
+    try { window.localStorage.setItem(LOCATION_KEY, JSON.stringify({ version: 2, view, projectId } satisfies StoredLocation)); }
     catch { /* Task navigation still works when browser storage is unavailable. */ }
-  }, [locationReady, projectId, timelineEnd, timelineStart, view]);
+  }, [locationReady, projectId, view]);
 
   async function mutate(url: string, options: RequestInit) {
     setSaving(true); setError("");
@@ -387,7 +295,7 @@ export function TaskManager() {
   async function deleteProject(project: TaskProject) {
     if (!window.confirm(`Delete project “${project.name}”? Its tasks will become Uncategorized and keep their dates.`)) return;
     const ok = await mutate(`/api/tasks/projects/${project.id}`, { method: "DELETE" });
-    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("all"); } }
+    if (ok) { setProjectDialog(null); if (projectId === project.id) { setProjectId(null); setView("uncategorized"); } }
   }
 
   async function quickAdd(event: FormEvent<HTMLFormElement>) {
@@ -403,61 +311,6 @@ export function TaskManager() {
 
   function select(next: View, selectedProject: string | null = null) { setView(next); setProjectId(selectedProject); setError(""); }
 
-  function applyRange(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const startDate = String(form.get("timelineStart") ?? "");
-    const endDate = String(form.get("timelineEnd") ?? "");
-    if (!validTimelineRange(startDate, endDate)) { setError("Choose an ordered date range of no more than two months."); return; }
-    setTimelineStart(startDate); setTimelineEnd(endDate); setError("");
-  }
-
-  async function navigationDragEnd(event: DragEndEvent) {
-    if (!navigationReady || navigationLoading || !accountId || !event.over || event.active.id === event.over.id || navigationSaveInFlight.current) return;
-    const requestedAccountId = accountId;
-    const sourceId = String(event.active.id).replace(/^view:/, "") as NavigationView;
-    const targetId = String(event.over.id).replace(/^view:/, "") as NavigationView;
-    const sourceIndex = navigationOrder.indexOf(sourceId);
-    const targetIndex = navigationOrder.indexOf(targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    const before = navigationOrder;
-    const next = arrayMove(navigationOrder, sourceIndex, targetIndex);
-    const generation = ++navigationSaveGeneration.current;
-    navigationSaveAbort.current?.abort();
-    const controller = new AbortController();
-    navigationSaveAbort.current = controller;
-    navigationSaveInFlight.current = true;
-    if (navigationStatusTimer.current !== null) window.clearTimeout(navigationStatusTimer.current);
-    navigationStatusTimer.current = null;
-    setNavigationOrder(next);
-    setNavigationSaving(true);
-    setNavigationError("");
-    setNavigationStatus("Saving task view order…");
-    try {
-      const saved = await navigationApi(requestedAccountId, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next }), signal: controller.signal });
-      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
-        setNavigationOrder(saved);
-        setNavigationStatus("Task view order saved.");
-        navigationStatusTimer.current = window.setTimeout(() => {
-          if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) setNavigationStatus("");
-          navigationStatusTimer.current = null;
-        }, 2400);
-      }
-    } catch {
-      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
-        setNavigationOrder(before);
-        setNavigationError("Could not save task view order. The previous order was restored.");
-        setNavigationStatus("");
-      }
-    } finally {
-      if (generation === navigationSaveGeneration.current && accountIdRef.current === requestedAccountId) {
-        navigationSaveInFlight.current = false;
-        setNavigationSaving(false);
-        if (navigationSaveAbort.current === controller) navigationSaveAbort.current = null;
-      }
-    }
-  }
-
   async function projectDragEnd(event: DragEndEvent) {
     if (!data || !event.over || event.active.id === event.over.id || saving) return;
     const sourceIndex = data.projects.findIndex((project) => project.id === event.active.id);
@@ -470,7 +323,7 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
-  const allTasks = useMemo(() => data?.tasks.filter((task) => !isArchivedTask(task)) ?? [], [data]);
+  const uncategorizedTasks = useMemo(() => data?.tasks.filter((task) => task.projectId === null) ?? [], [data]);
   const importantTasks = useMemo(() => {
     const baseOrder = new Map((data?.tasks ?? []).map((task, index) => [task.id, index]));
     return (data?.tasks.filter((task) => task.isImportant) ?? []).sort((a, b) =>
@@ -480,7 +333,7 @@ export function TaskManager() {
   }, [data]);
   const selectedProject = data?.projects.find((project) => project.id === projectId) ?? null;
   const projectTasks = selectedProject ? data?.tasks.filter((task) => task.projectId === selectedProject.id) ?? [] : [];
-  const visibleTasks = view === "all" ? allTasks : view === "important" ? importantTasks : projectTasks;
+  const visibleTasks = view === "uncategorized" ? uncategorizedTasks : view === "important" ? importantTasks : projectTasks;
 
   async function taskListDragEnd(event: DragEndEvent) {
     if (!data || !event.over || event.active.id === event.over.id || saving) return;
@@ -507,20 +360,8 @@ export function TaskManager() {
     if (!ok) setData(before);
   }
 
-  function dragEnd(event: DragEndEvent) {
-    if (String(event.active.id).startsWith("list:")) { void taskListDragEnd(event); return; }
-    if (!data || !event.over || saving) return;
-    const id = String(event.active.id).replace(/^task:/, "");
-    const task = data.tasks.find((item) => item.id === id);
-    if (!task) return;
-    const match = String(event.over.id).match(/(\d{4}-\d{2}-\d{2})$/);
-    if (!match) return;
-    const length = task.startDate && task.endDate ? daysBetween(task.startDate, task.endDate) : 0;
-    void patchTask(task, { startDate: match[1], endDate: addDays(match[1], length) });
-  }
-
-  const title = view === "all" ? "All tasks" : view === "important" ? "Important" : view === "project" ? selectedProject?.name ?? "Project" : "Gantt";
-  const description = view === "all" ? "All active project and uncategorized tasks." : view === "important" ? "Starred tasks from every project, including Archive." : "Scheduled and unscheduled tasks in this project.";
+  const title = view === "important" ? "Important" : view === "uncategorized" ? "Uncategorized" : selectedProject?.name ?? "Project";
+  const description = view === "important" ? "Starred tasks from every project, including Archive." : view === "uncategorized" ? "Tasks without a project." : "Scheduled and unscheduled tasks in this project.";
 
   const readyForAccount = Boolean(data && accountId && dataAccountId === accountId && isAdmin);
   if (loading && !readyForAccount) return <HomeAccess description="Opening home…" />;
@@ -529,19 +370,16 @@ export function TaskManager() {
   if (loadingData && (!data || dataAccountId !== accountId)) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
   if (!data || dataAccountId !== accountId) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
 
-  return <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[taskListModifier]} onDragEnd={dragEnd}>
+  return <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[taskListModifier]} onDragEnd={(event) => void taskListDragEnd(event)}>
     <div className="task-layout">
       <aside id="page-sidebar" className="places-sidebar tasks-sidebar" aria-label="Task views">
         <div className="tasks-sidebar-heading"><h2>Tasks</h2><button type="button" onClick={() => setTaskDialog({})} aria-label="Create task" title="Create task"><Plus size={14} /></button></div>
         <nav aria-label="Task navigation">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void navigationDragEnd(event)}>
-            <SortableContext items={navigationOrder.map((id) => `view:${id}`)} strategy={verticalListSortingStrategy}>
-              <div className="tasks-navigation-list">{navigationOrder.map((id) => <SortableNavigationRow key={id} id={id} active={view === id} disabled={!navigationReady || navigationLoading || navigationSaving} onSelect={() => select(id)} />)}</div>
-            </SortableContext>
-          </DndContext>
+          <div className="tasks-navigation-list">{Object.entries(NAVIGATION_VIEWS).map(([id, { label, icon: Icon }]) =>
+            <button key={id} className={view === id ? "selected" : ""} aria-current={view === id ? "page" : undefined} type="button" onClick={() => select(id as Exclude<View, "project">)}>
+              <Icon size={16} fill={id === "important" && view === id ? "currentColor" : "none"} /><span>{label}</span>
+            </button>)}</div>
         </nav>
-        {navigationError && <div className="task-navigation-error" role="alert"><span>{navigationError}</span><button type="button" disabled={navigationLoading} onClick={() => void loadNavigationPreference()}>{navigationLoading ? "Retrying…" : "Retry"}</button></div>}
-        <p className="sr-only" role="status" aria-live="polite">{navigationStatus}</p>
         <div className="tasks-project-heading"><h2>Projects</h2><button type="button" onClick={() => setProjectDialog("new")} aria-label="Create project" title="Create project"><Plus size={14} /></button></div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void projectDragEnd(event)}>
           <SortableContext items={data.projects.map((project) => project.id)} strategy={verticalListSortingStrategy}>
@@ -552,12 +390,11 @@ export function TaskManager() {
 
       <main className="task-main">
         <header className="task-header">
-          <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1>{view !== "gantt" && <span>{description}</span>}</div>
-          {view === "gantt" && <form key={`${timelineStart}:${timelineEnd}`} className="task-range-form" onSubmit={applyRange}><label>From<input name="timelineStart" type="date" defaultValue={timelineStart} required /></label><span aria-hidden="true">–</span><label>To<input name="timelineEnd" type="date" defaultValue={timelineEnd} required /></label><button type="submit">Apply</button></form>}
+          <div><p>PERSONAL WORKSPACE / OWNER ONLY</p><h1>{title}</h1><span>{description}</span></div>
         </header>
         <form className="task-quick-add" onSubmit={(event) => void quickAdd(event)}><Plus size={17} /><label className="sr-only" htmlFor="quick-task-title">Quick add task</label><input id="quick-task-title" name="title" maxLength={200} placeholder={view === "project" ? `Add a task to ${selectedProject?.name ?? "project"}…` : view === "important" ? "Add an important task…" : "Add a task…"} autoComplete="off" /><button type="submit" disabled={saving}>Add task</button></form>
         {error && <p className="task-error" role="alert">{error}</p>}
-        {view === "gantt" ? <GanttView timelineStart={timelineStart} timelineEnd={timelineEnd} tasks={allTasks} projects={data.projects} disabled={saving} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onResize={(task, startDate, endDate) => void patchTask(task, { startDate, endDate })} /> : <TaskList tasks={visibleTasks} empty={view === "all" ? "There are no active tasks yet." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />}
+        <TaskList tasks={visibleTasks} empty={view === "uncategorized" ? "There are no uncategorized tasks." : view === "important" ? "No tasks are marked Important." : "This project has no tasks."} projects={data.projects} disabled={saving} listRef={taskListRef} onOpen={setTaskDialog} onComplete={(task) => void completeTask(task)} onImportant={(task) => void toggleImportant(task)} onDelete={(task) => void deleteTask(task)} />
       </main>
     </div>
     {taskDialog && <TaskDialog value={taskDialog} projects={data.projects} busy={saving} error={error} onClose={closeTaskDialog} onDraftChange={rememberTaskDraft} onSave={saveTask} />}

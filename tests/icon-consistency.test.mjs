@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ChartGantt } from "lucide-react";
+import { Inbox } from "lucide-react";
 import ts from "typescript";
 
 const require = createRequire(new URL("../app/site-shell.tsx", import.meta.url));
@@ -92,12 +92,10 @@ for (const collapsed of [false, true]) {
   });
 }
 
-test("Gantt uses ChartGantt while task labels, ordering and other view icons stay intact", () => {
+test("task navigation uses Important and Uncategorized icons", () => {
   const tasks = source("app/tasks/task-manager.tsx");
-  assert.match(tasks, /gantt: \{ label: "Gantt", icon: ChartGantt \}/);
-  assert.match(tasks, /all: \{ label: "All tasks", icon: ListTodo \}/);
   assert.match(tasks, /important: \{ label: "Important", icon: Star \}/);
-  assert.match(tasks, /DEFAULT_NAVIGATION_ORDER: NavigationView\[\] = \["all", "important", "gantt"\]/);
-  assert.doesNotMatch(tasks, /CalendarRange/);
-  sizedIcon(renderToStaticMarkup(createElement(ChartGantt, { size: 16 })), "chart-gantt", 16);
+  assert.match(tasks, /uncategorized: \{ label: "Uncategorized", icon: Inbox \}/);
+  assert.doesNotMatch(tasks, /ChartGantt|label: "All tasks"/);
+  sizedIcon(renderToStaticMarkup(createElement(Inbox, { size: 16 })), "inbox", 16);
 });

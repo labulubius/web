@@ -9,7 +9,6 @@ const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
 const row = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableTaskRow");
-const navigationRow = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableNavigationRow");
 const compile = (node) => ts.transpileModule(node.getText(parsed), { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" } }).outputText;
 const archiveProjectId = "00000000-0000-4000-8000-000000000001";
 const task = { id: "task-1", title: "A long task title", projectId: null, isImportant: false, importantSortOrder: null };
@@ -78,17 +77,6 @@ test("task body is inert and edit, delete, complete stay separate", () => {
   assert.ok(nodes(renderList({ tasks: [], projects: [], empty: "Empty" })).some((n) => n.props.className === "task-empty"));
 });
 
-test("Gantt title and draggable bar do not activate editing", () => {
-  const gantt = readFileSync("app/tasks/gantt-view.tsx", "utf8");
-  assert.match(gantt, /<div className="gantt-task-label">/);
-  assert.doesNotMatch(gantt, /className="gantt-bar-main"[^>]*onClick/);
-  assert.match(gantt, /className="gantt-task-edit"[^\n]*onClick=\{\(\) => onOpen\(\{ task \}\)\}/);
-  assert.match(gantt, /ref=\{setActivatorNodeRef\}/);
-  assert.match(gantt, /\{\.\.\.listeners\} \{\.\.\.attributes\}/);
-  assert.match(gantt, /className="task-card-complete"[^\n]*disabled=\{disabled\}/, "gantt complete is locked while a save is in flight");
-  assert.match(gantt, /projects=\{projects\} disabled=\{disabled\}/, "gantt rows inherit the save state");
-});
-
 const dialogSource = readFileSync("app/tasks/task-dialogs.tsx", "utf8");
 const dialogParsed = ts.createSourceFile("dialogs.tsx", dialogSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const dialogNode = dialogParsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskDialog");
@@ -155,7 +143,7 @@ test("a remounted task dialog prefers its in-memory draft over saved task values
   assert.equal(all.find((node) => node.props.name === "endDate").props.defaultValue, draft.endDate);
 });
 
-for (const view of ["all", "important", "gantt", "project"]) {
+for (const view of ["important", "uncategorized", "project"]) {
   for (const success of [true, false]) {
     test(`quick add saves directly without a dialog (${view}, success: ${success})`, async () => {
       const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
@@ -177,12 +165,12 @@ test("quick add ignores blank titles without opening a dialog", async () => {
   const quickAdd = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "quickAdd");
   const unexpected = () => assert.fail("Blank title must not submit, reset, or open a dialog");
   const handle = new Function("FormData", "view", "projectId", "mutate", "setTaskDialog", `${compile(quickAdd)}; return quickAdd;`)(
-    class { get() { return "   "; } }, "all", null, unexpected, unexpected,
+    class { get() { return "   "; } }, "uncategorized", null, unexpected, unexpected,
   );
   await handle({ preventDefault() {}, currentTarget: { reset: unexpected } });
 });
 
-test("uncategorized tasks retain dates in the list and can move on Gantt", () => {
+test("uncategorized tasks retain dates in the list", () => {
   const scheduled = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
   const renderRow = new Function("h", "useSortable", "CSS", "Circle", "Star", "Pencil", "Trash2", "shortDate", `${compile(row)}; return SortableTaskRow;`)(
     h, () => ({ attributes: {}, listeners: {}, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false }),
@@ -190,44 +178,15 @@ test("uncategorized tasks retain dates in the list and can move on Gantt", () =>
   );
   const tree = renderRow({ task: scheduled, projectName: "Uncategorized", disabled: false, onOpen() {}, onComplete() {}, onImportant() {}, onDelete() {} });
   assert.ok(nodes(tree).some((n) => n.tag === "span" && n.children.includes("2026-10-10 – 2026-10-15")));
-  const drag = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "dragEnd");
-  const patches = [];
-  const handle = new Function("data", "saving", "daysBetween", "addDays", "patchTask", `${compile(drag)}; return dragEnd;`)(
-    { tasks: [scheduled] }, false, () => 5, () => "2026-10-16", (task, patch) => patches.push([task, patch]),
-  );
-  handle({ active: { id: "task:task-1" }, over: { id: "gantt:task-1:2026-10-11" } });
-  assert.deepEqual(patches, [[scheduled, { startDate: "2026-10-11", endDate: "2026-10-16" }]]);
 });
 
-
-test("Gantt includes dated uncategorized tasks and excludes unscheduled or out-of-range tasks", () => {
-  const source = readFileSync("app/tasks/gantt-view.tsx", "utf8");
-  const parsed = ts.createSourceFile("gantt.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const node = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "GanttView");
-  const code = ts.transpileModule(node.getText(parsed).replace("export function", "function"), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "h" },
-  }).outputText;
-  const render = new Function("h", "useMemo", "dateRange", "localDate", "fromLocalDate", "longDate", "shortDate", "DayCell", "GanttBar", "Pencil", `${code}; return GanttView;`)(
-    h, (fn) => fn(), () => ["2026-10-10", "2026-10-11"], () => "2026-10-10", (date) => new Date(`${date}T12:00:00`), (date) => date, (date) => date, "day", "bar", "pencil",
-  );
-  const dated = { ...task, startDate: "2026-10-10", endDate: "2026-10-15" };
-  const tree = render({ timelineStart: "2026-10-10", timelineEnd: "2026-10-11", projects: [], tasks: [task, dated, { ...dated, id: "outside", startDate: "2026-11-01", endDate: "2026-11-02" }] });
-  const bars = nodes(tree).filter((n) => n.tag === "bar");
-  assert.equal(bars.length, 1);
-  assert.equal(bars[0].props.task, dated);
-});
-
-test("Archive is an ordinary project row while its tasks stay out of active views", () => {
-  const all = source.indexOf('label: "All tasks"');
-  const gantt = source.indexOf('label: "Gantt"');
-  assert.ok(all >= 0 && all < gantt);
+test("Archive remains an ordinary project and Uncategorized keeps orphaned tasks accessible", () => {
   assert.doesNotMatch(source, /<span>Archive<\/span>|ArchiveIcon/);
-  assert.match(source, /data\?\.tasks\.filter\(\(task\) => !isArchivedTask\(task\)\)/);
-  assert.match(source, /tasks=\{allTasks\}/);
+  assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.projectId === null\)/);
   assert.match(source, /items=\{data\.projects\.map/);
   assert.match(source, /data\.projects\.map\(\(project\) => <SortableProjectRow/);
-  assert.match(source, /storedView === "archive" \? "project"/);
-  assert.match(source, /storedView === "archive" \? TASK_ARCHIVE_PROJECT_ID/);
+  assert.match(source, /value\.view === "archive" \? TASK_ARCHIVE_PROJECT_ID/);
+  assert.match(source, /setView\("uncategorized"\)/);
 });
 
 test("Archive is available in the task editor and another project can restore a task", () => {
@@ -245,12 +204,11 @@ test("Archive is available in the task editor and another project can restore a 
 });
 
 
-test("Important navigation includes starred Archive tasks without adding them to active views", () => {
+test("Important navigation includes starred Archive tasks", () => {
   assert.match(source, /important: \{ label: "Important"/);
   assert.match(source, /data\?\.tasks\.filter\(\(task\) => task\.isImportant\)/);
   assert.match(source, /Starred tasks from every project, including Archive/);
   assert.match(source, /view === "important" \? importantTasks/);
-  assert.match(source, /tasks=\{allTasks\}/);
 });
 
 test("task list sorting separates base and Important persistence", () => {
@@ -268,49 +226,34 @@ test("task list dragging stays inside the visible list", () => {
   const list = { getBoundingClientRect: () => ({ top: 100, bottom: 300 }) };
   assert.deepEqual(modifier(list, { active: { id: "list:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform }), { ...transform, x: 0, y: 125 });
   assert.deepEqual(modifier(list, { active: { id: "list:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform: { ...transform, y: -100 } }), { ...transform, x: 0, y: -20 });
-  assert.equal(modifier(list, { active: { id: "task:task-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform }), transform, "Gantt dragging is unchanged");
+  assert.equal(modifier(list, { active: { id: "project-1" }, draggingNodeRect: { top: 120, bottom: 175 }, transform }), transform, "project dragging is unchanged");
   assert.match(source, /modifiers=\{\[taskListModifier\]\}/);
   assert.match(source, /<ul ref=\{listRef\} className="task-list">/);
 });
 
 
-test("task view rows are fully draggable, selectable, and namespaced from other sortables", () => {
-  const calls = [];
-  const pointer = () => {};
-  const render = new Function("h", "useSortable", "CSS", "NAVIGATION_VIEWS", `${compile(navigationRow)}; return SortableNavigationRow;`)(
-    h,
-    (options) => {
-      calls.push(options);
-      return { attributes: { "aria-roledescription": "sortable" }, listeners: { onPointerDown: pointer }, setNodeRef() {}, setActivatorNodeRef() {}, transform: null, transition: undefined, isDragging: false };
-    },
-    { Transform: { toString: () => undefined } },
-    { all: { label: "All tasks", icon: "list" }, important: { label: "Important", icon: "star" }, gantt: { label: "Gantt", icon: "calendar" } },
-  );
-  let selected = 0;
-  const tree = render({ id: "important", active: true, disabled: false, onSelect: () => selected++ });
-  assert.deepEqual(calls, [{ id: "view:important", disabled: false }]);
-  const button = nodes(tree).find((node) => node.tag === "button");
-  assert.equal(button.props.onPointerDown, pointer);
-  assert.equal(button.props["aria-current"], "page");
-  assert.equal(button.props["aria-roledescription"], "sortable");
-  button.props.onClick();
-  assert.equal(selected, 1);
+test("retired browser locations restore to active task views", () => {
+  const read = parsed.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "readLocation");
+  const storage = { value: null, getItem() { return JSON.stringify(this.value); } };
+  const restore = new Function("window", "TASK_ARCHIVE_PROJECT_ID", "LOCATION_KEY", `${compile(read)}; return readLocation;`)({ localStorage: storage }, archiveProjectId, "site-tasks-location-v1");
+  const projects = [{ id: archiveProjectId, name: "Archive" }, { id: "project-1", name: "Course" }];
+  for (const view of ["all", "inbox", "uncategorized"]) {
+    storage.value = { version: 1, view, projectId: null };
+    assert.deepEqual(restore(projects), { version: 2, view: "uncategorized", projectId: null });
+  }
+  storage.value = { version: 1, view: "gantt", projectId: null };
+  assert.deepEqual(restore(projects), { version: 2, view: "important", projectId: null });
+  storage.value = { version: 1, view: "archive", projectId: null };
+  assert.deepEqual(restore(projects), { version: 2, view: "project", projectId: archiveProjectId });
+  storage.value = { version: 2, view: "project", projectId: "missing" };
+  assert.deepEqual(restore(projects), { version: 2, view: "uncategorized", projectId: null });
 });
 
-test("task navigation sorting is isolated, optimistic, and rolls back independently", () => {
-  assert.match(source, /items=\{navigationOrder\.map\(\(id\) => `view:\$\{id\}`\)\}/);
-  assert.match(source, /<DndContext sensors=\{sensors\} collisionDetection=\{closestCenter\} onDragEnd=\{\(event\) => void navigationDragEnd\(event\)\}>/);
-  assert.match(source, /navigationSaveInFlight\.current/);
-  assert.match(source, /setNavigationOrder\(next\)/);
-  assert.match(source, /method: "PUT"/);
-  assert.match(source, /JSON\.stringify\(\{ order: next \}\)/);
-  assert.match(source, /setNavigationOrder\(before\)/);
-  assert.match(source, /setNavigationSaving\(true\)/);
-  assert.doesNotMatch(source, /setSaving\(true\)[\s\S]{0,120}navigation-order/);
-  assert.match(source, /PointerSensor/);
-  assert.match(source, /TouchSensor/);
-  assert.match(source, /KeyboardSensor/);
-  assert.match(source, /className="sr-only" role="status" aria-live="polite"/);
+test("home offers only Important, Uncategorized and project task views", () => {
+  assert.match(source, /important: \{ label: "Important"/);
+  assert.match(source, /uncategorized: \{ label: "Uncategorized"/);
+  assert.doesNotMatch(source, /label: "All tasks"|label: "Gantt"|<GanttView|task-range-form/);
+  assert.match(source, /useState<View>\("important"\)/);
 });
 
 test("same-account auth rechecks keep the loaded task workspace mounted", () => {
@@ -322,39 +265,4 @@ test("same-account auth rechecks keep the loaded task workspace mounted", () => 
   assert.match(source, /if \(!data \|\| dataAccountId !== accountId\) return <section/);
   assert.match(source, /setDataAccountId\(null\)/);
   assert.match(source, /setTaskDialog\(null\)/);
-});
-
-test("task navigation preferences are bound to the initiating account and stale work is invalidated", () => {
-  assert.match(source, /const \{ supabase, user, isAdmin/);
-  assert.match(source, /const accountId = user\?\.id \?\? null/);
-  assert.match(source, /sessionData\.session\.user\.id !== expectedAccountId/);
-  assert.match(source, /accountIdRef\.current !== requestedAccountId/);
-  assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*navigationLoadGeneration\.current\+\+/);
-  assert.match(source, /navigationSaveGeneration\.current\+\+/);
-  assert.match(source, /navigationLoadAbort\.current\?\.abort\(\)/);
-  assert.match(source, /navigationSaveAbort\.current\?\.abort\(\)/);
-  assert.match(source, /setNavigationOrder\(DEFAULT_NAVIGATION_ORDER\)/);
-  assert.match(source, /setNavigationReadyAccountId\(null\)/);
-  assert.match(source, /setNavigationSaving\(false\)/);
-});
-
-test("failed task-navigation loads disable only sorting and expose a focused retry", () => {
-  assert.match(source, /const navigationReady = Boolean\(accountId && navigationReadyAccountId === accountId\)/);
-  assert.match(source, /disabled=\{!navigationReady \|\| navigationLoading \|\| navigationSaving\}/);
-  assert.match(source, /onSelect=\{\(\) => select\(id\)\}/);
-  assert.match(source, /if \(!navigationReady \|\| navigationLoading \|\| !accountId/);
-  assert.match(source, /onClick=\{\(\) => void loadNavigationPreference\(\)\}/);
-  assert.match(source, />\{navigationLoading \? "Retrying…" : "Retry"\}<\/button>/);
-  assert.match(source, /sorting is unavailable/);
-});
-
-test("task navigation has no permanent feedback row and clears success announcements", () => {
-  const styles = readFileSync("app/tasks/tasks.css", "utf8");
-  assert.doesNotMatch(source, /task-navigation-feedback|navigationStatus \|\| " "/);
-  assert.doesNotMatch(styles, /task-navigation-feedback|min-height: 24px/);
-  assert.match(source, /className="sr-only" role="status" aria-live="polite"/);
-  assert.match(source, /window\.setTimeout\(\(\) => \{/);
-  assert.match(source, /setNavigationStatus\(""\)/);
-  assert.match(source, /\}, 2400\)/);
-  assert.match(source, /navigationError && <div className="task-navigation-error" role="alert">/);
 });

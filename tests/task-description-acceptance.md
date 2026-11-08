@@ -1,3 +1,5 @@
+> Historical acceptance record. The Gantt and All tasks homepage views were removed in the subsequent homepage simplification.
+
 # Home task descriptions and independent dates — acceptance
 
 Target route: `/` (Home tasks, including All tasks and Gantt).
