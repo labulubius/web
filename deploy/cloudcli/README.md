@@ -9,11 +9,11 @@
 - No extra main-site/Supabase authentication gate. CloudCLI's native authentication is retained; hosted platform mode is explicitly disabled. Signing out of the main site does not sign out of this independent application.
 - Claude credentials, provider settings and existing Remote Control services are not changed by deployment. Changes made later inside CloudCLI may affect the same provider configuration used by the native CLIs.
 
-## Main-site shell integration
+## Fullscreen entry, matching Pi Web
 
-The `/cloudcli` page reuses `SiteShell`, preserving the main toolbar, active navigation, account/theme controls and status bar. The existing persistent iframe remains mounted outside the route subtree, while a route-owned content slot measures its actual viewport and bounds the frame to that rectangle. ResizeObserver, window and visual-viewport events keep it aligned without hard-coded toolbar heights, iframe reparenting, changing its URL or remounting it on navigation. ARIA ownership links the persistent workspace to the visible content slot. Unmounting the slot clears only its geometry, observers and listeners.
+At the owner's request, `/cloudcli` follows the same frameless route pattern as `/pi-web`: its page returns null and the existing root-level persistent iframe fills the viewport. The main-site toolbar and status bar are not rendered on this route. CloudCLI's own interface and navigation remain unchanged. Other main-site pages retain their toolbar, Places links, and swapped CloudCLI (Bot) / Pi Web (Terminal) icons.
 
-The route-owned `cloudcli-shell.css` overrides are gated by the content-slot marker. Shared shell/layout/authentication files and the original iframe component stay unchanged. Loading this fresh route from an older cached main-site shell still applies the content-area layout; Pi Web remains independent. Main-site theme/account controls govern the main site, not CloudCLI's independent account or internal theme settings.
+The temporary route-owned content-slot components, measurements and CSS overrides have been removed. The original iframe, its URL, root layout and persistence wrapper remain unchanged; leaving the route only hides the mounted workspace. Use browser Back or navigate to another main-site address to return to the site. No main-site authentication gate or provider-credential changes are part of this layout change.
 
 ## Process and data separation
 
