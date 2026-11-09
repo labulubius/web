@@ -1,6 +1,6 @@
 "use client";
 
-import { Compass, Home, Info, Menu, MessageSquareCode, Monitor, Moon, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Sun } from "lucide-react";
+import { Compass, Home, Info, MessageSquareCode, Monitor, Moon, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AccountControl } from "./site-auth";
@@ -86,6 +86,7 @@ export function SiteShell({
 
   const ThemeIcon = displayedThemeMode === "system" ? Monitor : displayedThemeMode === "light" ? Sun : Moon;
   const SidebarIcon = displayedSidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
+  const MobileSidebarIcon = mobileSidebarOpen ? PanelLeftClose : PanelLeftOpen;
 
   return (
     <div
@@ -108,7 +109,7 @@ export function SiteShell({
             aria-label={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
             title={mobileSidebarOpen ? "Close sidebar" : "Show sidebar"}
           >
-            <Menu size={18} />
+            <MobileSidebarIcon size={18} />
             <span>Sidebar</span>
           </button>}
           {hasSidebar && <button

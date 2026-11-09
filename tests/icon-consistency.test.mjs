@@ -76,7 +76,7 @@ test("main navigation and Places render the same five icons, labels and destinat
 });
 
 for (const collapsed of [false, true]) {
-  test(`desktop sidebar icon matches its ${collapsed ? "collapsed" : "expanded"} state without changing mobile Menu`, () => {
+  test(`desktop sidebar icon matches its ${collapsed ? "collapsed" : "expanded"} state and mobile closed icon`, () => {
     const html = shell(collapsed);
     const desktop = html.match(/<button\b[^>]*class="sidebar-toggle"[^>]*>[\s\S]*?<\/button>/)?.[0];
     const mobile = html.match(/<button\b[^>]*class="sidebar-toggle mobile-sidebar-toggle"[^>]*>[\s\S]*?<\/button>/)?.[0];
@@ -86,8 +86,9 @@ for (const collapsed of [false, true]) {
     assert.match(desktop, new RegExp(`aria-label="${collapsed ? "Show" : "Hide"} sidebar"`));
     assert.match(desktop, /aria-controls="page-sidebar"/);
     assert.match(desktop, /title="(?:Show|Hide) sidebar"/);
-    sizedIcon(mobile, "menu", 18);
+    sizedIcon(mobile, "panel-left-open", 18);
     assert.match(mobile, /aria-label="Show sidebar"/);
+    assert.match(mobile, /aria-expanded="false"/);
   });
 }
 
