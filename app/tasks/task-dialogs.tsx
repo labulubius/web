@@ -61,7 +61,7 @@ export function TaskDialog({ value, projects, busy, error, onClose, onDraftChang
     <form onChange={changeDraft} onInput={changeDraft} onSubmit={(event) => void submit(event)}>
       <div className="task-form-primary">
         <label>Title<input ref={titleInput} name="title" defaultValue={initial.title} maxLength={200} required /></label>
-        <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}><option value="">Uncategorized</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+        <label>Project<select name="projectId" defaultValue={initial.projectId ?? ""}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
       </div>
       <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={initial.description} /></label>
       <div className="task-form-row">

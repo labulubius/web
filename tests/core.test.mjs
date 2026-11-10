@@ -58,7 +58,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.doesNotMatch(manager, /completedAt|view === "completed"/);
   assert.doesNotMatch(dialog, /name="notes"|task-dialog-secondary/);
   assert.match(dialog, /<textarea name="description" maxLength=\{300\} rows=\{3\}/);
-  assert.match(dialog, /Uncategorized/);
+  assert.doesNotMatch(dialog, /Uncategorized|<option value="">/);
   assert.match(dialog, /task-form-primary/);
   assert.doesNotMatch(manager, /task-range-shift|This month|moveRange/);
   assert.doesNotMatch(types, /notes:/);

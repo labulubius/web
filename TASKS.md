@@ -8,7 +8,7 @@ The sidebar offers Important and the ordered Projects list. Important shows star
 
 Archive is an ordinary project row with the same selection, quick-add, rename, delete and drag-order interactions as other projects. Its reserved ID remains in persistent data for compatibility. Deleting a project makes its tasks Uncategorized while retaining their dates. Tasks without a project have no separate sidebar view; starred ones remain visible in Important. The delete confirmation states this visibility change.
 
-Tasks have a title, optional short description, optional project, independently optional start and due dates, and an Important flag. Dates remain visible and editable in list and dialog views. Completing a task permanently deletes it. There is no completed-task history or restore view. List rows have explicit edit and confirmed Delete actions. Projects and tasks can be reordered by dragging; Important has its own order. The task editor contains Cancel and Save.
+Tasks have a title, optional short description, optional project, independently optional start and due dates, and an Important flag. Dates remain visible and editable in list and dialog views. Completing a task permanently deletes it. There is no completed-task history or restore view. List rows have explicit edit and confirmed Delete actions. Projects and tasks can be reordered by dragging; Important has its own order. The task editor's Project selector lists only existing projects; it has no Uncategorized option. The task editor contains Cancel and Save.
 
 The current version excludes dependencies, progress percentages, milestones, recurrence, reminders, labels, priority levels, nested projects, collaboration and external calendar synchronization.
 
