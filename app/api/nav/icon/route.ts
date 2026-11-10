@@ -1,8 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import { Readable } from "node:stream";
+import { requireSiteAdmin } from "../../../lib/admin-auth";
 import { publicAddress } from "../../../lib/public-network";
 
 export const runtime = "nodejs";
@@ -29,30 +30,6 @@ function getSupabaseConfiguration() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error("Supabase is not configured.");
   return { url, key };
-}
-
-function getAccessToken(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1] ?? null;
-}
-
-async function getAdminClient(request: Request) {
-  const token = getAccessToken(request);
-  if (!token) return null;
-
-  const { url, key } = getSupabaseConfiguration();
-  const supabase = createClient(url, key, {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  const [{ data: userData, error: userError }, { data: isAdmin, error: adminError }] = await Promise.all([
-    supabase.auth.getUser(token),
-    supabase.rpc("site_is_admin"),
-  ]);
-
-  if (userError || !userData.user || adminError || isAdmin !== true) return null;
-  return supabase;
 }
 
 async function assertPublicUrl(value: string) {
@@ -243,7 +220,7 @@ function isManagedIconUrl(value: string, supabaseUrl: string) {
   return value.startsWith(`${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}/`);
 }
 
-type AdminClient = NonNullable<Awaited<ReturnType<typeof getAdminClient>>>;
+type AdminClient = SupabaseClient;
 
 async function retryStorageOperation(operation: () => Promise<void>) {
   let lastError: unknown;
@@ -336,7 +313,7 @@ async function storeIcon(supabase: AdminClient, siteId: string, siteUrl: string,
 
 export async function POST(request: Request) {
   try {
-    const supabase = await getAdminClient(request);
+    const supabase = (await requireSiteAdmin(request))?.supabase;
     if (!supabase) return Response.json({ error: "Unauthorized." }, { status: 401 });
 
     const body = await request.json() as RequestBody;
@@ -364,7 +341,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   let websiteDeleted = false;
   try {
-    const supabase = await getAdminClient(request);
+    const supabase = (await requireSiteAdmin(request))?.supabase;
     if (!supabase) return Response.json({ error: "Unauthorized." }, { status: 401 });
 
     const body = await request.json() as RequestBody;

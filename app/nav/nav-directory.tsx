@@ -14,29 +14,16 @@ import {
   arrayMove,
   rectSortingStrategy,
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
-  Compass,
-  Folder,
-  Globe2,
-  LayoutGrid,
-  Pencil,
-  Plus,
-  Search,
-  Star,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Compass, Plus, Search, Star, X } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibleDialog } from "../accessible-dialog";
 import { OwnerAccess } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
+import { type Dialog, NavDialog } from "./nav-dialogs";
+import { SiteCard, SortableCategoryRow } from "./nav-items";
+import { visibleSites } from "./site-filter";
 import type { Category, Site } from "./sites";
-
-type Dialog = "site" | "category" | null;
 
 const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect }) => {
   if (!draggingNodeRect || !windowRect) return transform;
@@ -52,117 +39,6 @@ const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect 
   );
   return next;
 };
-
-function SortableCategoryRow({
-  category,
-  active,
-  isAdmin,
-  onSelect,
-  onEdit,
-  onDelete,
-}: {
-  category: Category;
-  active: boolean;
-  isAdmin: boolean;
-  onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: category.id,
-    disabled: !isAdmin,
-  });
-
-  return (
-    <div
-      className={`category-row${isAdmin ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
-    >
-      <button
-        className={active ? "active" : ""}
-        onClick={onSelect}
-        type="button"
-        {...(isAdmin ? attributes : {})}
-        {...(isAdmin ? listeners : {})}
-      >
-        {isAdmin ? <Folder size={16} /> : <LayoutGrid size={16} />}<span>{category.name}</span>
-      </button>
-      <span className="category-actions" onPointerDown={(event) => event.stopPropagation()}>
-        <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${category.name}`}><Pencil size={12} /></button>
-        <button type="button" disabled={!isAdmin} onClick={onDelete} aria-label={`Delete ${category.name}`}><Trash2 size={12} /></button>
-      </span>
-    </div>
-  );
-}
-
-function SiteCard({
-  site,
-  category,
-  isAdmin,
-  canReorder,
-  onEdit,
-  onDelete,
-  onFavorite,
-}: {
-  site: Site;
-  category?: Category;
-  isAdmin: boolean;
-  canReorder: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onFavorite: () => void;
-}) {
-  const icon = site.icon_url;
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: site.id,
-    disabled: !canReorder,
-  });
-
-  return (
-    <article
-      className={`site-card${isAdmin ? " admin" : ""}${site.is_favorite ? " favorite" : ""}${canReorder ? " reorderable" : ""}${isDragging ? " dragging" : ""}`}
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : undefined }}
-      {...(canReorder ? listeners : {})}
-    >
-      <a
-        className="site-card-link"
-        draggable={false}
-        href={site.url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <div className="site-card-body">
-          <span className="site-logo">
-            <Globe2 className="site-logo-fallback" size={40} strokeWidth={1.35} aria-hidden="true" />
-            {/* Dynamic third-party favicons are intentionally not routed through Next Image. */}
-            {icon && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt=""
-                draggable={false}
-                src={icon}
-                onLoad={(event) => { event.currentTarget.style.display = ""; }}
-                onError={(event) => { event.currentTarget.style.display = "none"; }}
-              />
-            )}
-          </span>
-          <span className="site-card-copy">
-            <strong>{site.name}</strong>
-            <small>{site.description || site.url}</small>
-            <em>{category?.name ?? "Uncategorized"}</em>
-          </span>
-        </div>
-      </a>
-      <span className="site-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-        <button className={site.is_favorite ? "favorite-button active" : "favorite-button"} type="button" disabled={!isAdmin} onClick={onFavorite} aria-label={`${site.is_favorite ? "Remove" : "Add"} ${site.name} ${site.is_favorite ? "from" : "to"} favorites`} title={site.is_favorite ? "Remove from favorites" : "Add to favorites"}><Star size={14} fill={site.is_favorite ? "currentColor" : "none"} /></button>
-        <button type="button" disabled={!isAdmin} onClick={onEdit} aria-label={`Edit ${site.name}`} title="Edit website"><Pencil size={14} /></button>
-        <button type="button" disabled={!isAdmin} onClick={onDelete} aria-label={`Delete ${site.name}`} title="Delete website"><Trash2 size={14} /></button>
-      </span>
-    </article>
-  );
-}
 
 export function NavDirectory() {
   const { supabase, isAdmin, loading: authLoading, authError, retryAuth } = useSiteAuth();
@@ -233,26 +109,7 @@ export function NavDirectory() {
     }
   }, [categoryId, categories]);
 
-  const filteredSites = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    const categoryOrder = new Map(categories.map((category, index) => [category.id, index]));
-    return sites
-      .filter((site) => {
-        const inCategory = categoryId === "favorites" ? site.is_favorite : site.category_id === categoryId;
-        const category = categories.find((item) => item.id === site.category_id)?.name ?? "";
-        const searchable = `${site.name} ${site.description} ${site.url} ${category}`.toLowerCase();
-        return inCategory && (!keyword || searchable.includes(keyword));
-      })
-      .sort((a, b) => {
-        if (categoryId === "favorites") {
-          const favoriteDifference = (a.favorite_sort_order ?? a.sort_order) - (b.favorite_sort_order ?? b.sort_order);
-          if (favoriteDifference !== 0) return favoriteDifference;
-          const categoryDifference = (categoryOrder.get(a.category_id) ?? Number.MAX_SAFE_INTEGER) - (categoryOrder.get(b.category_id) ?? Number.MAX_SAFE_INTEGER);
-          if (categoryDifference !== 0) return categoryDifference;
-        }
-        return a.sort_order - b.sort_order || a.name.localeCompare(b.name);
-      });
-  }, [categories, categoryId, query, sites]);
+  const filteredSites = useMemo(() => visibleSites(sites, categories, categoryId, query), [categories, categoryId, query, sites]);
 
   const canReorderSites = isAdmin && query.trim() === "";
   const supportsFavoriteOrder = sites.some((site) => site.favorite_sort_order !== undefined);
@@ -538,34 +395,18 @@ export function NavDirectory() {
       </section>
 
       {dialog && (
-        <AccessibleDialog labelledBy="dialog-title" busy={saving} onClose={closeDialog}>
-            <header>
-              <h2 id="dialog-title">{dialog === "site" ? `${editingSite ? "Edit" : "Add"} website` : `${editingCategory ? "Edit" : "Add"} group`}</h2>
-              <button type="button" disabled={saving} onClick={closeDialog} aria-label="Close"><X size={17} /></button>
-            </header>
-
-            {dialog === "category" && (
-              <form onSubmit={handleCategorySave}>
-                <label>Group name<input name="name" defaultValue={editingCategory?.name ?? ""} maxLength={60} autoFocus required /></label>
-                {message && <p className="form-error" role="alert">{message}</p>}
-                <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button></footer>
-              </form>
-            )}
-
-            {dialog === "site" && (
-              <form onSubmit={handleSiteSave}>
-                <div className="form-grid">
-                  <label>Website name<input name="name" defaultValue={editingSite?.name ?? ""} maxLength={100} autoFocus required /></label>
-                  <label>Group<select name="category_id" defaultValue={editingSite?.category_id ?? (categoryId === "favorites" ? categories[0]?.id : categoryId)} required>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
-                </div>
-                <label>Website URL<input name="url" type="url" placeholder="https://example.com" defaultValue={editingSite?.url ?? ""} required /></label>
-                <label>Description<textarea name="description" maxLength={300} rows={3} defaultValue={editingSite?.description ?? ""} /></label>
-                <label>Custom icon source URL <small>(optional)</small><input name="icon_url" type="url" placeholder="Leave blank to find the website favicon automatically" /></label>
-                {message && <p className="form-error" role="alert">{message}</p>}
-                <footer><button type="button" disabled={saving} onClick={closeDialog}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save website"}</button></footer>
-              </form>
-            )}
-        </AccessibleDialog>
+        <NavDialog
+          dialog={dialog}
+          editingSite={editingSite}
+          editingCategory={editingCategory}
+          categories={categories}
+          categoryId={categoryId}
+          saving={saving}
+          message={message}
+          onClose={closeDialog}
+          onSiteSave={handleSiteSave}
+          onCategorySave={handleCategorySave}
+        />
       )}
     </div>
   );

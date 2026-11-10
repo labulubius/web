@@ -6,6 +6,10 @@ import { GET as health } from "../app/api/health/route.ts";
 import { reorderTaskProjects } from "../app/tasks/project-order.ts";
 import nextConfig from "../next.config.ts";
 
+// The navigator UI is split across route-owned files; checks apply to all of them.
+const navigatorSource = async () => (await Promise.all(["nav-directory.tsx", "nav-items.tsx", "nav-dialogs.tsx", "site-filter.ts"]
+  .map((name) => readFile(new URL(`../app/nav/${name}`, import.meta.url), "utf8")))).join("\n");
+
 test("Tasks uses a prerendered client shell like Navigator while private data stays behind its API", async () => {
   const home = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(home, /force-dynamic/);
@@ -38,8 +42,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(server, /O_NOFOLLOW/);
   assert.match(server, /await handle\.sync\(\)/);
   assert.match(server, /await rename\(/);
-  assert.match(server, /site_is_admin/);
-  assert.match(api, /requireTasksAdmin/);
+  assert.match(api, /requireSiteAdmin/);
   assert.match(api, /taskPrivateHeaders/);
   assert.match(server, /Cache-Control/);
   assert.match(manager, /<HomeAccess/);
@@ -125,7 +128,7 @@ test("global headers include baseline browser protections", async () => {
 test("old /pi stays removed while the embedded Pi Web lives at /pi-web without redirects", async () => {
   await assert.rejects(access(new URL("../app/pi", import.meta.url)), { code: "ENOENT" });
   await access(new URL("../app/pi-web/page.tsx", import.meta.url));
-  const redirects = await nextConfig.redirects();
+  const redirects = await nextConfig.redirects?.() ?? [];
   assert.ok(redirects.every(({ source }) => source !== "/pi" && source !== "/pi-web" && !source.startsWith("/pi/")));
 });
 
@@ -163,7 +166,7 @@ test("sidebar controls render for the configured workspace pages", async () => {
 });
 
 test("Navigator is owner-only and has no obsolete guest visibility controls", async () => {
-  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const directory = await navigatorSource();
   const types = await readFile(new URL("../app/nav/sites.ts", import.meta.url), "utf8");
   const layout = await readFile(new URL("../app/nav/layout.tsx", import.meta.url), "utf8");
   const privateMigration = await readFile(new URL("../supabase/migrations/202610220001_private_navigator.sql", import.meta.url), "utf8");
@@ -182,7 +185,7 @@ test("Navigator is owner-only and has no obsolete guest visibility controls", as
 });
 
 test("Navigator icon imports use a public fallback without exposing managed URLs as custom sources", async () => {
-  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const directory = await navigatorSource();
   const iconRoute = await readFile(new URL("../app/api/nav/icon/route.ts", import.meta.url), "utf8");
 
   assert.match(iconRoute, /https:\/\/icons\.duckduckgo\.com\/ip3\/\$\{new URL\(finalSiteUrl\)\.hostname\}\.ico/);
@@ -193,7 +196,7 @@ test("Navigator icon imports use a public fallback without exposing managed URLs
 test("sidebar create and delete actions share a trailing axis", async () => {
   const tasks = await readFile(new URL("../app/tasks/tasks.css", import.meta.url), "utf8");
   const navigator = await readFile(new URL("../app/nav/nav.css", import.meta.url), "utf8");
-  const directory = await readFile(new URL("../app/nav/nav-directory.tsx", import.meta.url), "utf8");
+  const directory = await navigatorSource();
 
   for (const stylesheet of [tasks, navigator]) assert.match(stylesheet, /margin: 8px 4px 5px 9px/);
   assert.match(tasks, /\.tasks-project-list > div \{[^}]*min-width: 0/);
@@ -233,4 +236,6 @@ test("retired Forums route, API, navigation, and parser stay absent", async () =
   assert.doesNotMatch(sidebar, /\/forums|MessagesSquare/);
   assert.doesNotMatch(globals, /forums-/);
   assert.doesNotMatch(packageJson, /fast-xml-parser/);
+  const redirects = await nextConfig.redirects?.() ?? [];
+  assert.ok(redirects.every(({ source, destination }) => source !== "/communities" && !destination.startsWith("/forums")), "no redirect may point at the retired Forums route");
 });

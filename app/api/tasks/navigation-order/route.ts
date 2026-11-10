@@ -1,4 +1,4 @@
-import { requireNavigationAdmin } from "./auth";
+import { requireSiteAdmin } from "../../../lib/admin-auth";
 import { InvalidNavigationOrder, loadNavigationOrder, navigationPrivateHeaders, saveNavigationOrder } from "./storage";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ async function requestBody(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireNavigationAdmin(request);
+    const auth = await requireSiteAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: navigationPrivateHeaders });
     return Response.json({ order: await loadNavigationOrder(auth.user.id) }, { headers: navigationPrivateHeaders });
   } catch {
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const auth = await requireNavigationAdmin(request);
+    const auth = await requireSiteAdmin(request);
     if (!auth) return Response.json({ error: "Unauthorized." }, { status: 401, headers: navigationPrivateHeaders });
     const body = await requestBody(request);
     const order = body && typeof body === "object" && !Array.isArray(body) ? (body as { order?: unknown }).order : undefined;

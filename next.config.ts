@@ -32,7 +32,6 @@ const nextConfig: NextConfig = {
       { source: "/", has: [{ type: "query", key: "v" }], headers: [{ key: "Clear-Site-Data", value: "\"cache\"" }] },
     ];
   },
-  async redirects() { return [{ source: "/communities", destination: "/forums", permanent: true }]; },
 };
 
 export default nextConfig;

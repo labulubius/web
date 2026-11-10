@@ -49,7 +49,7 @@ More details: [TASKS.md](TASKS.md), [DRIVE.md](DRIVE.md), [SHARE.md](SHARE.md), 
 
 - `app/`: pages, API routes, shared UI and server helpers. The task UI is under `app/tasks/` and its API under `app/api/tasks/`.
 - `app/nav/`: navigator UI and TypeScript types; actual entries are stored in Supabase.
-- `app/lib/`: authorization and server-side task storage helpers.
+- `app/lib/`: the shared administrator check (`admin-auth.ts`), public-network URL validation and server-side task storage helpers.
 - `proxy.ts`: canonical-host redirects.
 - `supabase/migrations/`: database and storage policy migrations.
 

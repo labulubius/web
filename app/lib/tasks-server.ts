@@ -1,15 +1,17 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { reorderTaskProjects, reorderTasks } from "../tasks/project-order";
 import { TASK_ARCHIVE_PROJECT_ID, TASK_ARCHIVE_PROJECT_NAME, type PersonalTask, type TaskData, type TaskProject } from "../tasks/task-types";
 
 const DATA_FILE = "tasks.json";
+const LOCK_FILE = ".tasks.lock";
+const LOCK_STALE_MS = 30_000;
+const LOCK_TIMEOUT_MS = 10_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const locks = new Map<string, Promise<void>>();
@@ -160,13 +162,46 @@ export async function tasksRoot() {
   return root;
 }
 
+export class TaskStorageBusy extends Error {}
+
+// Advisory lock file so a second server process (or a maintenance script) cannot
+// interleave a read-modify-write with this one. A lock older than LOCK_STALE_MS is
+// treated as left behind by a crashed process; every operation takes milliseconds.
+async function acquireFileLock(root: string) {
+  const lockPath = path.join(root, LOCK_FILE);
+  const owner = `${process.pid}:${randomUUID()}`;
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const handle = await open(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+      try { await handle.writeFile(owner); }
+      catch (error) { await handle.close().catch(() => {}); await unlink(lockPath).catch(() => {}); throw error; }
+      await handle.close();
+      return async () => {
+        const current = await readFile(lockPath, "utf8").catch(() => null);
+        if (current === owner) await unlink(lockPath).catch(() => {});
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+    const stat = await lstat(lockPath).catch(() => null);
+    if (stat && Date.now() - stat.mtimeMs > LOCK_STALE_MS) { await unlink(lockPath).catch(() => {}); continue; }
+    if (Date.now() >= deadline) throw new TaskStorageBusy("Task storage is busy. Please try again.");
+    await new Promise((resolve) => setTimeout(resolve, Math.min(10 * 2 ** attempt, 200)));
+  }
+}
+
 async function locked<T>(root: string, task: () => Promise<T>): Promise<T> {
   const previous = locks.get(root) ?? Promise.resolve();
   let release!: () => void;
   const next = new Promise<void>((resolve) => { release = resolve; });
   locks.set(root, next);
   await previous;
-  try { return await task(); }
+  try {
+    const releaseFile = await acquireFileLock(root);
+    try { return await task(); }
+    finally { await releaseFile(); }
+  }
   finally { release(); if (locks.get(root) === next) locks.delete(root); }
 }
 
@@ -380,19 +415,6 @@ export async function deleteProject(id: string) {
   });
 }
 
-export async function requireTasksAdmin(request: Request) {
-  const match = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i);
-  if (!match) return false;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) throw new Error("Supabase is not configured.");
-  const client = createClient(url, key, { auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false }, global: { headers: { Authorization: `Bearer ${match[1]}` } } });
-  const { data: user, error: userError } = await client.auth.getUser(match[1]);
-  if (userError || !user.user) return false;
-  const { data, error } = await client.rpc("site_is_admin");
-  return !error && data === true;
-}
-
 export async function taskRequestBody(request: Request) {
   if (Number(request.headers.get("content-length") || 0) > 16_384) throw new Error("Invalid request size.");
   const body = await request.text();
@@ -407,6 +429,7 @@ export function tasksError(error: unknown) {
   const missing = message === "Task not found." || message === "Project not found." || code === "ENOENT";
   const conflict = message === "Project name already exists.";
   const known = message.startsWith("Invalid") || message.startsWith("TASKS_DATA_DIR");
+  if (error instanceof TaskStorageBusy) return Response.json({ error: message }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "1", "X-Content-Type-Options": "nosniff" } });
   if (!missing && !conflict && !known) console.error("Task operation failed:", { code, name: error instanceof Error ? error.name : "UnknownError", message });
   return Response.json({ error: missing ? message : conflict ? message : known ? message : "Task operation failed." }, { status: missing ? 404 : conflict ? 409 : known ? 400 : 500, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }

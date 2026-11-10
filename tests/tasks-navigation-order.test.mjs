@@ -114,7 +114,7 @@ test("navigation API uses verified account identity, bounded bodies, and private
   class InvalidNavigationOrder extends Error {}
   let authenticated = { user: { id: userA } };
   const route = compile("app/api/tasks/navigation-order/route.ts", {
-    "./auth": { requireNavigationAdmin: async () => authenticated },
+    "../../../lib/admin-auth": { requireSiteAdmin: async () => authenticated },
     "./storage": {
       InvalidNavigationOrder,
       navigationPrivateHeaders: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
@@ -139,12 +139,9 @@ test("navigation API uses verified account identity, bounded bodies, and private
   assert.equal((await route.GET(new Request("https://example.test/api/tasks/navigation-order"))).status, 401);
 });
 
-test("navigation route owns Supabase verification and secure filesystem persistence", async () => {
-  const auth = await readFile("app/api/tasks/navigation-order/auth.ts", "utf8");
+test("navigation route uses verified identity and secure filesystem persistence", async () => {
   const route = await readFile("app/api/tasks/navigation-order/route.ts", "utf8");
   const storage = await readFile("app/api/tasks/navigation-order/storage.ts", "utf8");
-  assert.match(auth, /auth\.getUser\(token\)/);
-  assert.match(auth, /rpc\("site_is_admin"\)/);
   assert.match(route, /auth\.user\.id/);
   assert.match(route, /export async function GET/);
   assert.match(route, /export async function PUT/);

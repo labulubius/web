@@ -51,7 +51,9 @@ Run the isolated Nginx integration tests in `tests/webdav.test.mjs` before deplo
 
 ## Security headers
 
-Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, and the dedicated Drive origin. It retains inline script/style compatibility required by the current Next.js bootstrap, theme initializer, and drag-and-drop UI. Recheck CSP before adding a new browser-side origin. Verify effective headers on the main hostname and DNS `NXDOMAIN` for the retired Drive hostname after changes to Cloudflare Tunnel or a reverse proxy.
+Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, `https://pi-web.labulubius.com` for the Pi Web session exchange and frame, and `https://cloudcli.labulubius.com` as a frame. Recheck CSP before adding a new browser-side origin.
+
+`script-src` and `style-src` deliberately keep `'unsafe-inline'`. The Next.js bootstrap, the theme initializer and the drag-and-drop UI need inline code, and the nonce-based alternative requires a fresh nonce per response. That would make `/`, `/about` and `/nav` dynamically rendered and remove the Cloudflare edge caching of their static document shells described above. The accepted risk is that CSP does not block injected inline script. It is limited by the absence of user-generated HTML: all workspace data is administrator-written and rendered as React text, and `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` and `frame-ancestors 'none'` remain enforced. Revisit this if the site ever renders HTML from another person or a third-party feed. Verify effective headers on the main hostname and DNS `NXDOMAIN` for the retired Drive hostname after changes to Cloudflare Tunnel or a reverse proxy.
 
 ## Backups and restore drills
 

@@ -23,19 +23,19 @@ ${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}/tasks.json
 ${TASKS_DATA_DIR:-~/.local/share/labulubius/tasks}/preferences/<account-uuid>.navigation.json
 ```
 
-`TASKS_DATA_DIR`, when set, must be an absolute real directory outside the repository. The service creates task and preference directories with owner-only permissions. Writes are serialized within the web process and committed through an exclusive temporary file, `fsync`, and atomic rename. Reads and writes reject symbolic links. Task IDs and project IDs are opaque UUIDs. Project order is the validated order of the `projects` array and is saved atomically with task data.
+`TASKS_DATA_DIR`, when set, must be an absolute real directory outside the repository. The service creates task and preference directories with owner-only permissions. Writes are serialized within the web process and across processes by an advisory `.tasks.lock` file created with `O_EXCL`, then committed through an exclusive temporary file, `fsync`, and atomic rename. A lock file older than 30 seconds is treated as left behind by a crashed process and removed; a request that cannot obtain the lock within 10 seconds receives `503` with `Retry-After`. A second web instance or a maintenance script that writes `tasks.json` must go through the same server module rather than editing the file directly. Reads and writes reject symbolic links. Task IDs and project IDs are opaque UUIDs. Project order is the validated order of the `projects` array and is saved atomically with task data.
 
 Version 6 stores task descriptions, Important state and its independent order, independently optional `startDate` and `endDate` values as local `YYYY-MM-DD` dates (`endDate` is the due date), and ordinary ordered projects including Archive. Versions 1–5 migrate atomically on first authenticated read. Historical completed tasks are discarded and old notes are removed. Existing task navigation preference files are retained for compatibility but the current homepage does not read or write them.
 
 ## API and security
 
-The management API is under `/api/tasks` and `/api/tasks/projects`; the projects collection PATCH endpoint saves a complete validated project order. The legacy `/api/tasks/navigation-order` endpoint remains available for existing clients but is unused by the homepage. Every read and mutation requires a server-verified Supabase bearer token and a successful `site_is_admin` check. Responses use private, no-store caching headers. Browser UI state and client-supplied identity are not treated as authorization.
+The management API is under `/api/tasks` and `/api/tasks/projects`; the projects collection PATCH endpoint saves a complete validated project order. The legacy `/api/tasks/navigation-order` endpoint remains available for existing clients but is unused by the homepage. Every read and mutation requires a server-verified Supabase bearer token and a successful `site_is_admin` check, both performed by the shared `requireSiteAdmin` helper in `app/lib/admin-auth.ts` that every management API (tasks, task navigation order and navigator icons) uses. Responses use private, no-store caching headers. Browser UI state and client-supplied identity are not treated as authorization.
 
 The API validates request size, UUIDs, field lengths, real calendar dates, a due date no earlier than the start date when both are set and project references. Completion uses the authenticated task DELETE endpoint and leaves no completed record.
 
 ## Backup and restore
 
-Back up the entire Tasks directory, including `preferences/`, with other persistent datasets. An empty directory is valid before the first task or preference is created. The existing backup verifier still recognizes task-data versions 1 through 5; its pre-existing version-6 validation gap is unchanged:
+Back up the entire Tasks directory, including `preferences/`, with other persistent datasets. An empty directory is valid before the first task or preference is created. The backup verifier recognizes task-data versions 1 through 6 (6 is the version the server writes):
 
 ```bash
 node scripts/verify-backup.mjs \

@@ -22,7 +22,7 @@ test("CloudCLI navigation is a main-site route, not a backend-hostname link or r
   const page = await read("app/cloudcli/page.tsx");
   assert.doesNotMatch(page, /redirect\(|<iframe|<CloudCLIFrame/);
   assert.match(page, /index: false, follow: false/);
-  assert.ok((await nextConfig.redirects()).every(({ source }) => source !== "/cloudcli"));
+  assert.ok((await nextConfig.redirects?.() ?? []).every(({ source }) => source !== "/cloudcli"));
 });
 
 test("CloudCLI iframe is persistent and independent of Pi Web and main-site auth", async () => {

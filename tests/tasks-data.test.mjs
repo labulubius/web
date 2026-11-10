@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile, rm, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -218,4 +218,27 @@ test("invalid task orders and Important fields do not overwrite data", async (t)
   await assert.rejects(api.updateTask(id, { isImportant: "yes" }), /Invalid task/);
   await assert.rejects(api.updateTask(id, { importantSortOrder: 9 }), /Invalid task/);
   assert.deepEqual(await api.loadTaskData(), data);
+});
+
+test("two server instances sharing one data directory do not lose concurrent writes", async (t) => {
+  const first = await fixture(t);
+  const second = compile("app/lib/tasks-server.ts", { "server-only": {}, "../tasks/project-order": projectOrder, "../tasks/task-types": taskTypes }, {
+    env: { TASKS_DATA_DIR: first.root }, cwd: () => process.cwd(), pid: process.pid,
+  });
+  const titles = Array.from({ length: 24 }, (_, index) => `Task ${index}`);
+  await Promise.all(titles.map((title, index) => (index % 2 ? second : first).createTask({ title })));
+  const stored = await first.loadTaskData();
+  assert.deepEqual(stored.tasks.map((task) => task.title).sort(), [...titles].sort());
+  assert.deepEqual((await readdir(first.root)).filter((name) => name.startsWith(".tasks")), [], "no lock or temporary file is left behind");
+});
+
+test("a stale lock left by a crashed process is recovered", async (t) => {
+  const api = await fixture(t);
+  const lock = path.join(api.root, ".tasks.lock");
+  await writeFile(lock, "999999:crashed");
+  const old = new Date(Date.now() - 60_000);
+  await utimes(lock, old, old);
+  const data = await api.createTask({ title: "After crash" });
+  assert.equal(data.tasks.length, 1);
+  assert.deepEqual((await readdir(api.root)).filter((name) => name.startsWith(".tasks")), []);
 });
