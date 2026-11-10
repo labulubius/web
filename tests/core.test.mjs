@@ -112,6 +112,7 @@ test("global headers include baseline browser protections", async () => {
   assert.match(headers.get("content-security-policy"), /connect-src[^;]*https:\/\/pi-web\.labulubius\.com/);
   assert.doesNotMatch(headers.get("content-security-policy"), /pi\.labulubius\.com/);
   assert.doesNotMatch(headers.get("content-security-policy"), /share\.labulubius\.com/);
+  assert.doesNotMatch(headers.get("content-security-policy"), /drive\.labulubius\.com/);
   assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.equal(headers.get("x-frame-options"), "DENY");
   assert.ok(headers.has("referrer-policy"));
