@@ -4,7 +4,10 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { LogIn, LogOut, User as UserIcon, X } from "lucide-react";
 import { createContext, FormEvent, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibleDialog } from "./accessible-dialog";
+import { clearActivity, isIdleExpired, markActive, readLastActive } from "./lib/session-idle";
 import { getSupabaseBrowserClient } from "./lib/supabase";
+
+const ACTIVITY_INTERVAL_MS = 10 * 60 * 1000;
 
 type SiteAuthValue = {
   supabase: SupabaseClient;
@@ -24,15 +27,32 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const generation = useRef(0);
+  const signedIn = useRef(false);
+
+  // Revoke the session after seven idle days. A failed global sign-out (for example
+  // while offline) still clears the local session so the limit holds on this device.
+  const expireIdleSession = useCallback(async () => {
+    clearActivity(); signedIn.current = false;
+    const { error } = await supabase.auth.signOut().catch((failure: unknown) => ({ error: failure }));
+    if (error) await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  }, [supabase]);
 
   const syncUser = useCallback(async (nextUser: User | null, request = ++generation.current) => {
     if (request !== generation.current) return;
     setLoading(true); setAuthError("");
     if (!nextUser) {
+      signedIn.current = false; clearActivity();
       if (request !== generation.current) return;
       setUser(null); setIsAdmin(false); setLoading(false);
       return;
     }
+    if (isIdleExpired(readLastActive())) {
+      await expireIdleSession();
+      if (request !== generation.current) return;
+      setUser(null); setIsAdmin(false); setLoading(false);
+      return;
+    }
+    markActive(); signedIn.current = true;
     try {
       const { data, error } = await supabase.rpc("site_is_admin");
       if (request !== generation.current) return;
@@ -42,7 +62,7 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
       if (request !== generation.current) return;
       setUser(nextUser); setIsAdmin(false); setAuthError("Account permissions could not be verified."); setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, expireIdleSession]);
 
   const invalidateAuth = useCallback(() => { generation.current++; }, []);
 
@@ -59,6 +79,22 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
       setUser(null); setIsAdmin(false); setAuthError("Account service is temporarily unavailable."); setLoading(false);
     });
   }, [supabase, syncUser]);
+
+  // A visible page counts as use; a tab left hidden does not keep the session alive.
+  useEffect(() => {
+    const touch = () => {
+      if (document.visibilityState !== "visible" || !signedIn.current) return;
+      if (isIdleExpired(readLastActive())) void expireIdleSession(); else markActive();
+    };
+    document.addEventListener("visibilitychange", touch);
+    window.addEventListener("focus", touch);
+    const timer = window.setInterval(touch, ACTIVITY_INTERVAL_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", touch);
+      window.removeEventListener("focus", touch);
+      window.clearInterval(timer);
+    };
+  }, [expireIdleSession]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(retryAuth, 0);
@@ -92,6 +128,7 @@ export function AccountControl() {
     event.preventDefault(); setSaving(true); setError("");
     const form = new FormData(event.currentTarget);
     try {
+      markActive(); // a fresh sign-in starts a new idle window even if an old marker survived
       const result = await supabase.auth.signInWithPassword({ email: String(form.get("email") ?? "").trim(), password: String(form.get("password") ?? "") });
       if (result.error) setError(result.error.message); else setDialogOpen(false);
     } catch { setError("Sign in is temporarily unavailable."); }

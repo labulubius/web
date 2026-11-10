@@ -20,6 +20,7 @@ const compiled = ts.transpileModule(`${auth}\nexport { SiteAuthContext };`, {
 const loaded = { exports: {} };
 const localRequire = (name) => {
   if (name === "./accessible-dialog") return { AccessibleDialog: () => null };
+  if (name === "./lib/session-idle") return { clearActivity() {}, isIdleExpired: () => false, markActive() {}, readLastActive: () => null };
   if (name === "./lib/supabase") return { getSupabaseBrowserClient: () => { throw new Error("Unexpected network client"); } };
   return require(name);
 };

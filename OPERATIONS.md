@@ -49,6 +49,10 @@ Keep `absolute_redirect off;` on both servers to preserve the public HTTPS conne
 
 Run the isolated Nginx integration tests in `tests/webdav.test.mjs` before deployment. They use a temporary data root and mock authentication, never production attachments, and verify authentication on both listeners, root listing, Unicode filenames, upload/download, absolute-HTTPS file and folder MOVE/COPY, and equal rename/delete/recreate behavior for `Documents` and `zotero`. GitHub CI installs Nginx and its DAV extension so these tests are exercised there too. See `deploy/webdav/README.md` for client addresses, deployment and rollback details.
 
+## Sign-in lifetime
+
+Every login on the site follows one rule: it stays valid while used and ends after seven days without use. The main site enforces this in the browser (`app/lib/session-idle.ts`) because the Supabase project has no session timebox or inactivity timeout (`sessions_timebox = 0`, `sessions_inactivity_timeout = 0`; access tokens last 1 hour). Visible-page activity refreshes the marker; after the limit the client revokes the session with a normal sign-out. Pi Web re-derives its session from the main site; CloudCLI re-issues its 7-day JWT after half its life. `net.labulubius.com` keeps its Cloudflare Access application at a fixed 720 h session (Access cannot slide), and the router console behind it uses a locally patched sliding 7-day LuCI cookie (see `/etc/luci-sliding-session/README` on the router; re-apply after a luci-base upgrade). WebDAV uses per-request Basic authentication and has no session.
+
 ## Security headers
 
 Next.js applies CSP, clickjacking, MIME-sniffing, referrer, permissions, and production HSTS headers to all routes. The CSP permits the same origin, Supabase HTTPS/WebSocket connections, `https://pi-web.labulubius.com` for the Pi Web session exchange and frame, and `https://cloudcli.labulubius.com` as a frame. Recheck CSP before adding a new browser-side origin.
