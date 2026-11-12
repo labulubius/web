@@ -4,7 +4,8 @@ import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, type Modifier,
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CheckCircle2, Circle, Folder, Home, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
-import { FormEvent, ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { OwnerGate } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
 import { shortDate } from "./task-calendar";
 import { ProjectDialog, TaskDialog, type TaskDialogValue } from "./task-dialogs";
@@ -30,17 +31,6 @@ function restrictTaskListDrag(list: HTMLUListElement | null, { active, draggingN
       bounds.bottom - draggingNodeRect.bottom,
     ),
   };
-}
-
-function HomeAccess({ description, status, action }: { description: string; status?: string; action?: ReactNode }) {
-  return <section className="owner-access">
-    <span className="owner-access-icon" aria-hidden="true"><Home size={28} /></span>
-    <p className="section-label">LABULUBIUS WORKSPACE</p>
-    <h1>Home</h1>
-    <p>{description}</p>
-    {status && <p className="owner-access-status" role="alert">{status}</p>}
-    {action && <div className="owner-access-actions">{action}</div>}
-  </section>;
 }
 
 function taskDateLabel(task: PersonalTask) {
@@ -137,7 +127,11 @@ function readLocation(projects: TaskProject[]): StoredLocation | null {
 }
 
 export function TaskManager() {
-  const { supabase, user, isAdmin, loading, authError, retryAuth } = useSiteAuth();
+  return <OwnerGate icon={<Home size={28} />} title="Home" label="LABULUBIUS WORKSPACE"><TaskWorkspace /></OwnerGate>;
+}
+
+function TaskWorkspace() {
+  const { supabase, user, isAdmin } = useSiteAuth();
   const accountId = user?.id ?? null;
   const [data, setData] = useState<TaskData | null>(null);
   const [dataAccountId, setDataAccountId] = useState<string | null>(null);
@@ -366,10 +360,6 @@ export function TaskManager() {
   const title = view === "important" ? "Important" : selectedProject?.name ?? "Project";
   const description = view === "important" ? "Starred tasks from every project." : "Scheduled and unscheduled tasks in this project.";
 
-  const readyForAccount = Boolean(data && accountId && dataAccountId === accountId && isAdmin);
-  if (loading && !readyForAccount) return <HomeAccess description="Opening home…" />;
-  if (authError) return <HomeAccess description="Home is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
-  if (!isAdmin) return <HomeAccess description="Sign in to continue." />;
   if (loadingData && (!data || dataAccountId !== accountId)) return <section className="task-loading" role="status"><RefreshCw size={20} /> Loading tasks…</section>;
   if (!data || dataAccountId !== accountId) return <section className="task-loading"><p role="alert">{error || "Could not load tasks."}</p><button type="button" onClick={() => void load()}>Retry</button></section>;
 

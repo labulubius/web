@@ -45,7 +45,7 @@ test("personal tasks keep private atomic storage and owner-only APIs", async () 
   assert.match(api, /requireSiteAdmin/);
   assert.match(api, /taskPrivateHeaders/);
   assert.match(server, /Cache-Control/);
-  assert.match(manager, /<HomeAccess/);
+  assert.match(manager, /<OwnerGate icon=\{<Home size=\{28\} \/>\} title="Home" label="LABULUBIUS WORKSPACE">/);
   assert.match(manager, /Session expired/);
   assert.match(manager, /method: "DELETE"/);
   assert.match(server, /data\.tasks\.splice\(index, 1\)/);
@@ -172,8 +172,7 @@ test("Navigator is owner-only and has no obsolete guest visibility controls", as
   const privateMigration = await readFile(new URL("../supabase/migrations/202610220001_private_navigator.sql", import.meta.url), "utf8");
   const cleanupMigration = await readFile(new URL("../supabase/migrations/202610300001_remove_navigator_visibility.sql", import.meta.url), "utf8");
 
-  assert.match(directory, /if \(authLoading \|\| !isAdmin\) return;/);
-  assert.match(directory, /<OwnerAccess icon=\{<Compass size=\{32\} \/>\} title="Nav"/);
+  assert.match(directory, /<OwnerGate icon=\{<Compass size=\{32\} \/>\} title="Nav"><NavWorkspace \/><\/OwnerGate>/);
   assert.doesNotMatch(directory, /Visible to guests|supportsCategoryVisibility|is_published/);
   assert.doesNotMatch(types, /is_published/);
   assert.match(layout, /robots: \{ index: false, follow: false \}/);

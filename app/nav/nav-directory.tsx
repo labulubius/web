@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { Compass, Plus, Star } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { OwnerAccess } from "../owner-access";
+import { OwnerGate } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
 import { type Dialog, NavDialog } from "./nav-dialogs";
 import { SiteCard, SortableCategoryRow } from "./nav-items";
@@ -41,7 +41,11 @@ const restrictToViewport: Modifier = ({ draggingNodeRect, transform, windowRect 
 };
 
 export function NavDirectory() {
-  const { supabase, isAdmin, loading: authLoading, authError, retryAuth } = useSiteAuth();
+  return <OwnerGate icon={<Compass size={32} />} title="Nav"><NavWorkspace /></OwnerGate>;
+}
+
+function NavWorkspace() {
+  const { supabase, isAdmin } = useSiteAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [categoryId, setCategoryId] = useState("favorites");
@@ -94,10 +98,9 @@ export function NavDirectory() {
   }, [supabase]);
 
   useEffect(() => {
-    if (authLoading || !isAdmin) return;
     const initialLoad = window.setTimeout(() => void loadDirectory(), 0);
     return () => window.clearTimeout(initialLoad);
-  }, [authLoading, isAdmin, loadDirectory]);
+  }, [loadDirectory]);
 
   useEffect(() => {
     if (!hasLoadedCategories.current) return;
@@ -292,10 +295,6 @@ export function NavDirectory() {
     setMessage("");
     setDialog("site");
   }
-
-  if (authLoading) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Checking your account…" />;
-  if (authError) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Nav is temporarily unavailable." status={authError} action={<button className="account-control" type="button" onClick={retryAuth}>Retry</button>} />;
-  if (!isAdmin) return <OwnerAccess icon={<Compass size={32} />} title="Nav" description="Sign in to continue." />;
 
   return (
     <div className="directory-view">

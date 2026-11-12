@@ -28,6 +28,10 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState("");
   const generation = useRef(0);
   const signedIn = useRef(false);
+  // The user whose permissions were last verified. Supabase re-announces the same session
+  // (SIGNED_IN, TOKEN_REFRESHED) whenever the tab becomes visible again; rechecking that user
+  // quietly keeps pages mounted so open forms such as Nav's website editor keep their input.
+  const verifiedUserId = useRef<string | null>(null);
 
   // Revoke the session after seven idle days. A failed global sign-out (for example
   // while offline) still clears the local session so the limit holds on this device.
@@ -39,28 +43,36 @@ export function SiteAuthProvider({ children }: { children: ReactNode }) {
 
   const syncUser = useCallback(async (nextUser: User | null, request = ++generation.current) => {
     if (request !== generation.current) return;
-    setLoading(true); setAuthError("");
+    const recheck = nextUser !== null && nextUser.id === verifiedUserId.current;
+    if (!recheck) { setLoading(true); setAuthError(""); }
     if (!nextUser) {
-      signedIn.current = false; clearActivity();
+      signedIn.current = false; clearActivity(); verifiedUserId.current = null;
       if (request !== generation.current) return;
       setUser(null); setIsAdmin(false); setLoading(false);
       return;
     }
     if (isIdleExpired(readLastActive())) {
+      verifiedUserId.current = null;
       await expireIdleSession();
       if (request !== generation.current) return;
       setUser(null); setIsAdmin(false); setLoading(false);
       return;
     }
     markActive(); signedIn.current = true;
+    // Keep the same user object on a recheck so effects keyed on `user` do not rerun.
+    const keepUser = (current: User | null) => current?.id === nextUser.id ? current : nextUser;
     try {
       const { data, error } = await supabase.rpc("site_is_admin");
       if (request !== generation.current) return;
       if (error) throw error;
-      setUser(nextUser); setIsAdmin(data === true); setLoading(false);
+      verifiedUserId.current = nextUser.id;
+      setUser(keepUser); setIsAdmin(data === true); setLoading(false);
     } catch {
       if (request !== generation.current) return;
-      setUser(nextUser); setIsAdmin(false); setAuthError("Account permissions could not be verified."); setLoading(false);
+      // A failed background recheck keeps the verified state; the server still checks every write.
+      if (recheck) { setLoading(false); return; }
+      verifiedUserId.current = null;
+      setUser(keepUser); setIsAdmin(false); setAuthError("Account permissions could not be verified."); setLoading(false);
     }
   }, [supabase, expireIdleSession]);
 

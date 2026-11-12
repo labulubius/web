@@ -5,7 +5,7 @@ import ts from "typescript";
 
 const source = readFileSync("app/tasks/task-manager.tsx", "utf8");
 const parsed = ts.createSourceFile("tasks.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskManager");
+const component = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskWorkspace");
 const deletion = component.body.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "deleteTask");
 const list = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "TaskList");
 const row = parsed.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "SortableTaskRow");
@@ -138,7 +138,7 @@ test("task dialog reports unsubmitted field changes without normalizing dates", 
   ]);
 });
 
-test("task dialog drafts stay in TaskManager state across transient auth loading", () => {
+test("task dialog drafts stay in TaskWorkspace state while the dialog remounts", () => {
   assert.doesNotMatch(source, /TASK_DIALOG_DRAFT_KEY_PREFIX|sessionStorage|site-task-dialog-draft/);
   assert.match(source, /setTaskDialog\(\(current\) => \{/);
   assert.match(source, /return \{ \.\.\.current, draft \}/);
@@ -287,9 +287,9 @@ test("home offers only Important and project task views", () => {
 test("same-account auth rechecks keep the loaded task workspace mounted", () => {
   assert.match(source, /const \[dataAccountId, setDataAccountId\] = useState<string \| null>\(null\)/);
   assert.match(source, /setDataAccountId\(requestedAccountId\)/);
-  assert.match(source, /const readyForAccount = Boolean\(data && accountId && dataAccountId === accountId && isAdmin\)/);
-  assert.match(source, /if \(loading && !readyForAccount\) return <HomeAccess/);
-  assert.doesNotMatch(source, /if \(loading\) return <HomeAccess/);
+  // The shared OwnerGate keeps the workspace mounted through same-account rechecks.
+  assert.match(source, /<OwnerGate icon=\{<Home size=\{28\} \/>\} title="Home" label="LABULUBIUS WORKSPACE"><TaskWorkspace \/><\/OwnerGate>/);
+  assert.doesNotMatch(source, /HomeAccess|readyForAccount|authError|retryAuth/);
   assert.match(source, /if \(!data \|\| dataAccountId !== accountId\) return <section/);
   assert.match(source, /setDataAccountId\(null\)/);
   assert.match(source, /setTaskDialog\(null\)/);
