@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Compass, Plus, Search, Star, X } from "lucide-react";
+import { Compass, Plus, Star } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OwnerAccess } from "../owner-access";
 import { useSiteAuth } from "../site-auth";
@@ -44,7 +44,6 @@ export function NavDirectory() {
   const { supabase, isAdmin, loading: authLoading, authError, retryAuth } = useSiteAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
-  const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("favorites");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
@@ -109,9 +108,9 @@ export function NavDirectory() {
     }
   }, [categoryId, categories]);
 
-  const filteredSites = useMemo(() => visibleSites(sites, categories, categoryId, query), [categories, categoryId, query, sites]);
+  const filteredSites = useMemo(() => visibleSites(sites, categories, categoryId, ""), [categories, categoryId, sites]);
 
-  const canReorderSites = isAdmin && query.trim() === "";
+  const canReorderSites = isAdmin;
   const supportsFavoriteOrder = sites.some((site) => site.favorite_sort_order !== undefined);
 
   function closeDialog() {
@@ -333,11 +332,6 @@ export function NavDirectory() {
         <header className="directory-header">
           <div><h1>{categoryId === "favorites" ? "Favorites" : categories.find((item) => item.id === categoryId)?.name}</h1><p>{filteredSites.length} items</p></div>
           <div className="directory-tools">
-            <label className="breeze-search">
-              <Search size={16} aria-hidden="true" />
-              <input aria-label="Search websites" onChange={(event) => setQuery(event.target.value)} placeholder="Search…" type="search" value={query} />
-              {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}
-            </label>
             <button className="directory-action primary" type="button" onClick={openNewSite} disabled={!isAdmin || categories.length === 0} title={categories.length === 0 ? "Create a group first" : "Add website"}><Plus size={15} /> Website</button>
           </div>
         </header>
@@ -388,7 +382,7 @@ export function NavDirectory() {
           <div className="empty-state">
             <Compass size={48} strokeWidth={1.2} />
             <h2>{sites.length === 0 ? "No websites yet" : "No items found"}</h2>
-            <p>{isAdmin && sites.length === 0 ? "Create a group, then add your first website." : "Try a different search term or category."}</p>
+            <p>{isAdmin && sites.length === 0 ? "Create a group, then add your first website." : "Choose another category."}</p>
             {isAdmin && categories.length > 0 && sites.length === 0 && <button type="button" onClick={openNewSite}>Add website</button>}
           </div>
         )}

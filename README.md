@@ -9,7 +9,7 @@ All interface work must follow the scoped visual, interaction, accessibility and
 | Route | Purpose | Data / access |
 | --- | --- | --- |
 | `/` | Important and project task lists | Administrator only; signed-out visitors see a generic Home screen |
-| `/nav` | Website directory, search, favorites and categories | Administrator only; signed-out visitors see a generic Navigator screen |
+| `/nav` | Website directory, favorites and categories | Administrator only; signed-out visitors see a generic Navigator screen |
 | `/about` | Project overview | Public |
 | `/pi-web` | Embedded Pi Web interface, keeping the main-site address | Administrator session exchange; backend retains Pi Web authentication |
 | `/cloudcli` | Embedded CloudCLI interface, keeping the main-site address | CloudCLI's own account and login; no extra main-site authentication gate |

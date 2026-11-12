@@ -23,7 +23,8 @@ Reference pages are read-only examples unless the task explicitly includes them.
 | Need | Primary reference | Reuse or align with |
 | --- | --- | --- |
 | Global navigation, theme, window frame and status bar | `SiteShell` | Toolbar navigation, active state, sidebar controls, theme control, application viewport and status bar |
-| Categories, search, cards, favorites, drag sorting and edit dialogs | `/nav` | Sidebar category rows, search field, card density, action placement and `AccessibleDialog` forms |
+| Categories, cards, favorites, drag sorting and edit dialogs | `/nav` | Sidebar category rows, card density, action placement and `AccessibleDialog` forms |
+| Search fields and result lists | `GlobalSearch` (toolbar, Ctrl/Cmd+K) | Combobox semantics, keyboard selection, owner-only data loading |
 | Task lists, dense rows, destructive confirmation and progress states | `/` | Page header, action buttons, tabular rows, empty state, progress, error and destructive confirmation |
 | Accessible modal behavior | `AccessibleDialog` | Focus entry and restoration, focus trapping, Escape/backdrop handling, busy state and labelled dialogs |
 | Signed-out owner-only page | `OwnerAccess` | Consistent explanation and sign-in guidance |
