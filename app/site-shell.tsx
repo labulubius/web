@@ -3,6 +3,7 @@
 import { Compass, Home, Info, MessageSquareCode, Monitor, Moon, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Sun } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { GlobalSearch } from "./global-search/global-search";
 import { AccountControl } from "./site-auth";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -132,6 +133,7 @@ export function SiteShell({
             ))}
           </nav>
           <div className="toolbar-spacer" />
+          <GlobalSearch pages={navigation} />
           <div className="toolbar-account-slot"><AccountControl /></div>
           <button className="theme-control" onClick={cycleThemeMode} type="button" title={`Theme: ${displayedThemeMode}`} aria-label={`Color theme: ${displayedThemeMode}. Click to change.`}>
             <ThemeIcon size={18} /><span>{displayedThemeMode === "system" ? "System theme" : `${displayedThemeMode} theme`}</span>

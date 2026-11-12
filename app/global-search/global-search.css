@@ -1,0 +1,46 @@
+/* Toolbar search: trigger button and the search dialog. Uses the shared Breeze tokens only. */
+.search-control { align-items: center; background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; display: flex; font-size: 11px; gap: 6px; height: 32px; margin-right: 6px; padding: 0 9px; white-space: nowrap; }
+.search-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
+.search-control:active { background: color-mix(in srgb, var(--accent) 33%, var(--button)); }
+
+.dialog-backdrop:has(> .global-search-dialog) { align-items: flex-start; padding-top: min(14vh, 120px); }
+.breeze-dialog.global-search-dialog { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 36px)); overflow: hidden; width: min(560px, 100%); }
+.global-search-sr { clip: rect(0, 0, 0, 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
+
+.global-search-field { align-items: center; background: var(--view); border-bottom: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; gap: 8px; height: 46px; padding: 0 12px; }
+.global-search-field:focus-within { box-shadow: inset 0 -2px 0 var(--accent); }
+.global-search-field input { background: transparent; border: 0; color: var(--text); flex: 1; font-size: 14px; height: 100%; min-width: 0; outline: 0; }
+.global-search-field input::-webkit-search-cancel-button { display: none; }
+.global-search-field button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; height: 24px; justify-content: center; padding: 0; width: 24px; }
+.global-search-field button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); }
+
+.global-search-results { background: var(--view); flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px; }
+.global-search-results:empty { display: none; }
+.global-search-group { color: var(--text-muted); font-size: 10px; letter-spacing: .08em; padding: 9px 8px 4px; text-transform: uppercase; }
+.global-search-option { align-items: center; border: 1px solid transparent; border-radius: 4px; color: var(--text); cursor: pointer; display: grid; gap: 10px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 6px 8px; }
+.global-search-option[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 20%, var(--view)); border-color: var(--accent); }
+.global-search-icon { align-items: center; background: var(--window); border: 1px solid var(--separator); border-radius: 5px; color: var(--link); display: flex; height: 30px; justify-content: center; overflow: hidden; position: relative; width: 30px; }
+.global-search-icon img { background: var(--window); height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; }
+.global-search-copy { display: flex; flex-direction: column; min-width: 0; }
+.global-search-copy strong { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.global-search-copy small { color: var(--text-muted); font-size: 11px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.global-search-external { color: var(--text-muted); }
+
+.global-search-message { background: var(--view); color: var(--text-muted); font-size: 12px; margin: 0; padding: 14px 14px 16px; text-align: center; }
+.global-search-error { color: var(--negative); }
+.global-search-message button { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; font-size: 11px; margin-left: 6px; padding: 3px 9px; }
+.global-search-message button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
+
+.global-search-hint { background: var(--window); border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; font-size: 10px; gap: 14px; padding: 7px 12px; }
+.global-search-hint span { align-items: center; display: flex; gap: 4px; }
+.global-search-hint kbd { background: var(--button); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); font-family: var(--font-noto-mono), monospace; font-size: 10px; line-height: 1.4; padding: 0 4px; }
+
+@media (max-width: 760px) {
+  .search-control { flex: none; height: 34px; justify-content: center; margin-right: 4px; padding: 0; width: 34px; }
+  .search-control span { display: none; }
+  .dialog-backdrop:has(> .global-search-dialog) { padding-top: 12px; }
+}
+
+@media (hover: none) {
+  .global-search-hint { display: none; }
+}

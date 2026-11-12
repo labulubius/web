@@ -22,6 +22,7 @@ function load(name) {
     if (id === "react") return { ...require(id), useSyncExternalStore: () => true };
     if (id === "next/link") return function TestLink({ children, ...props }) { return createElement("a", props, children); };
     if (id === "./site-auth") return { AccountControl: () => null };
+    if (id === "./global-search/global-search") return { GlobalSearch: () => null };
     return require(id);
   };
   new Function("require", "module", "exports", compiled.outputText)(localRequire, loaded, loaded.exports);
