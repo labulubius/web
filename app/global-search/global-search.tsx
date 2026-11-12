@@ -228,11 +228,6 @@ export function GlobalSearch({ pages }: { pages: SearchPageLink[] }) {
       </p>}
       {!authLoading && !isAdmin && <p className="global-search-message">Sign in as the site owner to search websites too.</p>}
       <p className="global-search-sr" role="status" aria-live="polite">{announcement}</p>
-      <footer className="global-search-hint" aria-hidden="true">
-        <span><kbd>↑</kbd><kbd>↓</kbd> Move</span>
-        <span><kbd>Enter</kbd> Open</span>
-        <span><kbd>Esc</kbd> Close</span>
-      </footer>
     </AccessibleDialog>}
   </>;
 }

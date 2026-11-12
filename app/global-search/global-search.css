@@ -7,9 +7,12 @@
 .breeze-dialog.global-search-dialog { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 36px)); overflow: hidden; width: min(560px, 100%); }
 .global-search-sr { clip: rect(0, 0, 0, 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
 
-.global-search-field { align-items: center; background: var(--view); border-bottom: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; gap: 8px; height: 46px; padding: 0 12px; }
-.global-search-field:focus-within { box-shadow: inset 0 -2px 0 var(--accent); }
-.global-search-field input { background: transparent; border: 0; color: var(--text); flex: 1; font-size: 14px; height: 100%; min-width: 0; outline: 0; }
+.global-search-field { align-items: center; background: var(--view); border-bottom: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; gap: 10px; height: 48px; padding: 0 14px; }
+/* The search field is the whole header row, so the input itself drops the dialog form styling and focus rings. */
+.breeze-dialog .global-search-field input,
+.breeze-dialog .global-search-field input:focus,
+.breeze-dialog .global-search-field input:focus-visible { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--text); flex: 1; font-size: 14px; height: 100%; min-height: 0; min-width: 0; outline: 0; padding: 0; }
+.global-search-field input::placeholder { color: var(--text-muted); }
 .global-search-field input::-webkit-search-cancel-button { display: none; }
 .global-search-field button { align-items: center; background: transparent; border: 0; border-radius: 3px; color: var(--text-muted); cursor: pointer; display: flex; height: 24px; justify-content: center; padding: 0; width: 24px; }
 .global-search-field button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); }
@@ -31,16 +34,8 @@
 .global-search-message button { background: var(--button); border: 1px solid var(--frame); border-radius: 4px; color: var(--text); cursor: pointer; font-size: 11px; margin-left: 6px; padding: 3px 9px; }
 .global-search-message button:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 
-.global-search-hint { background: var(--window); border-top: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; font-size: 10px; gap: 14px; padding: 7px 12px; }
-.global-search-hint span { align-items: center; display: flex; gap: 4px; }
-.global-search-hint kbd { background: var(--button); border: 1px solid var(--frame); border-radius: 3px; color: var(--text); font-family: var(--font-noto-mono), monospace; font-size: 10px; line-height: 1.4; padding: 0 4px; }
-
 @media (max-width: 760px) {
   .search-control { flex: none; height: 34px; justify-content: center; margin-right: 4px; padding: 0; width: 34px; }
   .search-control span { display: none; }
   .dialog-backdrop:has(> .global-search-dialog) { padding-top: 12px; }
-}
-
-@media (hover: none) {
-  .global-search-hint { display: none; }
 }
