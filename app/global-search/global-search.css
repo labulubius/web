@@ -3,8 +3,10 @@
 .search-control:hover { background: color-mix(in srgb, var(--accent) 16%, var(--button)); border-color: var(--accent); }
 .search-control:active { background: color-mix(in srgb, var(--accent) 33%, var(--button)); }
 
-.dialog-backdrop:has(> .global-search-dialog) { align-items: flex-start; padding-top: min(14vh, 120px); }
-.breeze-dialog.global-search-dialog { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 36px)); overflow: hidden; width: min(560px, 100%); }
+/* KRunner-style: the panel drops from the toolbar's lower edge instead of floating mid-screen. */
+.dialog-backdrop:has(> .global-search-dialog) { --search-top: 56px; align-items: flex-start; background: rgba(0, 0, 0, .18); padding: var(--search-top) 18px 18px; }
+.breeze-dialog.global-search-dialog { animation: global-search-drop .16s ease-out; border-radius: 0 0 6px 6px; border-top: 0; box-shadow: 0 10px 28px rgba(0, 0, 0, .28); display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - var(--search-top) - 18px)); overflow: hidden; width: min(600px, 100%); }
+@keyframes global-search-drop { from { opacity: 0; transform: translateY(-12px); } }
 .global-search-sr { clip: rect(0, 0, 0, 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
 
 .global-search-field { align-items: center; background: var(--view); border-bottom: 1px solid var(--separator); color: var(--text-muted); display: flex; flex: none; gap: 10px; height: 48px; padding: 0 14px; }
@@ -37,5 +39,10 @@
 @media (max-width: 760px) {
   .search-control { flex: none; height: 34px; justify-content: center; margin-right: 4px; padding: 0; width: 34px; }
   .search-control span { display: none; }
-  .dialog-backdrop:has(> .global-search-dialog) { padding-top: 12px; }
+  .dialog-backdrop:has(> .global-search-dialog) { --search-top: 43px; padding: var(--search-top) 0 0; }
+  .breeze-dialog.global-search-dialog { border-left: 0; border-right: 0; max-height: calc(100dvh - var(--search-top) - 12px); width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breeze-dialog.global-search-dialog { animation: none; }
 }
