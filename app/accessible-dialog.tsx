@@ -1,15 +1,16 @@
 "use client";
 
-import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
+import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 
 const focusable = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function AccessibleDialog({ children, labelledBy, onClose, busy = false, className = "" }: {
+export function AccessibleDialog({ children, labelledBy, onClose, busy = false, className = "", style }: {
   children: ReactNode;
   labelledBy: string;
   onClose: () => void;
   busy?: boolean;
   className?: string;
+  style?: CSSProperties;
 }) {
   const dialog = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
@@ -52,7 +53,7 @@ export function AccessibleDialog({ children, labelledBy, onClose, busy = false, 
   }
 
   return <div className="dialog-backdrop" role="presentation" onMouseDown={backdrop}>
-    <section ref={dialog} className={`breeze-dialog${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
+    <section ref={dialog} className={`breeze-dialog${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} style={style}>
       {children}
     </section>
   </div>;

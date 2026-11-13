@@ -2,7 +2,7 @@
 
 import { ExternalLink, Globe2, type LucideIcon, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AccessibleDialog } from "../accessible-dialog";
 import type { Category, Site } from "../nav/sites";
 import { useSiteAuth } from "../site-auth";
@@ -38,14 +38,28 @@ export function GlobalSearch({ pages }: { pages: SearchPageLink[] }) {
   const [siteState, setSiteState] = useState<SiteState>({ status: "idle", sites: [], categories: [], loadedAt: 0 });
   const request = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Where the toolbar button sits, so the panel opens in place over it (GitHub-style).
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const listId = `${baseId}-results`;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
-  const openSearch = useCallback(() => {
-    setQuery(""); setActiveIndex(0); setOpen(true);
+  const measureTrigger = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    setAnchor(rect ? { top: rect.top, right: window.innerWidth - rect.right } : null);
   }, []);
+
+  const openSearch = useCallback(() => {
+    measureTrigger(); setQuery(""); setActiveIndex(0); setOpen(true);
+  }, [measureTrigger]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", measureTrigger);
+    return () => window.removeEventListener("resize", measureTrigger);
+  }, [open, measureTrigger]);
 
   const closeSearch = useCallback(() => {
     setOpen(false);
@@ -178,6 +192,7 @@ export function GlobalSearch({ pages }: { pages: SearchPageLink[] }) {
 
   return <>
     <button
+      ref={triggerRef}
       className="search-control"
       type="button"
       onClick={openSearch}
@@ -188,13 +203,17 @@ export function GlobalSearch({ pages }: { pages: SearchPageLink[] }) {
     >
       <Search size={18} /><span>Search</span>
     </button>
-    {open && <AccessibleDialog labelledBy={titleId} onClose={closeSearch} className="global-search-dialog">
+    {open && <AccessibleDialog
+      labelledBy={titleId}
+      onClose={closeSearch}
+      className="global-search-dialog"
+      style={anchor ? { "--search-top": `${anchor.top}px`, "--search-right": `${anchor.right}px` } as CSSProperties : undefined}
+    >
       <h2 id={titleId} className="global-search-sr">Search</h2>
       <div className="global-search-field">
         <Search size={16} aria-hidden="true" />
         <input
           ref={inputRef}
-          autoFocus
           type="search"
           role="combobox"
           aria-label={isAdmin ? "Search pages and websites" : "Search pages"}
